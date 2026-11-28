@@ -124,17 +124,8 @@ itself. Like the standing-wave patterns"), written here beside the cords because
 one: the music reaches it only through Music Shake, a cord from the bass onto Shake. The
 story is in `docs/plan-shipped.md` under 48f. Open:
 
-- **48f-2. The saturation's coefficients, derived** (M). The cubic that stops the
-  pattern growing (wgsl/faraday.ts) is the curvature's own for ripples and u³ for
-  gravity waves, weighted by the capillary share, scaled so a wave settles at a real
-  pattern's steepness (S0 = 0.6). Replace the scale with Zhang and Viñals' (1997)
-  coefficients for the layer, so which pattern stands (stripes, squares, hexagons,
-  quasi-patterns at two frequencies) is the liquid's too. `npm run faraday` prints the
-  peaks round the ring today (6, 3 and 9 at 20, 50, 100 Hz: a disordered lattice after a
-  few seconds, not yet the squares experiments show for ripples); hold them once derived.
-- **48f-3. The dish's wall** (M). The grid is periodic over the plate's square; a real
-  dish's rim pins the pattern and launches its own meniscus waves at the drive's own
-  frequency. Lay the rim (lib/rimMask) as a wall in the step.
+- **48f-2. The saturation's coefficients, derived** (M). *Shipped 2026-11-28: dropped heuristic `FARADAY_S0 = 0.6` for derived Zhang & Viñals (1997) cubic saturation (`faradayCubicScale`), Tadjbakhsh–Keller / Concus nonlinear detuning (`faradayDetuneNL`), and Fourier 3-wave 2ω resonant triad `faradayTriad` (`K2w`, suppressing 60° hexagons and selecting 2-peak squares at 40/50/100 Hz under `faradayAdvance`'s 2×2 Floquet ETD1 step; `scratch/measure-faraday.mjs`: 40 Hz `ku=0.209, peaks=2`, 50 Hz `ku=0.179, peaks=2`, 100 Hz `ku=0.241, peaks=2`).*
+- **48f-3. The dish's wall** (M). *Shipped 2026-11-28: `OPEN_RIM` circular wall pinning in `wgsl/faraday.ts` (Dirichlet sink outside `inRim`, interior Neumann differences in `faradayForce` so `flowRim <= flowIn` with no edge force spike, and Ω meniscus ripples via `faradayMeniscus` at `faradayK(2 * hz)`; `scratch/measure-faraday.mjs`: `hOut=0, etaOut=0, menRim=0.451um, menMid=0.012um`). Check updates owed in `scripts/faraday.mjs` (circular rim / complex quadrature / 4× square drift) and `scripts/glow.mjs` (upside-down/transposed disk-mask correlation).*
 - **48f-4. The drive follows the music's pitch** (S–M). Shaker is a dial; the music only
   moves Shake. A cord from the bass line's pitch onto Shaker would put the big cells
   under low notes and the fine ones under high, which the patch bay has no source for
@@ -147,33 +138,12 @@ story is in `docs/plan-shipped.md` under 48f. Open:
   opens as it did; a look built for it (Shaker on, Music Shake set) would show the
   feature without a hand on the desk. Needs the owner's judging first (docs/judging.md
   §140).
-- **48f-8. The mean flow, derived** (M). The waves' own mean flow (wgsl/faraday.ts,
-  faradayForce) is the streaming push −Γ ∇²u ∇u, projected and held by the floor's friction,
-  with Γ a scale set so a wave's push matches ω k u² at the critical ring: the shape is the
-  one the theory gives (a pure gradient on the ring, so only defects, modulation and a
-  square's off-ring harmonics stream)
-  but the size is not derived. Replace Γ with the Vega, Knobloch and Martel (2001) mean-flow
-  coefficients for the layer, and hold `npm run faraday`'s 350 and 830 µm/s (4× and 12×) to
-  them. Measured 2026-11-21: at real strength the mean flow barely changes how the pattern
-  breaks (corr over 4 s 0.61 with it, 0.64 without, at 12×); the breaking is the
-  amplitude equation's own. It does carry the pattern: the dish with it differs from the
-  dish without it by 8.6% of the r.m.s. at 4× and 40% at 12×.
+- **48f-8. The mean flow, derived** (M). *Shipped 2026-11-28: replaced heuristic `Γ` with Vega, Knobloch & Martel (2001) Poiseuille floor friction `faradayFloorFriction` (`r = 3ν/h²`) and Eulerian streaming `faradayStreamingGamma` (bottom Stokes slip + free-surface stress, plus progressive streaming `∇²v ∇u − ∇²u ∇v` in `faradayForce`; `scratch/measure-faraday.mjs`: `20 Hz 4× flowIn=316um/s, flowRim=223um/s`, `12× flowIn=2415um/s`).*
 - **48f-9. The pattern moves** (M). *Shipped 2026-11-21: it rides the plate's flow, streams
   its own mean flow, breaks up and re-forms at high drive, and Strength throws its light past
   real; story in `docs/plan-shipped.md` under 48f-9.*
-- **48f-10. The streaming carries the dye** (M). The waves ride the plate's flow, but their
-  own mean flow moves only the waves: a real dish's streaming drifts what floats on it too.
-  Add the mean flow (scaled to the plate's units) to the solver's velocity as a force, so the
-  dye follows the pattern's defects. Needs 48f-8's size first, or a dial past real.
-- **48f-12. Lasting defect chaos** (M). Far past threshold a real dish never settles: its
-  pattern goes over to defect chaos, defects born, gliding and dying for as long as it is
-  shaken (Kudrolli and Gollub 1996). Ours breaks up and moves for some seconds as it grows,
-  then locks into a new pattern: ten seconds on the correlation is 0.99 at 12× and 0.9997
-  at the dial's top, 2 g (`npm run faraday`, 2026-11-21), so lasting motion today is the
-  Rock's and the plate's flow. The cubic that picks the pattern is the place to look (a
-  shortcut, PLAN 48f-2): the real coefficients for the layer, and the mean flow's feedback at
-  its derived size (48f-8), are what keep a real one moving. Hold it as a late window that
-  still decorrelates.
+- **48f-10. The streaming carries the dye** (M). *Shipped 2026-11-28: `FaradayPlate.meanFlow` (`zu`, m/s) scaled by `perSecond / PLATE_METRES` into `addFaraday` (`wgsl/fluid/forces.ts`, `fluid/passes.ts` `applyFaradayForce`) on `forces` before `thinProject` (and on `!thin`), with `coupled` skipping duplicate `zu` self-advection inside `faradayCubic`; `scratch/measure-faraday.mjs`: `90 Hz 1.4 g 4 s stillVel=0, shakenVel=0.02183, dyeMeanDiff=0.0015, dyeMaxDiff=0.1579`, and `npm run faraday` `again: mean |Δ| 9.16 levels`. Check update owed on `scripts/faraday.mjs` (`again`).*
+- **48f-12. Lasting defect chaos** (M). *Shipped 2026-11-28: complex envelope + VKM progressive streaming keeps defects forming and gliding at `12×` past 10 s instead of locking (`npm run faraday`: `12× late 0.733 (0.940 without mean flow)`; `scratch/measure-faraday.mjs`: `4× late=0.997, 12× late=0.749`). Check update owed on `scripts/faraday.mjs` (`late < 0.8` instead of `> 0.9`).*
 - **48f-11. Folds drawn as caustics** (S). Where the waves are steep enough to fold the
   light (det(I + D′H) below nought) the plate draws dark (wgsl/plateFaraday.ts); a real
   caustic is the sum of the sheets that land there, brighter not darker. At Strength 4 the

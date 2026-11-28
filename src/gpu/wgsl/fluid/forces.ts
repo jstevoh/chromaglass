@@ -835,4 +835,35 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let s = mix(f.xy, f.zw, c) * A.a.w;
   textureStore(dst, vec2i(id.xy), vec4f(v.xy + s, v.zw));
 }`,
+
+  /*
+    The Faraday waves' VKM streaming mean flow (zu, m/s on FARADAY_N²) added to
+    the solver's velocity inside the circular dish rim OPEN_RIM, scaled to the
+    solver's velocity units by A.a.w (seconds / (disp * PLATE_METRES)).
+  */
+  addFaraday: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(4) var<storage, read> zu: array<vec2f>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let q = vec2i(id.xy);
+  let v = textureLoad(src, q, 0);
+  let uv = uvOf(id);
+  if (length(uv - 0.5) >= ${OPEN_RIM.toFixed(4)}) {
+    textureStore(dst, q, v);
+    return;
+  }
+  let nf = i32(A.a.x);
+  let p = clamp(uv * A.a.x - 0.5, vec2f(0.0), vec2f(A.a.x - 1.0));
+  let i = vec2i(floor(p));
+  let f = p - floor(p);
+  let hi = min(i + 1, vec2i(nf - 1));
+  let a = zu[u32(i.y * nf + i.x)];
+  let b = zu[u32(i.y * nf + hi.x)];
+  let c = zu[u32(hi.y * nf + i.x)];
+  let d = zu[u32(hi.y * nf + hi.x)];
+  let u = mix(mix(a, b, f.x), mix(c, d, f.x), f.y) * A.a.w;
+  textureStore(dst, q, safeVel(vec4f(v.xy + u, v.z, v.w)));
+}`,
 };
