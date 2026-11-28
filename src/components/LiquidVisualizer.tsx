@@ -68,7 +68,7 @@ import { MelodyWalk, melodyLine, type MelodyDrop, type MelodyLine } from '../lib
 import { makeNoteVoices, readNoteFeature, resetNoteVoices, type VoiceDrop, type VoiceTool } from '../lib/noteVoices';
 import { BarGrid, Accent, tellBar } from '../lib/barGrid';
 import { kickPress, kickDepth } from '../lib/squish';
-import { pressOverStep } from '../sim/pressLay';
+import { handPress } from '../sim/pressLay';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { captureFilmCamera, captureFilmWindow } from '../lib/filmCapture';
 import { Phrasing, type Phrase } from '../lib/phrasing';
@@ -3195,12 +3195,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 else hand.magnetAt = showNow();
               } else if (tool === 'press') {
                 // A hand on the top glass, its rate laid as this step's share (PLAN 18a-5).
-                const fg = currentSettings.fingering ?? 0;
-                const pa = pressOverStep(0.004 * k, simStepS);
-                af.applySquish(x, y, 30, pa, fg, true);
-                af.applySquish(x, y, 18, pa, fg);
-                af.applySquish(x, y, 8, pa, fg);
-                af.squeezeOut(x, y, 30 * GRID_SCALE, pa);
+                handPress(af, x, y, k, currentSettings.fingering ?? 0, simStepS, GRID_SCALE);
 
                 /*
                   That is the whole press. It used to add a twist on top: a

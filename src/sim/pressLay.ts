@@ -70,6 +70,30 @@ export function pressOverStep(amount: number, dtSeconds: number): number {
   return Number.isFinite(dtSeconds) && dtSeconds > 0 ? amount * (dtSeconds / PRESS_STEP_S) : amount;
 }
 
+/** What the Press tool's hand needs of a plate: FluidSimulation's two press calls. */
+export interface PressHand {
+  applySquish(x: number, y: number, radius: number, amount: number, fingering?: number, pileTips?: boolean): void;
+  squeezeOut(cx: number, cy: number, radius: number, amount: number): void;
+}
+
+/**
+ * The Press tool's hand on the glass for one step of `dtSeconds`, at Amount
+ * `k` (squared already) and Fingering `fingering`: three bowls, 30, 18 and 8
+ * cells of the 128 grid, and the old plate's carry. Moved out of the
+ * frame loop (LiquidVisualizer) so `npm run pressclock` and `npm run
+ * heldpress` press with the very lay the hand does.
+ */
+export function handPress(af: PressHand, x: number, y: number, k: number, fingering: number, dtSeconds: number, gridScale: number): void {
+  const pa = pressOverStep(0.004 * k, dtSeconds);
+  af.applySquish(x, y, 30, pa, fingering, true);
+  af.applySquish(x, y, 18, pa, fingering);
+  af.applySquish(x, y, 8, pa, fingering);
+  af.squeezeOut(x, y, 30 * gridScale, pa);
+}
+
+/** A bubble's standing squeeze on its footprint for one step (speciesPoll), a rate as the hand's is. */
+export const bubbleSqueeze = (dtSeconds: number): number => pressOverStep(0.0035, dtSeconds);
+
 /** The solver's own lay of a lift's spokes (`liftSpokes` in gpu/solverTypes.ts). */
 export type SpokesLay = (x: number, y: number, radius: number, reach: number, gap: number, count: number, phase: number, seed: number) => void;
 

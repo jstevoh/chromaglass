@@ -3253,7 +3253,9 @@
         "PLAN.md 18a-5 (scripts/pressclock.mjs): the app's Press held on a thin gap closes the",
         "glass by the same volume in the same seconds at 30, 60 and 120 steps a second, within 3%",
         "(main's per-step dent, the control, closed 0.64-0.68 of it at 30); and let go, the thin",
-        "gap's squeeze rate is the gap's own change, no memory (the old plate, the control, keeps it).",
+        "gap's squeeze rate is the gap's own change, no memory (the old plate keeps it; with main's",
+        "gap.ts the line read 7.96 rms off, which is its real control). The hand is pressed by",
+        "handPress, the Press tool's own lay.",
         "About 45 s on SwiftShader (cloud, 2026-11-28)."
       ]
     },

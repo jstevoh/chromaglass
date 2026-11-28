@@ -45,18 +45,35 @@ const checks = [];
 const check = (n, ok, d = '') => { checks.push({ n, ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
 
 const out = 'node_modules/.cache/pressclock-lib.mjs';
-await build({ stdin: { contents: "export { pressOverStep, PRESS_STEP_S } from './src/sim/pressLay.ts'; export { glassSpring } from './src/lib/squish.ts'; export { GRID_SCALE } from './src/sim/constants.ts';", resolveDir: '.', loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
-const { pressOverStep, PRESS_STEP_S, glassSpring, GRID_SCALE } = await import(`../${out}`);
+await build({ stdin: { contents: "export { pressOverStep, PRESS_STEP_S, handPress, bubbleSqueeze } from './src/sim/pressLay.ts'; export { glassSpring } from './src/lib/squish.ts'; export { GRID_SCALE } from './src/sim/constants.ts';", resolveDir: '.', loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
+const { pressOverStep, PRESS_STEP_S, handPress, bubbleSqueeze, glassSpring, GRID_SCALE } = await import(`../${out}`);
 
 const N = 192, L = 192, C = 96;
 // The app's Press at 1× (LiquidVisualizer: applySquish at 30, 18 and 8, 0.004 a step at 60), on the solver's cells.
 const RADII = [30, 18, 8].map((r) => r * GRID_SCALE), AMOUNT = 0.004;
 const HOLD = 0.4, READS = [0.1, 0.2, 0.4], RELEASE = 0.25;
 const CLASSIC_DT = 0.0018;   // Classic's step at sixty a second (Speed 0.009 × 0.2)
+// The glass as FluidSimulation.deriveStep gives it (its gapSpring, gapMemory and dt lines): glassSpring is the app's own; the other two are copied, and must follow it.
+
 const glass = (rate, thin) => {
   const s = 1 / rate, dt = CLASSIC_DT * (s / PRESS_STEP_S);
   return { thinGap: thin ? 1 : 0, gapThickness: 0.45, dt, gapSpring: glassSpring(0.35, thin ? s : dt), gapMemory: Math.pow(0.5, dt / 0.22) };
 };
+
+/*
+  What the hand lays, by the app's own lay (handPress, the very call
+  LiquidVisualizer's Press makes each step), recorded here and pressed in the
+  lab as FluidSimulation.applySquish presses on a thin gap: pressBowl at
+  radius × GRID_SCALE (the old plate, the control, squishDisc at the same).
+  'main' is the same hand with a step of 1/60 whatever the rate: main's dent.
+*/
+const handLay = (dtSeconds) => {
+  const out = [];
+  handPress({ applySquish: (x, y, r, a) => out.push([r * GRID_SCALE, a]), squeezeOut() {} }, C, C, 1, 0, dtSeconds, GRID_SCALE);
+  return out;
+};
+check('the hand lays its three bowls, 30, 18 and 8 of the 128 grid', handLay(1 / 60).map(([r]) => r).join() === RADII.join(), handLay(1 / 60).map(([r, a]) => `${r}@${a}`).join(', '));
+check('a bubble\'s squeeze is a rate too: a step of 1/30 lays twice what 1/60 does', bubbleSqueeze(1 / 30) === 2 * bubbleSqueeze(1 / 60) && bubbleSqueeze(1 / 60) === 0.0035, `${bubbleSqueeze(1 / 60)}, ${bubbleSqueeze(1 / 30)}`);
 
 // The step's share is exact at the show's own rate: the default plate presses bit for bit as it did.
 check('at sixty steps a second the press lays what it always did', pressOverStep(AMOUNT, 1 / 60) === AMOUNT && pressOverStep(AMOUNT, NaN) === AMOUNT,
@@ -73,9 +90,9 @@ try {
     const vols = [];
     const steps = Math.round(o.hold * o.rate);
     for (let k = 1; k <= steps; k++) {
-      for (const r of RADII) {
-        if (o.thin) lab.gridLay('press', C, C, r, o.amount, true);
-        else lab.squish(C, C, r, o.amount, 0, 'press', 0, false);
+      for (const [r, a] of o.lay) {
+        if (o.thin) lab.gridLay('press', C, C, r, a, true);
+        else lab.squish(C, C, r, a, 0, 'press', 0, false);
       }
       lab.flush(o.p.dt);
       await lab.step(1, o.p, true);
@@ -104,10 +121,11 @@ try {
   for (const how of ['main', 'now']) for (const rate of [60, 30, 120]) {
     // Main's press at sixty is this one (pressOverStep is exactly 1 there, checked above).
     if (how === 'main' && rate !== 30) continue;
-    const amount = how === 'main' ? AMOUNT : pressOverStep(AMOUNT, 1 / rate);
-    res[`${how} ${rate}`] = await run({ p: glass(rate, true), thin: true, rate, amount, hold: HOLD, reads: READS, release: how === 'now' && rate === 60 ? RELEASE : 0 });
+    const lay = handLay(how === 'main' ? 1 / 60 : 1 / rate);
+    res[`${how} ${rate}`] = await run({ p: glass(rate, true), thin: true, rate, lay, hold: HOLD, reads: READS, release: how === 'now' && rate === 60 ? RELEASE : 0 });
     console.log(`  ${how.padEnd(4)} ${String(rate).padStart(3)}/s: closed ${res[`${how} ${rate}`].vols.map((v) => v.toFixed(3)).join(', ')} at ${READS.join(', ')} s`);
   }
+  check('every run read the glass at every time', Object.values(res).every((r) => r.vols.length === READS.length), Object.entries(res).map(([k, r]) => `${k}: ${r.vols.length}`).join(', '));
   const ratio = (a, b) => a.vols.map((v, i) => v / b.vols[i]);
   const fmt = (r) => r.map((v) => v.toFixed(3)).join(', ');
   const m30 = ratio(res['main 30'], res['now 60']);
@@ -115,9 +133,13 @@ try {
   const n30 = ratio(res['now 30'], res['now 60']), n120 = ratio(res['now 120'], res['now 60']);
   check('now, at thirty steps a second the glass closes as at sixty, within 3%', n30.every((r) => Math.abs(r - 1) < 0.03), `30/60 ${fmt(n30)}`);
   check('and at a hundred and twenty, within 3%', n120.every((r) => Math.abs(r - 1) < 0.03), `120/60 ${fmt(n120)}`);
-  check('the press closed the glass at all', res['now 60'].vols[0] > 1 && res['now 60'].vols[2] > res['now 60'].vols[0], `${fmt(res['now 60'].vols)}`);
+  // One step's lay at the rest gap is Σ amount·πR² (a bowl keeps the flat disc's volume): the press must go on closing past it, slower as the film thins.
+  const oneStep = handLay(1 / 60).reduce((v, [r, a]) => v + a * Math.PI * r * r, 0);
+  const v60 = res['now 60'].vols;
+  check('the press goes on closing past its first step, and slows as the film thins (Stefan)', v60[0] > oneStep && v60[1] > v60[0] && v60[2] > v60[1] && v60[2] - v60[1] < 2 * (v60[1] - v60[0]),
+    `${fmt(v60)} against one step's ${oneStep.toFixed(3)}`);
 
-  const old = await run({ p: glass(60, false), thin: false, rate: 60, amount: AMOUNT, hold: HOLD, reads: [HOLD], release: RELEASE });
+  const old = await run({ p: glass(60, false), thin: false, rate: 60, lay: handLay(1 / 60), hold: HOLD, reads: [HOLD], release: RELEASE });
   const thinRel = res['now 60'].rel;
   check('let go on a thin gap, the squeeze field\'s rate is the gap\'s own change (no memory)', thinRel < 1e-3, `rms off ${thinRel.toExponential(2)} of the gap's rate`);
   check('the control: the old plate keeps its memory, its rate far from its gap\'s change', old.rel > 0.5, `rms off ${old.rel.toFixed(2)}`);
