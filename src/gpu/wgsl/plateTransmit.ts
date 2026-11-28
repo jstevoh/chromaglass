@@ -382,4 +382,22 @@ fn meniscus(color: vec3f, n: vec3f, a: f32, isCamera: bool) -> vec3f {
   let keep = edgePass(dyeBend(n), select(0.0, 1.0, isCamera));
   return color * mix(1.0, keep, U.edgeRelief * smoothstep(0.02, 0.2, a));
 }
+
+/*
+  More or less of the dye than the decode read, as a power of what it lets
+  through. Between the decode and the composite a few things scale how much
+  dye is at a point, and do it to the opacity: the dish's edge, the
+  pigment's grain, the back plate's level in the mixer. On a lamp ground
+  each is the amount of dye, so it is the exponent: half the dye, T^0.5.
+
+  The gooey edge's contrast is left out on purpose. It is an opacity curve
+  (thin dye thinner, thick dye thicker, so a blob's edge reads crisp on
+  black), and as an amount it bent Beer and Lambert itself: with it in, a
+  plate of dye twice as deep let through 0.16 of the green where the law
+  says 0.09 (npm run lamp). Its blur, which merges blobs, is in the amount
+  already, through the density the decode reads.
+*/
+fn throughScaled(through: vec3f, k: f32) -> vec3f {
+  return pow(max(through, vec3f(1e-6)), vec3f(clamp(k, 0.0, 4.0)));
+}
 `;

@@ -128,17 +128,6 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   h²σ/(12μR) for two oils.
   38v (2026-11-21): the ferrofluid's own rounding runs by steps, with no seconds and no grid
   size in its Cahn–Hilliard mobility (`fluid.ts:1393-1401`): 9ae.
-  - ~~**38e-1**~~ σ in N/m from each bottle: shipped 2026-11-27 (from PR #624, ported onto
-    38r's gap and the sealed bottle). The thin gap's pull is `oilMobility(σ)`, Darcy's
-    h₀²σ/12μ_ref, times the cover's (h/h₀)² as before; σ is each pour's own against water
-    (`interfacialTension`: the bottle's `interfacial`, sunflower 27 mN/m, silicone 37, or
-    Antonow's |γ_w − γ_o| for a Designer oil), averaged over the plate by what each covers
-    (`oilSigma`, carried and snapshotted with the oil). The dial keeps its 0–1 and is the share
-    of the oil's own. The old `OIL_TENSION_GAP` was σ = 0.0239 by the same law, so oil looks
-    round 13% faster with sunflower and 55% with silicone. `npm run gap` part 4 holds it.
-    Oil a look lays with no bottle (its bodies, a lava lamp's wax) stays at 0.0239, the
-    tension the looks were tuned at: with sunflower's 27 for it, `lavacycle`'s no-cool-glass
-    control fell 0.88 to 0.71 by 40 s on the Mac (main holds it), so only poured bottles change.
   - **38e-3** A lava lamp's wax at a measured σ of its own (paraffin against water, about
     0.04–0.05 N/m, against the 0.0239 the lamp was tuned at), after 19ak-25b says why the
     no-cool-glass control's window in the wax's weight and tension is narrow. Shortcut in the
@@ -273,10 +262,6 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
     = 1.6, drop the star, and drive the halo from `defocusShadow`. Check: a projected ferro
     look added to `scripts/nolight.mjs` gains no pixel over the lamp. (S–M; Medium; from
     RS-27.)
-  - ~~**38h-14**~~ *shipped 2026-11-08.* The projector's bubble film at Film Physics 0 is
-    the light through it, cp·(1 − 0.55·k·filmC) (`projectorFilm`, bubbleFilm.ts), a
-    transmittance in 0.67..1 per channel, never over the lamp: 54 levels over to 0.
-    `npm run nolight` line 16. Story in `docs/plan-shipped.md` §38.
   - **38h-16. The plate still reads the grid's hole round a bubble** (S–M, nil). Found doing
     38h-15. The solver cuts the dye out under a bubble on its grid, so the dye the plate
     decodes is thinned over a texel and a half inside each rim and, through the bicubic

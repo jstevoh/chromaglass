@@ -238,10 +238,10 @@ fn soapFilmOver(c: vec3f, fuv: vec2f) -> vec3f {
 ${CAUSTIC_PLATE_WGSL}
 ${FARADAY_PLATE_WGSL}
 ${GLOW_PLATE_WGSL}
-fn coversOver(c: vec3f, fuv: vec2f) -> vec3f {
+fn coversOver(c: vec3f, fuv: vec2f, glowFilter: vec3f) -> vec3f {
   var o = c;
   if (U.faraday > 0.5) { o = faradayOver(o, fuv); }
-  if (U.glow > 0.001) { o = glowOver(o, fuv); }
+  if (U.glow > 0.001) { o = glowOver(o, fuv, glowFilter); }
   if (U.soapFilm > 0.001) { o = soapFilmOver(o, fuv); }
   return o;
 }

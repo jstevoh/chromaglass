@@ -56,3 +56,33 @@ named in the code and each is an item:
   own liquid and size (`PlateGesture.liquid`, `gain`). The phone: Motion → Pads, the same
   three layouts through lib/padDoor.ts into the same holds. Check `npm run padhits`.
 - **30c-6** **shipped** (S, found 2026-11-28 running the checks for 49c-2) `npm run switches` is red on main, 1119/1127: eight phone Pads lines (`phone-pads-pick-5` to `-7` among them) read "on lights against off 1.00:1 by fill" (`#101012` both ways), so a picked pad on the phone's Pads sheet does not look picked. Make the picked pad lit the way the desk's is. **Shipped:** the picked pad takes `LIT`, as the layout row above it does; `npm run switches` 1133/1133 (was 1119/1127), `npm run phone` 367/367.
+
+## ~~48c. Bioluminescent trails: the water glows where it is sheared~~ (shipped 2026-11-21)
+
+- ~~**48c-1. The plankton are spread evenly.**~~ (shipped 2026-11-28) Every cell of the plate's water holds the same
+  population, so a stroke anywhere lights the same. A real bloom is patchy and is carried: a
+  concentration field over the plate, carried and diffused with the water as the dye is,
+  poured from a bottle (a "Plankton" liquid on the bench) and thinned where the water is
+  flushed, would scale both the light and the charge. Its cost: one more field on the glow's
+  256² grid and its carry.
+- ~~**48c-2. The threshold is a shear rate at seawater's viscosity.**~~ (shipped 2026-11-28) The cells answer the
+  stress on them (Latz et al. measure it in pascals), μ·S. The step compares the strain rate
+  with Glow Shear as if every liquid were seawater (1 mPa·s), so a stroke through glycerine
+  or syrup, which stresses the cells hundreds of times harder at the same rate, lights no
+  more than water. The fix reads the local liquid's viscosity (the mix's, 18d-1) and
+  compares the stress with a threshold in pascals.
+- ~~**48c-3. The light is not filtered by the dye.**~~ (shipped 2026-11-28) The emission is added over the plate's
+  colour, so a glow under a thick dye shows as brightly as one in bare water. Real light from
+  the water passes through the dye on its way to the lens and is absorbed by it as the
+  lamp's is (18b): attenuate it by the dye's absorbance over the path, Beer–Lambert, with
+  the blue's own extinction per dye.
+- ~~**48c-7. The wave's strain and the flow's are two, taken as the larger**~~ (shipped 2026-11-28) (S). The stroke's
+  shear is the gap's (two glasses 2 mm apart) and the wave's the open layer's (48f's 3 mm of
+  water with a free surface), and a cell's share is the larger of the two rather than one
+  strain from both flows together. One geometry for both (the open dish's layer with the
+  stroke's flow in it, or the wave in the gap, 48f-3) would let them add as one tensor.
+- ~~**48c-8. The wave does not carry the plankton**~~ (shipped 2026-11-28) (S–M). A standing Faraday wave drives a
+  steady streaming (Stokes drift and the boundary layers' own), which over seconds gathers
+  floating matter under the lattice's nodes; the glow's state is carried by the plate's flow
+  alone. Add the streaming velocity of the amplitude field to the carry, so a long bass note
+  herds the bloom into the lattice.

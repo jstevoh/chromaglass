@@ -20,7 +20,7 @@ import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_STRENGTH 
 import { VisualizerSettings } from '../types';
 import { lookTarget as dyeLookTarget } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
-import { plateLook, plainSeed } from '../presetPlate';
+import { plateLook } from '../presetPlate';
 import { layCrowd, layLavaLamp, layOilShare, layFoamCells } from '../lib/oilLay';
 import { plateAreas, areaFamily, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { magnetDepth } from '../lib/magnetSize';
@@ -52,7 +52,7 @@ import { SIM_STEP, stepCurrentCpu, pressSheetKick } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
 import { layDrop, stepPlateDrops } from './dropSplash';
 import { layLift, layPress, type SpokesLay } from './pressLay';
-import { SolverSeeds, takeBack, addShare, scaleSince, OwedLay, dishMean } from './solverLay';
+import { SolverSeeds, takeBack, addShare, scaleSince, OwedLay, dishMean, layPlainPreset } from './solverLay';
 import { makeDropQueue, dropsLive } from '../lib/dropImpact';
 import { besideStep } from '../gpu/besidePlate';
 import { mixWait } from './mixWait';
@@ -1974,14 +1974,9 @@ export class FluidSimulation {
         break;
       }
 
-      default: {
-        const [n, rad, amt] = plainSeed(presetId);
-        for (let i = 0; i < n; i++) {
-          const c = col(i);
-          this.splatBlob(10 + this.rng.float() * (S - 20), 10 + this.rng.float() * (S - 20), rad, amt, c.r, c.g, c.b);
-        }
+      default:
+        layPlainPreset(presetId, S, this.rng.float, col, this.gpu, this.seeds.plain(), (x, y, r, a, cr, cg, cb) => this.splatBlob(x, y, r, a, cr, cg, cb));
         break;
-      }
     }
 
     this.seedMean = Math.max(0, dishSum() - beforeMean + this.seeds.took());

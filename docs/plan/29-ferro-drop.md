@@ -71,11 +71,6 @@ the code's entry points, the checks to add and the scenes to match, in
     uniform (`dropSolved`, `ferroDrop.ts:266-267`). Check: a ferro closeup's ground matches
     Relief 0's within a few levels, and milk outside a ferro domain keeps `dropSolved` 0.
     (38v, from RS-25.)
-  - ~~**29a-13. The Magnet's domes were one black in the closeup.**~~ **Shipped** (the owner,
-    2026-11-01: "Let's make sure we have 3d in the macro view"; `npm run ferrodrop` 11-13).
-    The drop's reflection is worked in light and encoded as a camera records it, so a dome's
-    steep sides show the lit liquid round them as a dark gloss. Story in
-    `docs/plan-shipped.md` §29a-13.
   - **29a-13b. The Magnet's domes sometimes do not stand in ferrodrop's closeup scene on the
     Mac** (S, nil; found landing 29a-13 in the physics batch, 2026-11-28). Of thirteen runs of
     `npm run ferrodrop` section 7 on the owner's Mac, eleven read 19446 px of dome (the pool's

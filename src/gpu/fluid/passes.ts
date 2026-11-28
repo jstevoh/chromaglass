@@ -10,7 +10,7 @@ import { kernel } from '../wgsl/fluid';
 import type { GpuStepParams } from '../solverTypes';
 import { stepDisplacement } from '../../lib/detailFlow';
 import { WebGPUSlosh } from '../slosh';
-import { OPEN_RIM } from '../../lib/turntable';
+import { OPEN_RIM, WATER_NU } from '../../lib/turntable';
 import { DYE_FLOOR } from '../../lib/dye';
 import { WebGPUParticles } from '../particles';
 import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, oilNuOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIQUID_FALL, LIFT_SWEEPS, SEAL_KERNEL_NAMES, STIR_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, thinGapViscosity, R32, RG32, VEL, AIR_DISP_LEAST, HOLD_APART_FINE, HOLD_APART_WIDER } from './constants';
@@ -339,11 +339,20 @@ export class FluidPasses extends FluidFields {
       if (this.glowPlate) { this.glowPlate.dispose(); this.glowPlate = null; }
       return;
     }
-    if (!this.glowPlate) this.glowPlate = new GlowPlate(this.device);
+    if (!this.glowPlate) {
+      this.glowPlate = new GlowPlate(this.device);
+      if (this.pendingPlankton.length > 0) {
+        for (const q of this.pendingPlankton) this.glowPlate.pour(q.x, q.y, q.r, q.take, q.plankton, q.push, this.squeeze.read);
+        this.pendingPlankton.length = 0;
+      }
+    }
     // The uv a unit of velocity moves the dye this step (lib/detailFlow.ts stepDisplacement).
     const travel = p.dt * p.advection * ((this.N - 2) / this.N);
-    // The shaken dish's wave too, stepped just before (stepBeside), so its strain lights the cells (48c-6).
-    this.glowPlate.step(enc, p.magnetSeconds ?? 1 / 60, this.ride(), this.squeeze.read, travel, p.glowShear ?? GLOW_SHEAR, p.glowRecharge ?? GLOW_RECHARGE, this.faradayPlate?.field ?? null, p.faradayHz ?? 0);
+    const thin = this.thinLive;
+    const species = this.species && this.speciesLive && this.readsSpecies ? this.species.read : null;
+    const lnClear = thin ? Math.log(thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS) / WATER_NU) : 0;
+    // The shaken dish's wave too, stepped just before (stepBeside), so its strain lights and streams the cells (48c-6, 48c-7, 48c-8).
+    this.glowPlate.step(enc, p.magnetSeconds ?? 1 / 60, this.ride(), this.squeeze.read, travel, p.glowShear ?? GLOW_SHEAR, p.glowRecharge ?? GLOW_RECHARGE, this.faradayPlate?.field ?? null, p.faradayHz ?? 0, species, lnClear, thin);
   }
 
   /**

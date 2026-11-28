@@ -298,8 +298,8 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'splodascope':        ['oil', 'oil', 'water'],
   // More oil presses a new cell in among the others; the water wets the films.
   'foam-cells':         ['oil', 'water'],
-  // Sea water: the glow's threshold is a shear rate at its viscosity (PLAN 48c-2).
-  'night-sea':          ['water', 'water'],
+  // Sea water with drifting plankton patches, thinned by clear water drops (PLAN 48c-1, 48c-2).
+  'night-sea':          ['plankton', 'water', 'water'],
   // A third of the drops are Ouzo, which bloom white in the water; a third Alcohol, which thins a
   // bloom it lands on and clears it at the second drop (presetsOuzo.ts has the sums; PLAN 48s).
   // 48s-7: still half Ouzo, so the cloud leads, and a third Alcohol (a quarter before), which

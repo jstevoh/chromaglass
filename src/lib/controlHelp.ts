@@ -123,7 +123,7 @@ export const CONTROL_HELP: Record<string, string> = {
   soapFilmAngle: 'The angle the soap film is seen from. Leaning it moves every band of colour to a thicker film.',
   soapFilmTilt: 'How the soap film\'s frame is held: 90 hangs it, so gravity drains it into level bands; toward 0 it lies flat, and it keeps its swirls.',
   glow: 'The water glows blue where a stroke shears it, like a wake in a bay of plankton, and tires: the same path again at once glows less.',
-  glowShear: 'How hard the water must be sheared before it glows, per second. Lower lights a gentle stir; higher only a hard stroke.',
+  glowShear: 'Shear stress the plankton need to fire, in millipascals (30 mPa is a stir in water; thicker syrup fires sooner).',
   glowRecharge: 'Seconds the glow takes to refill once it has flashed. Short and every stroke lights fully; long and a busy plate goes dark.',
   glitter: 'Glitter in the liquid: flakes that ride the flow, flip and glint in the Side Light and the closeup\'s softbox. Dark specks on the lamp.',
   lensStop: 'The lens\'s f-number. Wide open, glitter out of focus is big soft discs; stopped down, small discs and long six-pointed stars.',

@@ -116,6 +116,8 @@ export class FluidCore {
   protected surfaceHeight: SurfaceHeight | null = null;
   /** The water's glow (PLAN 48c, gpu/glow.ts), made while Glow is up. */
   protected glowPlate: GlowPlate | null = null;
+  /** Plankton pours laid before GlowPlate is created, drained onto it on its first step (PLAN 48c-1). */
+  protected pendingPlankton: { x: number; y: number; r: number; take: number; plankton: number; push: boolean }[] = [];
   /** The plate's boiling vapour fraction (.r) and float32 temperature (.g, °C above T_AMBIENT) field (`rg32float`, PLAN §36e-2), per-cell nucleation superheat, and uniform buffer. */
   protected boilAlpha: PingPong | null = null;
   protected boilSites: GPUBuffer | null = null;
@@ -879,6 +881,8 @@ export class FluidCore {
     this.speciesClears++;
     this.speciesPoured = null;
     this.speciesSnap = null;
+    this.pendingPlankton.length = 0;
+    this.glowPlate?.reset();
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;
     this.oilSigma = OIL_TENSION_SIGMA;

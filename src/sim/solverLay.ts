@@ -23,6 +23,7 @@
 */
 import type { PlateSolver } from '../gpu/solverTypes';
 import { layCrowd } from '../lib/oilLay';
+import { plainSeed } from '../presetPlate';
 import { dyeAbsorbances } from '../lib/dye';
 import { OPEN_RIM } from '../lib/turntable';
 import { plateLook } from '../presetPlate';
@@ -257,4 +258,35 @@ export function dishMean(density: Float32Array, S: number, dishArea: number): nu
     }
   }
   return s / Math.max(1, dishArea);
+}
+
+/**
+ * Initial drifting plankton patches for Night Sea (PLAN 48c-1): a low open
+ * background across the plate with five bloom patches, so strokes light
+ * patchy blooms from the first second rather than a uniform sheet.
+ */
+export function layNightSeaPlankton(gpu: PlateSolver | null, rand: () => number): void {
+  if (!gpu?.pour) return;
+  gpu.pour(0.5, 0.5, 1.5, 1.0, null, false, { plankton: 0.15 });
+  for (let i = 0; i < 6; i++) {
+    const x = 0.2 + rand() * 0.6;
+    const y = 0.2 + rand() * 0.6;
+    const r = 0.12 + rand() * 0.10;
+    gpu.pour(x, y, r, 1.0, null, false, { plankton: 0.75 + rand() * 0.5 });
+  }
+}
+
+/** Seed a plain preset's dye blobs plus Night Sea's initial plankton patches. */
+export function layPlainPreset(
+  presetId: string, S: number, rand: () => number,
+  col: (i: number) => { r: number; g: number; b: number },
+  gpu: PlateSolver | null, plain: boolean,
+  splat: (x: number, y: number, r: number, a: number, cr: number, cg: number, cb: number) => void,
+): void {
+  const [n, rad, amt] = plainSeed(presetId);
+  for (let i = 0; i < n; i++) {
+    const c = col(i);
+    splat(10 + rand() * (S - 20), 10 + rand() * (S - 20), rad, amt, c.r, c.g, c.b);
+  }
+  if (presetId === 'night-sea' && plain) layNightSeaPlankton(gpu, rand);
 }

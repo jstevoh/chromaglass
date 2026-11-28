@@ -121,6 +121,8 @@ export interface LiquidBehaviour {
    */
   ethanol?: number;
   anise?: number;
+  /** Bioluminescent dinoflagellates (PLAN 48c-1): seawater carrying plankton that glow when sheared. */
+  plankton?: number;
 }
 
 export interface LiquidType {
@@ -1088,7 +1090,7 @@ export interface VisualizerSettings {
   soapFilmAngle: number;      // degrees from straight on that the film is seen at: every band moves to a thicker film (32d)
   soapFilmTilt: number;       // the frame's tilt from flat, degrees: 90 hangs it (gravity along the film is g sin of it, 32h)
   glow: number;               // the water's bioluminescence, 0 (off) to 2: blue light where a stroke shears it past a threshold, tiring as it is spent (PLAN 48c)
-  glowShear: number;          // the shear rate, per second, the organisms fire at: lower and a gentle stir lights, higher and only a hard stroke does (48c)
+  glowShear: number;          // the shear stress threshold, in millipascals (0.03 Pa = 30/s in seawater): lower and a gentle stir lights, higher and only a hard stroke does, and thicker liquids stress more (48c, 48c-2)
   glowRecharge: number;       // seconds the organisms take to refill their light once they have flashed (48c)
   glitter: number;            // glitter suspended in the liquid, 0 (none) to 1: flakes that ride the gap's flow, flip in its shear and glint (PLAN 47e)
   lensStop: number;           // the lens's f-number, 1.4 to 22: wide open the glitter off the focal plane is big discs; stopped down, small discs and long star spikes (47d)

@@ -72,8 +72,8 @@ export class FluidCover extends FluidReads {
    * solve's source and the glass's rise cancel at the rim: a pour under a
    * glass the edge still holds spills nothing.
    */
-  pour(x: number, y: number, radius: number, take: number, sp: Parameters<FluidReads['pour']>[4], volume = true): void {
-    super.pour(x, y, radius, take, sp, volume);
+  pour(x: number, y: number, radius: number, take: number, sp: Parameters<FluidReads['pour']>[4], volume = true, what?: Parameters<FluidReads['pour']>[6], plateSigma?: Parameters<FluidReads['pour']>[7]): void {
+    super.pour(x, y, radius, take, sp, volume, what, plateSigma);
     if (volume && radius > 0 && take > 0 && this.hsPour) {
       const r = radius * DISH_METRES;
       this.coverPoured += take * (Math.PI * r * r) / 2 * this.coverMetres;
