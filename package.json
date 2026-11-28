@@ -125,8 +125,7 @@
     "pictureplate": "npm run build && node scripts/pictureplate.mjs",
     "webgpu": "npm run build && node scripts/webgpu-smoke.mjs",
     "crash": "npm run build && node scripts/crash.mjs",
-    "watch": "node scripts/watch.mjs",
-    "watchwords": "node scripts/watchwordstest.mjs",
+    "watch": "reelreader",
     "watchcard": "node scripts/watchcardtest.mjs",
     "codecblip": "node scripts/codecblip.mjs",
     "moving": "npm run build && node scripts/moving.mjs",
@@ -428,12 +427,7 @@
     "linearlight": "node scripts/linearlight.mjs",
     "watchconfig": "node scripts/watchconfigtest.mjs",
     "watchmode": "node scripts/watchmodetest.mjs",
-    "watchreport": "node scripts/watchreporttest.mjs",
-    "watchshots": "node scripts/watchshotstest.mjs",
-    "watchbatch": "node scripts/watchbatchtest.mjs",
-    "ratepage": "node scripts/ratepagetest.mjs",
-    "reelset": "node scripts/reelsettest.mjs",
-    "reelpack": "node scripts/reelreaderpacktest.mjs"
+    "ratepage": "node scripts/ratepagetest.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
@@ -461,6 +455,7 @@
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.28.2",
     "playwright": "^1.63.0",
+    "reelreader": "0.1.0",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2"
   },

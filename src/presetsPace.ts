@@ -7,7 +7,7 @@ import type { VisualizerSettings } from './types';
   What was found (2026-11-12): the study that filmed every look against the
   owner's references and two real shows read each look's turnover, the time
   the flow takes to carry a form across its own size (`npm run watch`'s
-  physics read, scripts/watchphysics.mjs), and 25 of 33 liquid looks turned
+  physics read, reelreader/scripts/watchphysics.mjs), and 25 of 33 liquid looks turned
   over several times slower than a real show: Galaxy in 12 s, Home Movie in
   10, Aurora and Jellyfish in 9, against the Joshua Light Show's 1.5 s and a
   modern oil-and-water show's 2.4. A closer camera did not close the gap, so

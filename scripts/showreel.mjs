@@ -35,7 +35,7 @@
  * minute from 78 s has the groove, the breakdown and the return, so each look
  * is seen following a band, going quiet with it, and coming back.
  *
- * Each look is also watched (`scripts/watch.mjs`, as the film does) and its
+ * Each look is also watched (`reelreader/scripts/watch.mjs`, as the film does) and its
  * shape written beside the clip: swells a minute, calm, near black, hues,
  * colour changes, and motion against loudness over 1 s and 20 s, the same
  * columns the film table reads against the real shows. It measures and does
@@ -54,7 +54,7 @@ import path from 'node:path';
 import { launchChromium, port } from './chromium.mjs';
 import { engineQuery } from './frame.mjs';
 import { PRESETS } from '../src/presets.ts';
-import { watchVideo, WatchError, findFfmpeg } from './watch.mjs';
+import { watchVideo, WatchError, findFfmpeg } from 'reelreader/scripts/watch.mjs';
 import { AUTOPLAY, withBand, untilRunning } from './recorder.mjs';
 import { untilFlowerFree } from './flowergate.mjs';
 

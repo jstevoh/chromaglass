@@ -13,7 +13,7 @@
  *
  * So this records the show the way the owner does, with the Record button
  * (the canvas and the sound, `useRecorder.ts`), with "a band in a box" playing
- * so there is music in the file, and watches the take with `scripts/watch.mjs`
+ * so there is music in the file, and watches the take with `reelreader/scripts/watch.mjs`
  * (the same tool the `watch` skill uses on references).
  *
  * A frozen plate is not a still picture. The first version looked for frames
@@ -46,7 +46,7 @@
  * MOVING_OUT (default /tmp/chromaglass-moving) for a person or Claude to read.
  *
  * Needs a GPU that presents WebGPU (the macOS runner, in checks.yml), and
- * ffmpeg (see the header of scripts/watch.mjs).
+ * ffmpeg (see the header of reelreader/scripts/watch.mjs).
  */
 import { chromium } from 'playwright';
 import { launchChromium, port } from './chromium.mjs';
@@ -54,7 +54,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { engineQuery } from './frame.mjs';
-import { watchVideo, freezes, WatchError } from './watch.mjs';
+import { watchVideo, freezes, WatchError } from 'reelreader/scripts/watch.mjs';
 import { AUTOPLAY, withBand, recordTake, untilRunning } from './recorder.mjs';
 
 const PORT = port(4351, 'MOVING_PORT');

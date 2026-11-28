@@ -21,13 +21,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
-import { watchVideo, findFfmpeg } from './watch.mjs';
-import { clipAudio, ffmpegVersion } from './watchffmpeg.mjs';
-import { reportCard, REAL_SHOW_CARDS } from './watchcard.mjs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { watchVideo, findFfmpeg } from 'reelreader/scripts/watch.mjs';
+import { clipAudio, ffmpegVersion } from 'reelreader/scripts/watchffmpeg.mjs';
+import { reportCard, REAL_SHOW_CARDS } from 'reelreader/scripts/watchcard.mjs';
 import { MEASURE_SETTINGS } from './watchsettings.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
+// The installed reelreader package's scripts folder, where the watch modules live.
+const PKG = path.dirname(fileURLToPath(import.meta.resolve('reelreader/scripts/watch.mjs')));
 const W = 320, H = 180, FPS = 24;
 const MUTANTS_ON = !process.argv.includes('--no-mutants');
 
@@ -308,7 +310,7 @@ async function runSuite(mods, dir, clips, only = null) {
   const out = [];
   const want = id => !only || only === id;
   const rec = (id, name, ok, detail) => out.push({ id, name, ok: !!ok, detail });
-  // The report card and Settings to try are the liquid read's (PLAN 47p-3, scripts/watchmode.mjs):
+  // The report card and Settings to try are the liquid read's (PLAN 47p-3, reelreader/scripts/watchmode.mjs):
   // these clips hold them to pictures, so they are watched as liquid footage whatever the footage
   // cues decide; that general footage gets neither is npm run watchmode.
   const rw = (file, o) => mods.watchVideo(file, { liquid: true, ...o });
@@ -544,12 +546,13 @@ const MUTANTS = [
 async function runMutant(m, clips, tmpRoot) {
   const mDir = fs.mkdtempSync(path.join(tmpRoot, `mut-${m.id}-`));
   try {
-    for (const f of fs.readdirSync(HERE)) {
-      // reelreader.config.json too: without it the copy would watch with no settings map (47p-1).
-      if ((/^watch.*\.mjs$/.test(f) && f !== 'watchcardtest.mjs') || f === 'reelreader.config.json') {
-        fs.copyFileSync(path.join(HERE, f), path.join(mDir, f));
-      }
-    }
+    // The watch tool is the reelreader package now (PLAN 47p-7): the mutant is
+    // a copy of the installed package's modules, with this repository's settings
+    // map beside them. The copy finds the settings map through the config at the
+    // repository's root (the folder every npm script runs from), as the real
+    // run does, so a mutant watches exactly as `npm run watch` would.
+    for (const f of fs.readdirSync(PKG)) if (/^watch.*\.mjs$/.test(f)) fs.copyFileSync(path.join(PKG, f), path.join(mDir, f));
+    fs.copyFileSync(path.join(HERE, 'watchsettings.mjs'), path.join(mDir, 'watchsettings.mjs'));
     const target = path.join(mDir, m.file);
     const src = fs.readFileSync(target, 'utf8');
     if (!src.includes(m.find)) return { ok: false, detail: `mutant target missing in ${m.file}` };

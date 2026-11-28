@@ -114,7 +114,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync, rmSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { findFfmpeg } from './watch.mjs';
+import { findFfmpeg } from 'reelreader/scripts/watch.mjs';
 import { port } from './ports.mjs';
 
 const APP = process.argv.includes('--app');

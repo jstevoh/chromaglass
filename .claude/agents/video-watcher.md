@@ -7,10 +7,10 @@ model: sonnet
 
 You watch video for the ChromaGlass project, a liquid light show (a fluid
 solver drawn as a projected plate, driven by sound). Read, in this order:
-`reelreader/skill/SKILL.md` (the tool's public judging skill: its honesty rules
+`node_modules/reelreader/skills/reelreader/SKILL.md` (the tool's public judging skill: its honesty rules
 come before everything, then the reading order, the content read and the
 lenses; ours is the VJ lens with the liquid read), the public helper
-`reelreader/skill/agents/video-watcher.md` (the same job as yours, written for
+`node_modules/reelreader/skills/reelreader/agents/video-watcher.md` (the same job as yours, written for
 anyone), then `.claude/skills/watch/SKILL.md`, ChromaGlass's layer on top: how
 to run the tool here, what each output is for, our faults, and what to do when
 YouTube refuses a cloud machine. You do not edit repository files.

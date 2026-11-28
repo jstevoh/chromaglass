@@ -15,22 +15,25 @@ techniques used, and to judge our own visuals the same way.
 
 ## Read the public skill first
 
-The tool ships to anyone as **reelreader** (PLAN 47p), with a judging skill of its own:
-[`reelreader/skill/SKILL.md`](../../../reelreader/skill/SKILL.md). Read it before this page,
+The tool is **reelreader** (PLAN 47p), an npm package made in its own public repository
+(jstevoh/reelreader) and pinned in our package.json; it has a judging skill of its own,
+installed with it: `node_modules/reelreader/skills/reelreader/SKILL.md`. Read it before this page,
 every time. It holds what any judge needs and this page no longer repeats: the **honesty
 rules** (evidence on every claim, Footage and Read as first, one take is one take, the
 numbers miss faults, the card is not a score, the image budget, the content read's limits,
 liquid or general is a measurement, rights), the **reading order**, the **content read**
 (shots, subjects, setting), the **lenses** (anyone, editor, colourist, VJ or liquid artist:
 for our plate, always the VJ lens with the liquid read), comparing two films, the helper
-agent and the words guide (`reelreader/skill/watch-words.md`), the **test set** with known
-answers (`reelreader/skill/testset/`, held by `npm run reelset`) and how to build an **eval
-set** from ratings (`reelreader/skill/evals.md`).
+agent and the words guide (`node_modules/reelreader/skills/reelreader/watch-words.md`), the **test set** with known
+answers (`node_modules/reelreader/skills/reelreader/testset/`, held by reelreader's own tests) and how to build an **eval
+set** from ratings (`node_modules/reelreader/skills/reelreader/evals.md`).
 
 This page is ChromaGlass's layer on top: the owner's links and the Mac route, our takes and
 the app's own output, the solver's terms and PLAN items in an account, the real shows and the
 reference library, our faults, the checks that film the app, and the settings map. Nothing
-here goes into the public folder (`npm run reelset` fails if a ChromaGlass word reaches it).
+here goes into the public package. A change the tool itself needs (a new measure, a misread)
+is a pull request to jstevoh/reelreader and a release there, then a bump of the pin here;
+never a patch to `node_modules`.
 
 ```sh
 npm run watch -- <file or URL> --out <scratchpad>/<name>
@@ -45,7 +48,6 @@ npm run watch -- our-take.webm --out … --vs <name>   # against a kept referenc
 npm run watch -- --refs         # the library, with each reference's numbers
 npm run watch -- our-take.webm --out … --liquid   # the liquid read whatever the footage shows (a drained, frozen or cut take of the app)
 npm run watch -- --selftest     # synthetic clips, frames and flows with known answers
-npm run watchwords              # vocabulary and before/after diff contract check
 npm run watchcard               # footage robustness, report card & gap settings check
 ```
 
@@ -59,7 +61,7 @@ npm run watchcard               # footage robustness, report card & gap settings
    `device_stage_files` the `source.mkv` and `source.info.json` and watch the
    staged `source.mkv`. The info file is what gives the techniques section the
    page's description, tags, chapters and links. (The Mac, its folder and the
-   reference library come from `scripts/reelreader.config.json`; `docs/watch.md` is
+   reference library come from `reelreader.config.json` at the repository's root; `docs/watch.md` is
    the tool's README.) Vimeo wants a login from
    anyone now and its copies are DRM-locked: ask for a screen recording.
 2. **Look at the first sheet, then crop.** If the camera shows the room (a
@@ -69,7 +71,7 @@ npm run watchcard               # footage robustness, report card & gap settings
    symmetry from the mask; say so.
 3. **Check the Read as line first.** The physics read, Techniques, the Report card,
    the wet show's words and Settings to try come only with a liquid read (PLAN 47p-3,
-   `scripts/watchmode.mjs`): one take, its own motion, coloured light on a dark ground.
+   `reelreader/scripts/watchmode.mjs`): one take, its own motion, coloured light on a dark ground.
    A real show or an app take reads liquid by itself; an app take that is drained,
    frozen or cut reads general, so pass `--liquid` for any take of the app and any
    liquid reference that reads general (and say so). Anything else reads general, with a
@@ -83,7 +85,7 @@ npm run watchcard               # footage robustness, report card & gap settings
    section (the seven canons calibrated against real shows — Unity, Complexity, Intensity, Arc,
    Surprise, Music fit, Restraint — plus verdict and Spearman ratings agreement when `ratings.json`
    is present), then its **In words** section
-   (every word with the number that chose it, its source in `reelreader/skill/watch-words.md`,
+   (every word with the number that chose it, its source in `node_modules/reelreader/skills/reelreader/watch-words.md`,
    and `(may vary from take to take)` on unsteady measures), followed by the Design,
    Physics and Techniques sections. Take `--at` stills of what matters.
    With `--vs`, a **Reference in words** section, **Report card (side by side)** table,
@@ -120,7 +122,7 @@ It prints a summary (also `summary.md`) and writes:
 | `stats.tsv` | Per sample: brightness, near-black fraction, blown fraction, saturation, motion, loudness. |
 | `palette.png` | The clip's six main colours, each as wide as its share. |
 | `report.html` | All of the above on one self-contained page for a person (best moment, timeline, read, words, numbers, sheets). **Attach it when showing the owner a watch**: it opens on a phone. `--no-report` skips it. |
-| `best.mp4`, `best.png` | The strongest 12 s and frame (most motion, colour, lit area and loudness by rank, no title card, one shot when it can be; `scripts/watchreport.mjs`). The moment to show, or to drop into a judging page. |
+| `best.mp4`, `best.png` | The strongest 12 s and frame (most motion, colour, lit area and loudness by rank, no title card, one shot when it can be; `reelreader/scripts/watchreport.mjs`). The moment to show, or to drop into a judging page. |
 | `design.json` | The design, physics, and `footage` reads (autocrop, overlays, title spans, camera share, blockiness, cutoff, `reliable` flags), plus `shape`, `overall`, `card` for `--vs`. |
 | `diff.md`, `diff-timeline.png`, `pairs.png` | Written by `--before A --after B`: `# What changed` (ranked steps, what held, near an edge, how it felt, both "In words" reads), stacked timelines, and matched-time frame pairs beside `before/` and `after/`. |
 
@@ -131,7 +133,7 @@ be right and score zero; a plate that is meant to hit on the beat and scores
 zero is not.
 
 And **the shape** over minutes, in the units the footage study measured real
-shows in (`shape()` in `scripts/watch.mjs` defines each): swells a minute and
+shows in (`shape()` in `reelreader/scripts/watch.mjs` defines each): swells a minute and
 their gap, rise, decay and height; the share of time the plate is calm; how
 long motion stays like itself; near black at the 5th and 95th percentile; hues
 a frame; composition changes a minute; and motion vs loudness over 1, 5, 10
@@ -142,7 +144,7 @@ and 20 s windows. For scale, at `--rate 4`: the Joshua Light Show film reads
 
 **Cuts and dissolves.** A hard cut is one sample that changes far more than
 the samples around it. A dissolve spreads that change over a second, so it
-is found another way (`scripts/watchcuts.mjs`, 47w-2): a run of raised
+is found another way (`reelreader/scripts/watchcuts.mjs`, 47w-2): a run of raised
 change whose ends differ by a cut's worth, whose every frame is a mix of its
 two ends, and whose new picture the old take never showed. A pour, a dye
 body spreading and a lamp dimming and coming back are each turned down by
@@ -160,7 +162,7 @@ The references the owner likes are kept once, outside the public repo, in
 a `ref.json` saying where it came from and why it was kept. `--keep <name>`
 puts a watched clip there, `--vs <name>` compares a take with it without
 fetching again, and `--refs` lists them. A look's retune can be held to its
-reference's numbers this way. `scripts/watchrefs.mjs` has the rules.
+reference's numbers this way. `reelreader/scripts/watchrefs.mjs` has the rules.
 
 Kept so far: `jls-liquid-loops-1969` and `bar-the-dip-2016` (the two real
 shows) and `lll-melt-your-face-1` (Liquid Light Lab's own look: a dish
@@ -175,7 +177,7 @@ squarer piece of the screen (47v-6).
 ## The design, physics and techniques sections
 
 Definitions, with why each measure and what its bands mean, are at the top of
-`scripts/watchdesign.mjs` and `scripts/watchphysics.mjs`. In short:
+`reelreader/scripts/watchdesign.mjs` and `reelreader/scripts/watchphysics.mjs`. In short:
 
 - **Design:** palette (k-means, hex and share); colourfulness (Hasler and
   Süsstrunk: 33 moderate, 59 quite, 82 highly, 109 extremely); hue harmony
@@ -195,7 +197,7 @@ Definitions, with why each measure and what its bands mean, are at the top of
   luminance spectrum's slope (shallow: fine filaments; steep: smooth, soft).
   The frames cannot give viscosity or the glass's real size. Beside flow,
   carried, turnover, lifetime and spectrum the read prints the range real
-  performances read (`REAL_SHOWS` in `scripts/watchphysics.mjs`, 47v-3), and
+  performances read (`REAL_SHOWS` in `reelreader/scripts/watchphysics.mjs`, 47v-3), and
   says when a clip is under or over every one. Real shows read carried only
   0.13 to 0.23 (the lamp, superimposed loops, the camera; the grain is taken
   out of the change first, from the pair's own noise, 47v-5), so a low carried
@@ -265,7 +267,7 @@ detectors for all of them are the fault-read follow-up (handoff section 7a; PLAN
 47p-5e are the misreads the test set found).
 
 - **Frozen** (the plate stops; the recorder repeats the last frame): the timeline's motion
-  strip goes flat. `freezes()` in `scripts/watch.mjs` finds it (`npm run moving` and `gig`
+  strip goes flat. `freezes()` in `reelreader/scripts/watch.mjs` finds it (`npm run moving` and `gig`
   use it), but the summary does not print it, and the Footage read files a long freeze as a
   "title span" and leaves it out, so Overall says "one steady pace" (the test set's
   `frozen-take.mp4`, 47p-5c).

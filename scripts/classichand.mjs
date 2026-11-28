@@ -61,8 +61,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openLab } from './lab.mjs';
-import { physicsAcc, physicsFrame, physicsSummary, REAL_SHOWS } from './watchphysics.mjs';
-import { designFrame, designSummary, paletteAcc } from './watchdesign.mjs';
+import { physicsAcc, physicsFrame, physicsSummary, REAL_SHOWS } from 'reelreader/scripts/watchphysics.mjs';
+import { designFrame, designSummary, paletteAcc } from 'reelreader/scripts/watchdesign.mjs';
 
 const args = process.argv.slice(2);
 const flag = (k) => args.find((a) => a.startsWith(`--${k}=`))?.split('=')[1];

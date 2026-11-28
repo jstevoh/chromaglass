@@ -8,11 +8,11 @@
  * physics read, report card, technique guesses, wet-show words and Settings
  * to try are calibrated on liquid light shows. Before 47p-3 they were said of
  * every film: Big Buck Bunny graded Arc 9.0/10 against the real shows. Now
- * `scripts/watchmode.mjs` reads liquid only from footage that shows one (one
+ * `reelreader/scripts/watchmode.mjs` reads liquid only from footage that shows one (one
  * take, its own motion, coloured light on a dark ground), or when asked. This
  * holds that:
  *
- *   (a) the measured films (scripts/watchmode.mjs's table, 2026-11-28): every
+ *   (a) the measured films (reelreader/scripts/watchmode.mjs's table, 2026-11-28): every
  *       liquid one reads liquid on all three cues, every general one fails at
  *       least two (so no page's words can tip it), and every real show in the
  *       report card's calibration passes the light cue the card's rows can
@@ -37,7 +37,7 @@
  *   (g) the before/after read of two general films leaves out the show's own
  *       measures, which a pair of liquid reads keeps;
  *   (h) every wet-show word's general form, reached or not by these clips, has
- *       a general term, a general source on reelreader/skill/watch-words.md, its number and
+ *       a general term, a general source on reelreader's skills/reelreader/watch-words.md, its number and
  *       no liquid word, and describe() of the liquid films with liquid: false
  *       says none of the wet words their liquid read says.
  *
@@ -54,14 +54,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { watchVideo, findFfmpeg } from './watch.mjs';
-import { readMode, liquidCues, MIN_NEAR_BLACK, MIN_COLOURFULNESS } from './watchmode.mjs';
-import { REAL_SHOW_CARDS } from './watchcard.mjs';
-import { blobTake } from './watchreadtest.mjs';
-import { compareReads, describe, BANDS } from './watchwords.mjs';
+import { watchVideo, findFfmpeg } from 'reelreader/scripts/watch.mjs';
+import { readMode, liquidCues, MIN_NEAR_BLACK, MIN_COLOURFULNESS } from 'reelreader/scripts/watchmode.mjs';
+import { REAL_SHOW_CARDS } from 'reelreader/scripts/watchcard.mjs';
+import { blobTake } from 'reelreader/scripts/watchreadtest.mjs';
+import { compareReads, describe, BANDS } from 'reelreader/scripts/watchwords.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REPO_CONFIG = path.join(HERE, 'reelreader.config.json');
+const REPO_CONFIG = path.join(HERE, '..', 'reelreader.config.json');
 let total = 0, failed = 0;
 const check = (name, ok, detail = '') => { total++; if (!ok) failed++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`); };
 
@@ -163,9 +163,10 @@ const HEADS = /\/10:|## (Physics|Techniques|Report card|Settings to try)/g;
 const outsideReadAs = md => md.split(/\n(?=## )/).filter(s => !s.startsWith('## Read as')).join('\n');
 const liquidProse = md => [...new Set((outsideReadAs(md).match(PROSE) ?? []).map(w => w.toLowerCase()))];
 const liquidVocab = md => [...liquidProse(md), ...new Set(outsideReadAs(md).match(HEADS) ?? [])];
-// Where each area's words may come from (reelreader/skill/watch-words.md), with the
+// Where each area's words may come from (reelreader's skills/reelreader/watch-words.md), with the
 // general words' sources: film and photography lighting, Arnheim, Ching, Greenberg.
-const DOC = fs.readFileSync(path.join(HERE, '..', 'reelreader', 'skill', 'watch-words.md'), 'utf8').toLowerCase();
+// The words guide ships in the reelreader package (PLAN 47p-7), beside its skill.
+const DOC = fs.readFileSync(fileURLToPath(import.meta.resolve('reelreader/skills/reelreader/watch-words.md')), 'utf8').toLowerCase();
 const BOLD = new Set([...DOC.matchAll(/\*\*([^*]+)\*\*/g)].map(m => m[1].replace(/\s+/g, ' ').trim()));
 const GENERAL_SOURCES = { light: ['itten', 'arnheim', 'photography'], form: ['greenberg', 'ching'] };
 const generalOk = w => BOLD.has(String(w.term).toLowerCase()) && (GENERAL_SOURCES[w.area] ?? ['laban', 'ching', 'itten', 'greenberg', 'arnheim']).some(x => String(w.source).toLowerCase().includes(x)) && !/wet show/i.test(w.source);
@@ -190,7 +191,7 @@ const wet = (rStreet.words?.words ?? []).filter(w => w.source === 'the wet show'
 check("(c) no wet-show word in the street's words", (rStreet.words?.words?.length ?? 0) >= 4 && !wet.length,
   wet.map(w => w.term).join(', ') || `${rStreet.words.words.length} words: ${rStreet.words.words.map(w => w.term).join(', ')}`);
 const unsourced = (rStreet.words?.words ?? []).filter(w => !generalOk(w));
-check("(c) every one of the street's words is bold in reelreader/skill/watch-words.md with a general source", (rStreet.words?.words?.length ?? 0) >= 4 && !unsourced.length,
+check("(c) every one of the street's words is bold in reelreader's skills/reelreader/watch-words.md with a general source", (rStreet.words?.words?.length ?? 0) >= 4 && !unsourced.length,
   unsourced.map(w => `${w.term} (${w.source})`).join(', ') || 'all');
 const streetVocab = liquidVocab(streetMd);
 check("(c) none of the liquid show's vocabulary anywhere in the street's summary", !streetVocab.length, streetVocab.join(', ') || 'clean');

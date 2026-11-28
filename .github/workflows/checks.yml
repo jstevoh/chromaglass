@@ -531,7 +531,7 @@ jobs:
         id: build
         run: npm run build
       # ffmpeg is not on the macOS image; imageio-ffmpeg is a static build that
-      # scripts/watch.mjs finds by itself. Homebrew's Python refuses a plain
+      # reelreader/scripts/watch.mjs finds by itself. Homebrew's Python refuses a plain
       # pip install (PEP 668), hence the second try.
       # Bounded with the other fetches (PLAN 19ab): two pip tries against PyPI on
       # the shard that costs the Mac queue most, and nothing above stops them

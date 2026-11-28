@@ -34,7 +34,7 @@ on:
     paths:
       - 'scripts/film.mjs'
       - 'scripts/recorder.mjs'
-      - 'scripts/watch.mjs'
+      - 'reelreader.config.json'
       - '.github/workflows/film.yml'
 
 concurrency:

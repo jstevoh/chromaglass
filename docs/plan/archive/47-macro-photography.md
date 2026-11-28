@@ -203,3 +203,12 @@ blur.
   page, the refit and the notes' themes (handoff "Ratings for everyone"): `scripts/watchshots.mjs`,
   `watchbatch.mjs`, `watchrate.mjs`, `watchfit.mjs`, `watchnotes.mjs`; checks `npm run watchshots`,
   `npm run watchbatch`, `npm run ratepage`.
+- ~~**47p-7**~~ reelreader is made in its own repository (shipped, this PR; the owner,
+  2026-11-28: "stand up a new project for reelreader so we can continue to improve it").
+  jstevoh/reelreader became the source of truth (its PR #1: a plan, a contributor guide, and
+  `scripts/repotest.mjs`, the old `npm run reelpack` points held on the repository itself in its
+  own CI), and this repository installs the npm package at an exact pin: the in-repo copy of the
+  modules, `reelreader/`, the pack script and the six tests that now run there (watchwords,
+  watchreport, watchshots, watchbatch, reelset, reelpack) went; the config moved to the root;
+  watchcard, watchconfig, watchmode and ratepage stay here and read the installed package.
+  docs/watch.md says how a change to the tool lands (a PR there, a release, a pin bump here).

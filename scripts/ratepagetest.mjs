@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The rating page a batch run writes, in a real browser (PLAN 47p-5,
- * scripts/watchrate.mjs).
+ * reelreader/scripts/watchrate.mjs).
  *
  *   npm run ratepage
  *
@@ -11,7 +11,7 @@
  * ratings.json. So the script is held where it runs, in Chromium, at a
  * phone's width (390 px), on a page of three clips built here (no video and
  * no ffmpeg: the page's own behaviour, not the batch's files, which
- * `npm run watchbatch` holds):
+ * reelreader's own watchbatchtest holds, in its repository):
  *
  *   (a) no sideways scroll at a phone's width;
  *   (b) a mark, a note typed just before a tap elsewhere (the first version
@@ -35,7 +35,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { ratePage } from './watchrate.mjs';
+import { ratePage } from 'reelreader/scripts/watchrate.mjs';
 
 let total = 0, failed = 0;
 const check = (name, ok, detail = '') => { total++; if (!ok) failed++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`); };

@@ -77,7 +77,7 @@ import type { Preset } from './presets';
  *    quarter (presetPlate.ts plainSeed).
  *  - No swells: at 0.36 something landed every three seconds or so, a
  *    steady drizzle whose motion never stood above its own median, which is
- *    what a swell is (scripts/watch.mjs shape()). Evolve is now 0.24,
+ *    what a swell is (reelreader/scripts/watch.mjs shape()). Evolve is now 0.24,
  *    between the two. Filmed (Mac, seed 1, 60 s) this did not bring the
  *    swells back: 1.0 a minute before and after, calm 11% and 10%, so the
  *    rate is not what took them (PLAN 48s-8 asks what did).

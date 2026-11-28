@@ -19,7 +19,7 @@ Start with the [full guide](guide.md): every feature, control and setup, and how
 - Reliability: [stability-plan.md](stability-plan.md), [crash-plan.md](crash-plan.md)
 - CI on the owner's Mac: [mac-runner.md](mac-runner.md)
 - The live show (where the Mac app can stream, and how): [live-show.md](live-show.md)
-- The link watcher (`npm run watch`), its config file and its limits: [watch.md](watch.md); its words [watch-words.md](../reelreader/skill/watch-words.md), its public judging skill and test set [reelreader/](../reelreader/README.md), its packaging [watch-plugin-plan.md](watch-plugin-plan.md)
+- The link watcher (`npm run watch`): reelreader, an npm package made in its own repository (jstevoh/reelreader); how this repository uses it, its config and the checks that stay here: [watch.md](watch.md); its old packaging plan (history) [watch-plugin-plan.md](watch-plugin-plan.md)
 - The App Store and Google Play listings, ready to paste: [store-listings.md](store-listings.md); the press kit is the site's `/press` (`public/press.html`)
 
 **Handoffs for finished pieces**: [handoff-signin.md](handoff-signin.md), [handoff-phone-link-qr.md](handoff-phone-link-qr.md), [handoff-switches.md](handoff-switches.md), [handoff-macro-ferro-drop.md](handoff-macro-ferro-drop.md)

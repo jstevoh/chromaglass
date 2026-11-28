@@ -27,7 +27,7 @@ import { installFrameReader, frameOf } from './frame.mjs';
 import { PIN_RANGE, PINNABLE } from '../src/lib/deskPins.ts';
 import { PALETTE } from '../src/constants.ts';
 import { PRESETS } from '../src/presets.ts';
-import { watchVideo, freezes, WatchError } from './watch.mjs';
+import { watchVideo, freezes, WatchError } from 'reelreader/scripts/watch.mjs';
 
 const PORT0 = port(4540, 'GIG_PORT');
 const LOOK = process.env.GIG_LOOK ?? 'soap-film';
@@ -35,7 +35,7 @@ const MINUTES = Number(process.env.GIG_MINUTES ?? 10);
 const SEED = Number(process.env.GIG_SEED ?? 20260924);
 /*
   The gig is filmed (GIG_FILM=0 to not), and the film watched afterwards with
-  scripts/watch.mjs. The photographs below are one every two to four seconds,
+  reelreader/scripts/watch.mjs. The photographs below are one every two to four seconds,
   which says what the plate looked like and nothing about what it did between
   them: a plate that froze for three seconds, or a look change that landed as
   a jump cut, happens between two photographs. The film has every frame, and

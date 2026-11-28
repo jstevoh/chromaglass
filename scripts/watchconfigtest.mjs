@@ -9,11 +9,12 @@
  * Mac, Homebrew's bin folder and the app's settings map in their code, so a
  * copy run anywhere else looked in folders that are not there and suggested
  * dials of an app it was not watching. `watchconfig.mjs` moved those into
- * `scripts/reelreader.config.json`. This holds that move, with no ffmpeg (the
+ * `reelreader.config.json` (at the repository's root since the tool became the
+ * reelreader package, PLAN 47p-7). This holds that move, with no ffmpeg (the
  * end-to-end "no settings map, no Settings to try" line is (h2) in
  * `npm run watchcard`, which has one):
  *
- *   (a) no watch module names one of the places, or imports the settings map,
+ *   (a) no module of the installed package names one of the places, or imports the settings map,
  *       outside the config; the scan is shown to catch the old lines, and to
  *       have read the modules (not an empty glob);
  *   (b) the places are in the config (moved, not lost);
@@ -33,7 +34,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig, referenceTries, settingsMapFor } from './watchconfig.mjs';
+import { loadConfig, referenceTries, settingsMapFor } from 'reelreader/scripts/watchconfig.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 let failed = 0, total = 0;
@@ -59,9 +60,11 @@ function scan(name, src) {
   return hits;
 }
 
-// (a)
-const mods = fs.readdirSync(HERE).filter(f => /^watch.*\.mjs$/.test(f) && f !== 'watchconfigtest.mjs');
-const hits = mods.flatMap(f => scan(f, fs.readFileSync(path.join(HERE, f), 'utf8')));
+// (a) over the installed package's modules: the watch tool is the reelreader
+// package now (PLAN 47p-7), and what it must not name is still this project's.
+const PKG = path.dirname(fileURLToPath(import.meta.resolve('reelreader/scripts/watch.mjs')));
+const mods = fs.readdirSync(PKG).filter(f => /^watch.*\.mjs$/.test(f));
+const hits = mods.flatMap(f => scan(f, fs.readFileSync(path.join(PKG, f), 'utf8')));
 check('(a) no watch module names a project place or imports the settings map', hits.length === 0, hits.slice(0, 6).join('; '));
 check('(a) the scan read the tool: watch.mjs, watchrefs.mjs, watchconfig.mjs among 10+ modules',
   mods.length >= 10 && ['watch.mjs', 'watchrefs.mjs', 'watchconfig.mjs', 'watchpair.mjs'].every(f => mods.includes(f)), `${mods.length} modules`);
@@ -77,7 +80,8 @@ check('(a) the scan catches each old line and each respelling', old.every(l => s
 check('(a) the scan passes a comment that names Homebrew', scan('watch.mjs', ' * Homebrew\'s bin folder (/opt/homebrew/bin)').length === 0);
 
 // (b)
-const repoFile = path.join(HERE, 'reelreader.config.json');
+// At the repository's root since 47p-7: reelreader looks in the folder it runs from.
+const repoFile = path.join(HERE, '..', 'reelreader.config.json');
 const repoText = fs.readFileSync(repoFile, 'utf8');
 check('(b) the config holds every place the code gave up',
   ['/mnt/project-files/references', '~/chromaglass-films/references', '~/chromaglass-films/watch', '/opt/homebrew/bin', 'watchsettings.mjs'].every(p => repoText.includes(p)));
@@ -89,7 +93,7 @@ try {
   const empty = path.join(tmp, 'empty.json');
   fs.writeFileSync(empty, '{}');
   const ce = loadConfig({ file: empty, env: env0, fresh: true });
-  const watch = await import('./watch.mjs');
+  const watch = await import('reelreader/scripts/watch.mjs');
   const line = watch.macFetch('https://www.youtube.com/watch?v=abc', ce);
   const msg = watch.fetchElsewhere('https://www.youtube.com/watch?v=abc', ce).join('\n');
   const tries0 = referenceTries(env0, ce);
@@ -126,7 +130,7 @@ try {
   check('(e) a settings map that will not load is an error', /did not load/.test(mapErr), mapErr.slice(0, 90));
 
   // (f)
-  const refs = await import('./watchrefs.mjs');
+  const refs = await import('reelreader/scripts/watchrefs.mjs');
   const deep = path.join(tmp, 'a', 'b', 'lib');
   // Folders that exist on no machine but this run's, so a real ~/reelreader-references does not answer first.
   const lone = path.join(tmp, 'lone.json');

@@ -6,7 +6,7 @@
  *   npm run codecblip
  *
  * `npm run moving` freezes the liquid on purpose for four seconds and asks
- * the film (the app's Record button, read by `scripts/watch.mjs`) to find
+ * the film (the app's Record button, read by `reelreader/scripts/watch.mjs`) to find
  * the freeze where the plate stood. It went red in 9 of 58 runs from
  * 2026-09-25 to 27, and in 8 of them the plate had stopped on time while the
  * film found the stillness 1.3–1.9 s late, or split it in two. This makes the
@@ -38,7 +38,7 @@
 import { chromium } from 'playwright';
 import { chromiumPath } from './chromium.mjs';
 import { acquireFilmLock } from './maclock.mjs';
-import { watchVideo, freezes } from './watch.mjs';
+import { watchVideo, freezes } from 'reelreader/scripts/watch.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

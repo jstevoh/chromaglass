@@ -467,20 +467,7 @@ Arnheim's balance, and the wet show's own words (cells, beads, threads, marbling
 a bloom, a turned dish, a pour). Every word carries the number that chose it, a word from
 an unsteady measure says "may vary from take to take", and every word names its source.
 
-- **47x-6b** run `npm run watch -- --selftest`, `npm run watchwords` and `npm run watchcard` on the
-  owner's Mac with ffmpeg-full 9.0.2 and with Homebrew's default ffmpeg, to confirm 47x-6 there.
-- **47x-9** the overall read against itself. Swells, rests and the peak's place come from one
-  take of a moving fluid: run two takes of one look through it and find which of its sentences
-  hold between takes, as 47x-2 did for the words, and mark the rest as varying. It has no
-  check of its own yet: `npm run watchwords` sees only that diff.md still holds its sections.
-- **47x-17** own flow speed on a rigid slide is the read's own floor, 0.11 to 0.16 % of the width a
-  second across phases of one drift, so a ratio between two takes of a picture that only slides
-  can still reach most of a step (0.87 at worst of eight). Take the floor out of it as carried
-  does (47v-5), or let the words compare a show measure under its floor as held.
-- **47x-15** refit the card's bands from the owner's ratings once there are enough. The refit itself shipped in 47p-5 (`npm run watch -- --refit`, scripts/watchfit.mjs); what is left is the owner's ratings in, 47p-5f.
-- **47x-16** calibrate `REAL_SHOW_CARDS` (`scripts/watchcard.mjs`) with more real optical liquid-show
-  references so leave-one-out scoring (`(f2)` in `npm run watchcard`) passes `>= 6` on at least
-  five canons per row; today three rows leave each film outside one or two peers' bands.
+- **47x-15** refit the card's bands from the owner's ratings once there are enough. The refit itself shipped in 47p-5 (`npm run watch -- --refit`, reelreader/scripts/watchfit.mjs); what is left is the owner's ratings in, 47p-5f.
 
 ## 47y. Found doing this: Poster 1969 against a real overhead projection (M)
 
@@ -651,68 +638,10 @@ makers, video QA). It reads look and motion, not content. Its public name is **r
 under the MIT licence (the owner, 2026-11-28). Five pieces, one PR each, in this
 order; the README is `docs/watch.md`, the plugin's layout `docs/watch-plugin-plan.md`.
 
-- **47p-3b** an app take with cuts reads general: the closeup film of 38h-7 (two hard cuts in
-  21 s) did, and a drained or frozen take fails the light or motion cue. Our own films are
-  liquid by construction: have `film.mjs`, `gig.mjs`, `moving.mjs` and the 5b/7a bad-take
-  set pass `liquid: true`, or let a take carry its own sidecar that says it is the app's.
-  A real show can too: one minute (2:00 to 3:00) of the 1969 *Liquid Loops* film reads general
-  on 3 hard cuts a minute from its splices (the test set's linked show, 47p-5b).
-- **47p-3c** footage that is continuous, coloured, on a dark ground and moving by itself reads
-  liquid though it is not (a night street with neon on a tripod, a VJ loop, a fish tank).
-  A fourth cue (rigid motion: the flow's blocks moving as solid pieces) would tell them apart.
-- **47p-4b** the best moment judged on real footage: chosen and checked on made clips only.
-  Watch three or four of the library's films (a real show, an edited film, an app take) and
-  look at whether `best.mp4` is the moment a person would pick; a liquid take may want the
-  swell's peak (shape()'s swells) weighted over colour.
-- **47p-5f** the owner's own ratings (the phone rating page, its shared store) into a refit: export
-  its rows as ratings.json and give each film a read the refit can find (watch each of the 21
-  films with `--keep` under the page's key, or add `read` from a batch run), then
-  `npm run watch -- --refit` (47x-15 and 7d, which can now run on the tool's own refit).
-- **47p-5g** a shot's palette is its share of the 64 colour bins the cut test keeps (4 levels a
-  channel): it tells shots apart and says which is warmer, but two greens a colourist would call
-  different read as one. The design read's palette per shot would be finer, at a pass's cost.
-- **47p-5h** the beat comes only from music with a steady pulse: ambient music, rubato or a live
-  band's drift reads "no steady beat" (the tracker needs eight onsets of 3 dB and a period that
-  correlates), so the on-beat share is silent on most of the demo music. A beat from the motion's
-  own swells, against the sound's, would read those.
-- **47p-5i** the notes' themes read English words from a fixed list of fault names (froze,
-  drained, flicker, …): another language, or a fault no word on the list names, comes up only as a
-  plain repeated word. Claude reads the notes themselves as well (the skill's evals.md says so).
-- **47p-5c** a freeze is filed as a title card: on the test set's frozen take the Footage read
-  drops 0:04.8 to 0:10.2 as a "title span", so the motion reads never meet it, Overall says
-  "holds one steady pace from start to end", and the summary never prints what `freezes()`
-  finds (4.7 to 10.3 s). Print the freezes in the summary and keep a still span that is the
-  picture itself (not a card) in the reads. Feeds the fault reads (handoff 7a).
-- **47p-5d** a whole-picture turn reads as the liquid's own flow: the turned take (the whole
-  picture inside a fixed rim, clockwise once every 8 s) reads own flow 17.2%/s, "fast,
-  churning", over every real show, whole-field only 31%, and "about one turn in 22 s". The
-  affine fit takes out too little of a rotation inside a round mask; name a rigid turn and
-  its true period. Feeds 7a and the owner's rule of no whole-frame motion from sound.
-- **47p-5e** the Footage read misfires on a slow dark liquid take: the test set's good take
-  gets four "still overlays" masked (one the left quarter of the frame) and three 0.4 s
-  "title spans" dropped, with no overlay or title on the sheets.
-
-- ~~**47p-6**~~ the release build (shipped, this PR). reelreader's public repository is a build
-  of this one, never edited by hand: `scripts/reelreaderpack.mjs --out DIR [--demo] [--zip]
-  [--test]` copies every watch module but the settings map (and every file they import, so
-  watchreadtest.mjs goes too), the tests that need only node and ffmpeg, the skill as
-  `skills/reelreader/` with its helper again as `agents/`, and `reelreader/release/` (README,
-  package.json, MIT licence, `.claude-plugin/` plugin + marketplace, the `/reelreader` command, CI
-  and a tag-driven release workflow that puts the skill zip on the GitHub release and the
-  package on npm). `npm run reelpack` (14 checks, each shown failing on a wrong build) holds that
-  every import resolves, npm packs no test, clip or demo, one version everywhere, no home
-  folder, address or model name, and the command runs through a bin link as npx runs it.
-- **47p-6b** publish: the public repository jstevoh/reelreader (the owner creates it empty and
-  adds it to the project; a cloud session cannot create one), the `NPM_TOKEN` secret there (the
-  owner's npm account), then push the build and the tag `v0.1.0`; deploy the omnibrains.org card
-  and its demo report from the Mac (source /mnt/project-files/omnibrains-site/, card added
-  2026-11-28).
-- **47p-6c** community lists: submissions drafted, posted only with the owner's OK.
-- **47p-6d** native Windows untried: watch.mjs's run-as-command test compares a URL's pathname
-  with a resolved path, which differs on a drive letter. macOS, Linux and WSL work.
-- **47p-6e** the copy ships without watchmodetest (it proves "Settings to try" goes with the
-  liquid read, which needs the app's settings map); a version of its other cases with no map
-  would cover the general-versus-liquid choice in the public CI too.
+- **47p-7a** the open reelreader items (47p-3b, 47p-3c, 47p-4b, 47p-5c to 47p-5i, 47p-6c to
+  47p-6f, 47x-6b, 47x-9, 47x-16, 47x-17) now live in jstevoh/reelreader's PLAN.md under the same
+  ids; work on them happens there. What stays here is ChromaGlass's side: the owner's ratings
+  for 47x-15, the settings map, and our films as references.
 
 Later, not now: photosensitivity (flash) screening, real units (mm/s), dance and pose, "what is
 in it". The reference library stays private and ships empty (watch-plugin-plan.md, point 3).
@@ -723,7 +652,7 @@ in it". The reference library stays private and ships empty (watch-plugin-plan.m
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q; 47d-1 shipped), 47a, 47e (its glitter half shipped; 47e-1, 47e-2), 47f, 47k; 47b-2 and 47b-3 after 47b-1; 47g,
-47h, 47i and 47n when wanted; the release build shipped (47p-6), publishing next (47p-6b, waiting on the owner's empty repository and npm token), 47p-6c with the owner's OK, 47p-5f with the owner's ratings, 47p-4b when the watch tool next watches real films, 47p-3b and 47p-3c when the watch tool is next touched; 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
+47h, 47i and 47n when wanted; reelreader's own items in its repository's PLAN.md (47p-7a); 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
 as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4 in that order (the owner asked
 for the drops' physics and their colour, 2026-11-12; ~~47z-5~~ shipped early, 2026-11-13, as Foam
 Cells), then 47z-7 after 47z-3, 47z-8 and 47z-6 after 28k-2 (a). Each its own thread

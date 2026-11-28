@@ -1,5 +1,9 @@
 # Sharing the watch tool as a Claude Code plugin (PLAN 47x-4)
 
+> **History (2026-11-28, PLAN 47p-7).** reelreader is now made in its own repository,
+> jstevoh/reelreader, and this repository installs it from npm; the pack script and
+> `reelreader/` this page names are gone. See [watch.md](watch.md).
+
 Built as reelreader (PLAN 47p-6, 2026-11-28): one repository that is the npm package, the plugin
 and its own marketplace, built from this one by `scripts/reelreaderpack.mjs`. What follows is the
 plan as it was written; check-skeptic and the second wave were not shipped with it.

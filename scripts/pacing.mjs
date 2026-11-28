@@ -15,7 +15,7 @@
  *   - at Pacing 0 nothing is planned, nothing fires, and every tick hands the
  *     plate 1 and 1, on every built-in sequence: the default keeps today's show;
  *   - "Light Show Night", measured with the same yardstick the filmed shows
- *     were (`shape()` from scripts/watch.mjs), swells 1.5 to 3.5 times a minute
+ *     were (`shape()` from reelreader/scripts/watch.mjs), swells 1.5 to 3.5 times a minute
  *     and is calm 20 to 40 % of the time, over several nights' seeds;
  *   - every dark ending reaches near-black, the light never steps (planned or
  *     followed), and a sequence stopped in the dark comes back up over more
@@ -52,7 +52,7 @@ import { makeRng } from '../src/lib/rng.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { RIG_KEYS, lookOf } from '../src/lib/lookFade.ts';
 import { PRESETS } from '../src/presets.ts';
-import { shape } from './watch.mjs';
+import { shape } from 'reelreader/scripts/watch.mjs';
 import { analysePcm } from '../src/lib/audioFeatures.ts';
 import { SongShape } from '../src/lib/songShape.ts';
 import { arrange, rng as songRng, SR } from './arrangement.mjs';

@@ -21,7 +21,7 @@
  * For each look, FILM_TAKES takes (default 3) on seeds 1, 2, 3, each a
  * fresh page with the band in a box, waited on until the show runs steadily,
  * then FILM_SECONDS (default 120) through the app's own Record button
- * (`scripts/recorder.mjs`), watched with `scripts/watch.mjs` and reduced to
+ * (`scripts/recorder.mjs`), watched with `reelreader/scripts/watch.mjs` and reduced to
  * its shape (`shape()` there says what each number is and how it was
  * checked). Two minutes because the band's sections are eight bars, about
  * 16 s, and motion against loudness over 20 s windows needs five windows
@@ -46,7 +46,7 @@ import path from 'node:path';
 import { launchChromium, port } from './chromium.mjs';
 import { engineQuery } from './frame.mjs';
 import { PRESETS } from '../src/presets.ts';
-import { watchVideo, WatchError } from './watch.mjs';
+import { watchVideo, WatchError } from 'reelreader/scripts/watch.mjs';
 import { AUTOPLAY, withBand, recordTake, untilRunning } from './recorder.mjs';
 import { untilFlowerFree } from './flowergate.mjs';
 
@@ -170,7 +170,7 @@ function tableLines(results) {
   return [
     `# The looks, filmed`,
     '',
-    `${results.length} looks, ${TAKES} take${TAKES > 1 ? 's' : ''} each on seeds ${SEEDS.join(', ')}, ${SECONDS} s a take with the band in a box, watched at ${RATE} samples a second. Each cell is the median over the takes, with their range in brackets when they differ. What each column is: \`shape()\` in scripts/watch.mjs ("colour changes" sees colour, not where shapes are). The first rows are real shows for scale, not targets. A dash is a number there was nothing to measure for (a still take, a flat sound, too few windows).`,
+    `${results.length} looks, ${TAKES} take${TAKES > 1 ? 's' : ''} each on seeds ${SEEDS.join(', ')}, ${SECONDS} s a take with the band in a box, watched at ${RATE} samples a second. Each cell is the median over the takes, with their range in brackets when they differ. What each column is: \`shape()\` in reelreader/scripts/watch.mjs ("colour changes" sees colour, not where shapes are). The first rows are real shows for scale, not targets. A dash is a number there was nothing to measure for (a still take, a flat sound, too few windows).`,
     '',
     `| | ${COLUMNS.map(c => c.head).join(' | ')} |`,
     `|---|${COLUMNS.map(() => '---').join('|')}|`,
