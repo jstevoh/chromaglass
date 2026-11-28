@@ -219,7 +219,7 @@ export const OIL_CELLS = 0.5;
   Francois 2006) leaves no spurious current to clip, and then this goes.
   Fixed in cells as OIL_CELLS is, so on a finer grid than 512² it binds on
   larger drops again (on 1024², under about twenty cells).
-  Only a body wide and gently curved against the gap takes it (WIDE_ACROSS
+  Only a body several gaps wide every way takes it (WIDE_ACROSS
   in src/gpu/wgsl/fluid/capillary.ts): a thread's beads at six caps beside
   a neck slowed by THREAD_PULL broke at 8.18 widths a bead, not 4.7.
 */

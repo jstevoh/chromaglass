@@ -35,15 +35,19 @@ export const THREAD_REACH = 12;
   pulled at six caps beside a neck that THREAD_PULL slows, so they sucked
   the neck dry before Rayleigh–Plateau's wave could set the spacing: 8.18
   widths a bead against the law's 4.7. A body is a Hele-Shaw pancake, the
-  drop whose rounding 38e-2 measures, once it is several gaps across and
-  curved in the plane more gently than the gap; under either its in-plane
-  curve is the gap's own size and it belongs with the thread it came from,
-  at the cap the thread is tuned to. Width alone was not enough (6.70
-  widths a bead): at a bead's shoulder or a thread's tip the walk runs
-  along the thread, not across it, and reads it wide, so the in-plane
-  curvature has to be under 1/h as well (4.43 widths, the law's within 6%).
-  Two gaps, and κh under one, keep the smallest drop droplaw reads (20
-  cells across, κh 0.51 at 512²) on the wide cap.
+  drop whose rounding 38e-2 measures, once it is several gaps across every
+  way; under that its in-plane curve is the gap's own size and it belongs
+  with the thread it came from, at the cap the thread is tuned to. So both
+  ways: two gaps along the edge's normal (the thread's own walk, carried
+  on), and as broad again a gap in from the edge, across the normal.
+  Width along the normal alone was not enough (6.70 widths a bead): at a
+  bead's shoulder or a thread's tip the normal runs along the thread, not
+  across it, and reads it wide; a gap in, across, it reads the thread.
+  Both: 4.40 widths (the law's within 7%). A curvature gate instead (κ
+  under 1/h or 2/h) split one oval drop into capped tips and uncapped
+  flanks, which stretched it rather than rounding it (R 10 at −0.03 of
+  the law at 1/h); the breadth a gap in is the same at a small drop's tip
+  and flank, and R 10 rounds at 0.88, as with no gate.
 */
 export const WIDE_ACROSS = 2;
 /*
@@ -190,11 +194,20 @@ fn csAt(g: vec2f, n: f32) -> f32 {
   let b = cs(c0 + vec2i(0, 1), n) + (cs(c0 + vec2i(1, 1), n) - cs(c0 + vec2i(0, 1), n)) * f.x;
   return a + (b - a) * f.y;
 }
+// 1 where the oil at q runs on along ±t for far cells' worth (the body's
+// breadth there, read the same way the walk below reads its width).
+fn broad(q: vec2f, t: vec2f, far: f32, n: f32) -> f32 {
+  var w = csAt(q, n);
+  if (w < 0.5) { return 0.0; }
+  for (var k = 1; k <= ${THREAD_REACH}; k++) { let s = csAt(q + t * f32(k), n); if (s < 0.02) { break; } w += s; if (w >= far) { return 1.0; } }
+  for (var k = 1; k <= ${THREAD_REACH}; k++) { let s = csAt(q - t * f32(k), n); if (s < 0.02) { break; } w += s; if (w >= far) { return 1.0; } }
+  return 0.0;
+}
 // x: the thread's own curvature across the gap (0 off a thread); y: 1 on a
-// body wider across than WIDE_ACROSS gaps and curved in the plane more gently
-// than the gap (κ, its in-plane curvature, under 1/h): the only oil whose pull
-// may pass the cap on the open thin gap (OIL_WIDE_CELLS; capillaryAt says why).
-fn threadCurve(p: vec2i, g: vec2f, n: f32, kappa: f32) -> vec2f {
+// body wide both ways, WIDE_ACROSS gaps along the normal and as broad a gap
+// in from the edge: the only oil whose pull may pass the cap on the open thin
+// gap (OIL_WIDE_CELLS; WIDE_ACROSS says why both).
+fn threadCurve(p: vec2i, g: vec2f, n: f32) -> vec2f {
   if (S.thinGap < 0.5) { return vec2f(0.0, 0.0); }
   let h = max(textureLoad(sq, clampP(p, n), 0).r, 0.0) * ${DISH_GAP_FIELD_UV.toFixed(6)} * n;
   let gl = length(g);
@@ -202,7 +215,7 @@ fn threadCurve(p: vec2i, g: vec2f, n: f32, kappa: f32) -> vec2f {
   let u = g / gl;
   let o = vec2f(p);
   let far = ${WIDE_ACROSS.toFixed(1)} * h;
-  let wide = select(0.0, 1.0, abs(kappa) * h < 1.0);
+  let wide = broad(o + u * h, vec2f(-u.y, u.x), far, n);
   var w = cs(p, n);
   // A walk that runs out of reach still in the oil is across a wide body
   // (a lifted gap on a fine grid is wider than the reach), and reads as one.
@@ -228,13 +241,12 @@ fn threadCurve(p: vec2i, g: vec2f, n: f32, kappa: f32) -> vec2f {
 // grid out of it. And the thread's own curvature across the gap (above),
 // its whole pull slowed by THREAD_PULL's one factor before the clip, so the
 // clip does not flatten Rayleigh–Plateau (PLAN 47k).
-// A.a.y is the cap (OIL_CELLS a step); negative, a wide body's (threadCurve's y: WIDE_ACROSS says which) is OIL_WIDE_CELLS instead (PLAN 38e-2), and a thread's, its beads' and anything curved tighter than the gap still |A.a.y|.
+// A.a.y is the cap (OIL_CELLS a step); negative, a wide body's (threadCurve's y: WIDE_ACROSS says which) is OIL_WIDE_CELLS instead (PLAN 38e-2), and a thread's and its beads' still |A.a.y|.
 fn capillaryAt(p: vec2i, n: f32) -> vec2f {
   let g = grad(p, n);
-  let kappa = curvature(p, n);
-  let tw = threadCurve(p, g, n, kappa);
+  let tw = threadCurve(p, g, n);
   let t = tw.x;
-  var f = A.a.x * (kappa + t) * g;
+  var f = A.a.x * (curvature(p, n) + t) * g;
   let cap = abs(A.a.y);
   if (t != 0.0) { f *= min(1.0, ${THREAD_PULL.toFixed(2)} * cap / max(A.a.x, 1e-20)); }
   let most = select(cap, cap * ${(OIL_WIDE_CELLS / OIL_CELLS).toFixed(4)}, tw.y > 0.5 && A.a.y < 0.0);

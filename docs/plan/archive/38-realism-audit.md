@@ -210,12 +210,12 @@ written first. Line numbers are as read on main at d07ac31.
   `npm run droplaw`). At the Mac's 512² the half-cell cap bound on every drop under about
   45 cells' radius (a drop rounded at 2% of the law at R 10); a wide body (no thread
   curvature) on the open thin gap is now capped at six times it (`OIL_WIDE_CELLS`, three
-  cells a step), within 0.6–1.3 of Darcy's rounding from R 10 to 40 and as R^−3.2. Film
+  cells a step), at 0.93, 0.79 and 0.60 of Darcy's rounding at R 10, 20, 40 (bar 0.5–1.3) and as R^−3.3. Film
   Hold takes the blur's waist pull back out in a film (from PR #624): `filmhold` 35 → 33
-  held. Only a body over two gaps across and curved more gently than the gap takes it
+  held. Only a body two gaps across along its edge's normal and as broad a gap in takes it
   (`WIDE_ACROSS`): with every non-thread body at six caps a thread's beads outpulled the
-  slowed neck and `pinch` read 8.18 widths a bead; width alone 6.70; width and κh under
-  one 4.43 (the law 4.7). A thread and its beads keep OIL_CELLS and THREAD_PULL, the sealed bottle SEALED_CELLS (27f-9q),
+  slowed neck and `pinch` read 8.18 widths a bead; the normal's width alone 6.70; both
+  4.40 (the law 4.7). A curvature gate stretched ovals (capped tips, free flanks). A thread and its beads keep OIL_CELLS and THREAD_PULL, the sealed bottle SEALED_CELLS (27f-9q),
   the old plate OIL_CELLS. Not none: with no cap the edge read half again as wide (cells
   0.1–0.45 oil 890 against the cap's 590) and a faint halo grew three times as fast, the
   spurious current the cap had clipped; six caps 710 and a halo under two thirds of none's.
