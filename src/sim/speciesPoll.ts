@@ -17,6 +17,7 @@ import { DISH_GAP_METRES } from '../lib/turntable';
 import type { VisualizerSettings } from '../types';
 import { GRID_SCALE, GRID_SIZE, particleFlowScale } from './constants';
 import type { FluidSimulation } from './fluidSimulation';
+import { pressOverStep } from './pressLay';
 
 export interface SolverSpeciesSnap extends SpeciesSnapshot {
   poured: PouredLiquid;
@@ -104,11 +105,13 @@ export function stepPlateBubbles(
   // dye out to the rim, so the field flows round the bubbles
   // instead of sliding underneath them as if they were painted on.
   // The bubble's press, not the hand's (lib/squish.ts Presser): a held Blow's straw bubble is one, and `npm run tools` counts the hand's alone.
+  // Held every step, so laid as this step's share of a rate (pressOverStep, PLAN 18a-5).
   if (lead) {
+    const squeeze = pressOverStep(0.0035, simStepS);
     for (const b of bubbles.bubbles) {
       if (b.r < 1.2) continue;
       const bx = Math.round(b.x), by = Math.round(b.y);
-      if (bx > 2 && by > 2 && bx < GRID_SIZE - 3 && by < GRID_SIZE - 3) lead.applySquish(bx, by, Math.max(1, b.r * 0.85 / GRID_SCALE), 0.0035, 0, false, 'press', 'bubble');
+      if (bx > 2 && by > 2 && bx < GRID_SIZE - 3 && by < GRID_SIZE - 3) lead.applySquish(bx, by, Math.max(1, b.r * 0.85 / GRID_SCALE), squeeze, 0, false, 'press', 'bubble');
     }
   }
   /*

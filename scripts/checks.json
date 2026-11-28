@@ -3246,6 +3246,18 @@
       ]
     },
     {
+      "name": "A held press closes the glass over its own time",
+      "shard": "plate",
+      "run": "npm run pressclock",
+      "why": [
+        "PLAN.md 18a-5 (scripts/pressclock.mjs): the app's Press held on a thin gap closes the",
+        "glass by the same volume in the same seconds at 30, 60 and 120 steps a second, within 3%",
+        "(main's per-step dent, the control, closed 0.64-0.68 of it at 30); and let go, the thin",
+        "gap's squeeze rate is the gap's own change, no memory (the old plate, the control, keeps it).",
+        "About 45 s on SwiftShader (cloud, 2026-11-28)."
+      ]
+    },
+    {
       "name": "The Finger drags the liquid",
       "shard": "plate",
       "run": "npm run fingerflow",

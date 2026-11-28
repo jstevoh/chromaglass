@@ -196,12 +196,11 @@ its frame rate live. "Free" means no new passes or texture reads.
       bar of 1.4–1.8 (cold 0.00829, warm 0.01566). Real water's μ(20 °C)/μ(50 °C) is
       1.0016/0.5465 = 1.83, so the bar's "~2%/K" may be the thing that is off, or the
       warm plate's speed carries more than the viscosity. Measure which before moving it.
-  - **18a-5, the press over its own time.** `squish` can lay a press's dent in one
-    step, so the displaced volume leaves in one step, faster than the dye's face
-    fluxes may carry it (0.45 of a cell a step). The app's Press lays its dent a step
-    at a time (`lib/squish.ts`), and `npm run thingap` presses over ten steps; the
-    glass should close over the press's own time wherever a dent is laid, and
-    `gapMemory` then has no job in a thin gap.
+  - **18a-5b, the presses laid per event.** A pad's or a remote's 'press' gesture
+    (`performGesture`) and a Touch tool's move (`sim/tools.ts`) lay a dent per event, not
+    per step, so how fast they close follows the event rate (a MIDI pad's or a phone's
+    message rate). A held gesture could carry its seconds held. And the old plate's pile
+    (`applySquish`, 45 presses' steps) still counts steps. (S; not reported.)
   - **18a-6, inertia for water.** The velocity's self-advection is dropped. The reduced
     Reynolds number Re·h/L is under 0.1 for oils and near 2 for water in the plate's
     6 mm middle, so water in a deep gap has more inertia than this keeps. Measure it on

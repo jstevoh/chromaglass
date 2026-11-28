@@ -34,6 +34,42 @@ export function layPress(
   depths[who] += depth;
 }
 
+/** The step the hand's press was set on (s): the show's own, sixty a second (SIM_STEP in sim/stepping.ts). */
+export const PRESS_STEP_S = 1 / 60;
+
+/**
+ * A press held over one step of `dtSeconds`: `amount` is what it lays in a
+ * sixtieth of a second, the step it was set on (PLAN 18a-5).
+ *
+ * What was wrong. A hand held on the glass laid the same dent every solver
+ * step, and the step is not a fixed time: the governor lowers the step rate
+ * before it gives up a rung (QualityGovernor.stepRate) and doubles each
+ * step's `dtSeconds`, and `?steps=` sets it by hand. At thirty steps a
+ * second the Press closed the film half as fast in the show's seconds as at
+ * sixty, and at a hundred and twenty twice as fast: the glass went down over
+ * the steps it was given, not over the press's own time. Everything round it
+ * was already counted in seconds: the glass's spring (glassSpring, on a thin
+ * gap the show's seconds), the lift that follows the press (PressLift, its
+ * amount times dtSeconds · 60), the kick's hold and release (KickRelease),
+ * the clock glass (GlassPress).
+ *
+ * The physics. A hand is a load on the glass, and the film under it closes
+ * at Stefan's rate, dh/dt = −a(h/h₀)³, a rate in seconds, whatever the
+ * solver's step. The shader integrates that exactly over the step it is
+ * handed (squeezeUpdate: 1/h² grows by 2a/h₀³, which is linear in a), so a
+ * rate laid as its share of the step closes the glass to the same depth in
+ * the same time at any step rate: two steps of half the rate are one step of
+ * the whole, up to the spring taken between them. `npm run pressclock`.
+ *
+ * At sixty steps a second the share is exactly 1 and the plate presses bit
+ * for bit as it did. Only a held press goes through this (the Press tool's
+ * hands each step, a bubble's standing squeeze each step): a dent laid once,
+ * a drop's impact or a pad's hit, is a dent, not a rate.
+ */
+export function pressOverStep(amount: number, dtSeconds: number): number {
+  return Number.isFinite(dtSeconds) && dtSeconds > 0 ? amount * (dtSeconds / PRESS_STEP_S) : amount;
+}
+
 /** The solver's own lay of a lift's spokes (`liftSpokes` in gpu/solverTypes.ts). */
 export type SpokesLay = (x: number, y: number, radius: number, reach: number, gap: number, count: number, phase: number, seed: number) => void;
 

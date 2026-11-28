@@ -244,8 +244,19 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     when the film can close no further. The remembered opening of a release
     is left as it was. That the memory pushes liquid without moving the gap
     at all is still a shortcut, written into PLAN.md.
+
+    And not on a thin gap (A.a.y; PLAN 18a-5). There the film is a Stokes
+    flow, with no inertia to carry a press past its hand: the glass stops
+    closing the step the load comes off, and the liquid it moved is the
+    gap's own change, which is what the thin solve reads (hsDivergence's
+    gapBefore), never this rate. So the memory pushed nothing there; it only
+    left the rate this texel reports (readSqueeze, the checks) a quarter of a
+    second of a press that had gone, on top of the spring's own motion, which
+    the next step then remembered too. The press now lasts as long as its
+    hand does, a rate laid as each step's share of it (pressOverStep in
+    sim/pressLay.ts), and on a thin gap this rate is what the gap does.
   */
-  if (!pressed) {
+  if (!pressed && A.a.y < 0.5) {
     let room = (gap - ${GAP_FLOOR}) / max(S.dt, 0.0001);
     dhdt += max(s.b * S.gapMemory, -room);
   }
