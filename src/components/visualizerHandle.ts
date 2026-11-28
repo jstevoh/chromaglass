@@ -9,6 +9,7 @@ import type { SongEvent, SongShapeState } from '../lib/songShape';
 import type { BarNow } from '../lib/barGrid';
 import type { LookPhase, FrameDigest, VisualizerRender, SongShapeReport } from '../sim/frameTypes';
 import type { MidiEvent, MidiTarget } from '../lib/midi';
+import type { DissolvePlan } from '../lib/focusDissolve';
 
 export interface PlateSnapshot {
   /** Release GPU copies held for the Undo window. */
@@ -96,6 +97,22 @@ export interface LiquidVisualizerHandle {
   /** A pressed look change over `seconds`: the old dye thins while the new palette pours in. */
   /** A look fading in over `seconds`; `phase` as for applyPreset: what the incoming look asks of the ferrofluid, laid half way. */
   handoff: (seconds: number, phase?: LookPhase) => void;
+  /**
+   * A focus dissolve over `seconds` (PLAN 51c, lib/focusDissolve.ts): the
+   * projectors the Go changes rack out and back (stageClocks' rackStage),
+   * for a Go to the back plate with `back`, `two` the wall's two projectors.
+   * Says when the look change should go in, inside the rack.
+   */
+  rack: (seconds: number, back?: boolean, two?: boolean) => DissolvePlan;
+  /** A deck dissolve's racks over `seconds` to projector `to`, 0 A or 1 B (PLAN 51c-2, stageClocks' rackDeck). */
+  deck: (seconds: number, to: 0 | 1) => void;
+  /**
+   * The back plate keeps what it shows now (the front's solver settings and
+   * dyes, while it follows the front) as a look of its own, `id` and `name`,
+   * so a Go to the dark front leaves the lit back as it is (PLAN 51c-2).
+   * False when it already has one, or a render holds the plates.
+   */
+  pinBack: (id: string, name: string) => boolean;
   /**
    * Send a look to the back plate alone (PLAN.md §16a), or `null` to have it
    * follow the front again. Over `seconds`: its solver settings fade the way

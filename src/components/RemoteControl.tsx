@@ -524,7 +524,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
       data-testid="remote-pad"
     >
       <span className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-[12px] uppercase tracking-[0.25em] text-dim">
-        {padTool === 'blow' ? 'drag to blow air across the plate' : padTool === 'press' ? 'hold to press the glass: the dye spreads in a ring' : padTool === 'spin' ? 'drag round the middle to turn the dish; hold still to stop it' : 'tap or drag to drop dye'}
+        {padTool === 'blow' ? 'drag to blow air across the plate' : padTool === 'press' ? 'hold to press the glass: the dye spreads in a ring' : padTool === 'finger' ? 'drag to stir through the liquid' : padTool === 'spin' ? 'drag round the middle to turn the dish; hold still to stop it' : 'tap or drag to drop dye'}
         {penSeen ? ' · pen: press for more, lean to steer' : ''}
       </span>
       {padTouchCount > 0 && (
@@ -565,20 +565,20 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               key={t}
               onClick={() => setPadTool(t)}
               disabled={!connected}
-              className={`min-h-11 min-w-11 rounded-full border px-3.5 text-[12px] font-bold uppercase tracking-widest disabled:opacity-65 ${padTool === t ? LIT : 'border-white/10 text-muted'}`}
+              className={`min-h-11 min-w-11 rounded-full border px-3.5 py-2 text-[12px] font-bold uppercase tracking-widest disabled:opacity-65 ${padTool === t ? LIT : 'border-white/10 text-muted'}`}
               data-testid={`remote-tool-${t}`}
             >
-              {t}
+              {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
           <button
             aria-pressed={tiltOn}
             onClick={toggleTilt}
             disabled={!connected}
-            className={`flex min-h-11 min-w-11 items-center gap-2 rounded-full border px-3.5 text-[12px] font-bold uppercase tracking-widest disabled:opacity-65 ${tiltOn ? LIT : 'border-white/10 text-text-2'}`}
+            className={`flex min-h-11 min-w-11 items-center gap-2 rounded-full border px-3.5 py-2 text-[12px] font-bold uppercase tracking-widest disabled:opacity-65 ${tiltOn ? LIT : 'border-white/10 text-text-2'}`}
             title="Tilting the device tilts the plate"
           >
-            <Compass size={13} /> {tiltOn ? 'Tilt live' : 'Tilt'}
+            <Compass size={14} /> {tiltOn ? 'Tilt live' : 'Tilt'}
           </button>
         </div>
       </div>
@@ -600,15 +600,15 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
                 key={liq.id}
                 onClick={() => chooseLiquid(liq.id)}
                 disabled={!connected}
-                className={`flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold uppercase tracking-wider transition-transform active:scale-95 disabled:opacity-65 ${
+                className={`flex min-h-11 items-center gap-1.5 rounded-full border px-3 py-2 text-[12px] font-bold uppercase tracking-wider transition-transform active:scale-95 disabled:opacity-65 ${
                   on ? LIT : 'border-white/10 text-muted'
                 }`}
                 title={liq.description}
               >
-                <span className="h-2.5 w-2.5 rounded-full border border-white/30" style={bottleSwatch(liq)} />
+                <span className="h-3 w-3 rounded-full border border-white/30" style={bottleSwatch(liq)} />
                 {liq.name}
                 {/* A dot for the four that do something the dye cannot. */}
-                {liq.behaviour && <span className="h-1 w-1 rounded-full bg-amber-300/80" />}
+                {liq.behaviour && <span className="h-1.5 w-1.5 rounded-full bg-amber-300/80" />}
               </button>
             );
           })}
@@ -756,8 +756,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.2em] text-white/70">
                 <Hand size={15} /> Projectionist {penSeen && <PenTool size={12} className="text-dim" />}
               </span>
-              <button onClick={openDraw} className="flex min-h-11 min-w-11 items-center gap-1.5 rounded-full border border-white/10 px-3.5 text-[12px] font-bold uppercase tracking-widest text-text-2" title="Draw: the pad as the whole screen" data-testid="remote-pad-fullscreen">
-                <Maximize2 size={12} /> Draw
+              <button onClick={openDraw} className="flex min-h-11 min-w-11 items-center gap-1.5 rounded-full border border-white/10 px-3.5 py-2 text-[12px] font-bold uppercase tracking-widest text-text-2" title="Draw: the pad as the whole screen" data-testid="remote-pad-fullscreen">
+                <Maximize2 size={14} /> Draw
               </button>
             </div>
             {padSurface}
@@ -790,7 +790,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               }`}
             >
               <Waves size={18} />
-              <span className="text-[12px] font-bold uppercase tracking-widest">Auto</span>
+              <span className="text-[12px] font-bold uppercase tracking-widest">Evolve</span>
             </button>
             {/* Keep full (PLAN 18a-22): the dropper tops up a dish left running. A setting, so it goes as a patch. */}
             <button
@@ -798,14 +798,14 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               onClick={() => patch({ keepFull: !value('keepFull') })}
               disabled={!connected}
               data-testid="remote-keepfull"
-              className={`flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl border py-5 transition-colors active:scale-95 disabled:opacity-30 ${
+              className={`flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl border py-5 transition-colors active:scale-95 disabled:opacity-65 ${
                 value('keepFull')
                   ? LIT
-                  : 'border-white/10 bg-white/5 text-white/70'
+                  : 'border-white/10 bg-white/5 text-text-2'
               }`}
             >
               <Droplets size={18} />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Full</span>
+              <span className="text-[12px] font-bold uppercase tracking-widest">Full</span>
             </button>
           </div>
 
@@ -849,6 +849,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           </div>
           <Slider label="Dye Budget" field="dyeBudget" step={0.05} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Projector Focus" field="projectorFocus" step={0.05} value={value('projectorFocus') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Dye Index Boost" field="dyeIndexBoost" step={1} value={value('dyeIndexBoost') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Heat" field="heat" step={0.05} value={value('heat') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Plate Rock" field="plateRock" step={0.01} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Melody Walk" field="melodyWalk" step={0.05} value={value('melodyWalk') as number | undefined} {...sliderProps} connected={connected} />
@@ -1149,17 +1150,17 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {/* One-shot gestures */}
           <div className="mb-7 flex gap-3">
             <ActionButton label="Seed" icon={Droplets} onPress={() => action('seed')} connected={connected} />
-            <ActionButton label="Random" icon={Shuffle} onPress={() => action('lucky')} connected={connected} />
+            <ActionButton label="Randomise" icon={Shuffle} onPress={() => action('lucky')} connected={connected} />
             <ActionButton label="Drain" icon={Waves} onPress={() => action('drain')} connected={connected} />
             <ActionButton label="Clear" icon={Eraser} onPress={() => action('clear')} tone="warn" connected={connected} />
           </div>
 
           {/* Presets */}
           <div ref={(el) => { sectionRefs.current.looks = el; }} id="remote-sec-looks" className="mb-3 flex items-center justify-between">
-            <h2 className="text-[12px] uppercase tracking-[0.25em] text-dim">Preset palettes — tap to arm, Go sends</h2>
+            <h2 className="text-[12px] uppercase tracking-[0.25em] text-dim">Looks — tap to arm, Go sends</h2>
             <div className="flex gap-1.5">
-              <button onClick={() => action('preset-prev')} disabled={!connected} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 disabled:opacity-65 active:scale-95" aria-label="Previous preset" data-testid="remote-preset-prev"><ChevronLeft size={16} /></button>
-              <button onClick={() => action('preset-next')} disabled={!connected} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 disabled:opacity-65 active:scale-95" aria-label="Next preset" data-testid="remote-preset-next"><ChevronRight size={16} /></button>
+              <button onClick={() => action('preset-prev')} disabled={!connected} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 disabled:opacity-65 active:scale-95" aria-label="Previous look" data-testid="remote-preset-prev"><ChevronLeft size={16} /></button>
+              <button onClick={() => action('preset-next')} disabled={!connected} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 disabled:opacity-65 active:scale-95" aria-label="Next look" data-testid="remote-preset-next"><ChevronRight size={16} /></button>
             </div>
           </div>
           {presetGroups.map(({ label, presets }) => (

@@ -28,6 +28,14 @@ phone and the iPad draw what the desk draws; a new control goes on the phone too
   the air at the radius of the hole's own coverage (a blurred air mip), or take the
   taps from the Sobel's own footprint, and bring `holeline` to cover the 1.8-cell hole
   at the same bar (1 level) as the others; then find what draws the 22-level pixel.
+- ~~**33b-5. The held air held only its own share.**~~ **Shipped** (2026-11-28, with 38u-10):
+  the slope's reads under a bubble's air were held at the pixel's own density by the air's
+  share, but the solver empties the dye wherever any air is (`airExclude` multiplies by
+  1 − air every step), so the soft rim's half-held ramp lit a pool's edge at every hole:
+  3.46 levels within 3 cells of a 14-cell hole on main (bar 1), 15.4 at the boost 38u-10
+  asks it at, unseen while `holeline` threw on its rim check. Held now by
+  `airShare` (air × `AIR_WALL` 12, clamped; `wgsl/plateSlope.ts`): 0.30 levels, the
+  pool's rim beside a hole kept at the control's 27.69. `npm run holeline`.
 - **33b-4. The lace and the boundary line at a hole** are not masked by `airNear`; 33c is
   the lace, and the boundary line is 33a's hue gate. Apply `airNear` there only if 33c's
   check finds a ring.

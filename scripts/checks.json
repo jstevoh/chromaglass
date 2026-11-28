@@ -317,6 +317,29 @@
       ]
     },
     {
+      "name": "Every folder's README names what its code exports",
+      "shard": "logic",
+      "run": "npm run readmes",
+      "always": true,
+      "why": [
+        "CLAUDE.md's rule that a PR changing an export updates its folder's README (PLAN.md 50n):",
+        "a name a PR newly exports under src/ or server/ is named in that folder's README, one it",
+        "removes is not still named there as live, and no README names a code name no code has.",
+        "Always: it reads the diff and the tree by walking them, which no trace can see."
+      ]
+    },
+    {
+      "name": "The mutation run tells a caught fault from a missed one",
+      "shard": "logic",
+      "run": "npm run mutate -- --self",
+      "why": [
+        "The weekly mutation run's own test (PLAN.md 50l): on made-up files, a fault a check sees",
+        "is caught, one every check stays green on is missed, a check red without the fault is no",
+        "catch, a fault that only breaks the typecheck is to rewrite, every file is put back; and",
+        "scripts/mutants.json is well formed, its files there and its expected checks real."
+      ]
+    },
+    {
       "name": "Main held red lets only the fix merge",
       "shard": "logic",
       "run": "npm run mainhold -- --self-test",
@@ -440,8 +463,9 @@
       "shard": "sound",
       "run": "npm run music",
       "why": [
-        "The ear: synthetic songs through the real matcher, and the tempo",
-        "sources through the real beat clock."
+        "The ear: the tempo sources through the real beat clock. (The local",
+        "matcher's checks went to archive/song-id/ when automatic song",
+        "identification was retired, 2026-11-27.)"
       ]
     },
     {
@@ -468,8 +492,9 @@
         "scripts/fixtures/songs, decoded by the ffmpeg installed above, joined",
         "with gaps, gapless and crossfaded, in a quiet room and a noisy one,",
         "through the app's ear into the boundary; every song whole with no",
-        "change inside it; and the local matcher naming each crossfade's new",
-        "song. About two minutes on the runner's cores."
+        "change inside it. (The local matcher naming each crossfade's new song",
+        "went to archive/song-id/ with song identification, 2026-11-27.) About",
+        "two minutes on the runner's cores."
       ]
     },
     {
@@ -1032,9 +1057,9 @@
         "Listen (PLAN 28h-8): the show designed from a heard song's map plays on",
         "the song (its cues through the real scheduler, its stages where startAt",
         "lays them, louder sections fuller against the song's own range), and",
-        "the flow waits for the right map and says when nothing was named; and",
-        "a map heard from halfway in sits on the song's own seconds (28h-9): its",
-        "cues fire on the song's choruses and its fingerprint names the song's place."
+        "the flow waits for the name and then the right map; and a map heard",
+        "from halfway in sits on the song's own seconds (28h-9): its cues fire",
+        "on the song's choruses."
       ]
     },
     {
@@ -1276,20 +1301,6 @@
         "numbers into one group and is closed without the token; and one",
         "address is held to its hourly limit. The endpoint is public, so most",
         "of what it proves is what it will not do."
-      ]
-    },
-    {
-      "name": "The song-ID Worker",
-      "shard": "logic",
-      "run": "npm run fingerprint-worker",
-      "why": [
-        "The song-ID Worker (scripts/fingerprint-worker.mjs, PLAN.md 14o): every",
-        "lookup it passes on is paid for from the owner's account and its",
-        "address is in the public bundle, so what is checked is mostly what it",
-        "refuses (another site, no Origin, an oversized or unsized body, the",
-        "31st an hour from one address or /64, the day's ceiling, no counter",
-        "store), each read twice: the status, and that the service was never",
-        "called. Node's Request and FormData only, so `logic`."
       ]
     },
     {
@@ -1636,7 +1647,7 @@
     {
       "name": "The frame reads back what the solver wrote, once",
       "shard": "lab",
-      "run": "npm run framereads -- --owed=h2c9",
+      "run": "npm run framereads",
       "env": {"PW_WEBGPU":"1"},
       "why": [
         "The fields are read back only after a submit that may have written them, and a",
@@ -1902,6 +1913,17 @@
         "variance under 0.27: 0.331 with unsplit faces, 0.218 with the corner's transverse",
         "share) and no more than 0.33 cells, keeping its colour; a small clear drop's window",
         "opens round. About a minute on SwiftShader (cloud, 2026-11-27)."
+      ]
+    },
+    {
+      "name": "The thin gap's flow has no mode the pressure cannot see",
+      "shard": "lab2",
+      "run": "npm run gridnull",
+      "why": [
+        "PLAN.md 18a-8 (scripts/gridnull.mjs): with the faces as the flow's state, a checkerboard",
+        "laid in the flow is gone in a step on water and the oil and leaves no flow elsewhere, an",
+        "eight-cell wave of water keeps its inertia against a long one, and a floored dent's rim",
+        "under a steady push is smooth, its faces too. About 90 s on SwiftShader (cloud, 2026-11-27)."
       ]
     },
     {
@@ -3235,6 +3257,31 @@
       ]
     },
     {
+      "name": "The ouzo clouds on its measured curve, and Louche's cloud leads",
+      "shard": "lab",
+      "run": "npm run ouzo",
+      "timeout": 15,
+      "why": [
+        "PLAN 48s-1 and 48s-6: each cell's droplets are ouzoDrops of its own",
+        "ethanol, oil and gap, none without oil or at the bottle's strength,",
+        "the oil kept through water and Alcohol and across a regrid, the plate",
+        "handed 209 x the droplets; and Louche's small seed, Ouzo-led dish and",
+        "translucent white (two control builds and a 3% control)."
+      ]
+    },
+    {
+      "name": "Lava Pop's colour stays in its dish",
+      "shard": "lab",
+      "run": "npm run rimdye",
+      "timeout": 15,
+      "why": [
+        "Lava Pop left running (PLAN 18a-23): Oil Bodies' colour levelling read",
+        "the cells past the open rim as neighbours, and they are cleared every",
+        "step, so the water's colour seeped over the rim and was wiped there;",
+        "it now stops at the rim, as the dye's dispersion and the oil's do."
+      ]
+    },
+    {
       "name": "Keep Full refills an emptied dish in the app",
       "shard": "plate",
       "run": "npm run keepfullapp",
@@ -3622,6 +3669,19 @@
       ]
     },
     {
+      "name": "Oil threads pinch into beads",
+      "shard": "plate",
+      "run": "npm run beads",
+      "timeout": 15,
+      "why": [
+        "PLAN 38w-27: a pressed thread on Classic stayed a thread. On a thin gap",
+        "at 512², a thread of oil narrower than the gap breaks into beads",
+        "(Rayleigh–Plateau, its curvature across the gap) and a ribbon wider",
+        "than the gap holds (confinement); no oil made or lost. About seven",
+        "minutes on software WebGPU."
+      ]
+    },
+    {
       "name": "The oil's colour rides the oil",
       "shard": "plate",
       "run": "npm run oilride",
@@ -3632,6 +3692,41 @@
         "oil keeps its share of the dye (main handed 0.54% of it to the water),",
         "inside the oil, none stranded in open water, no oil made or lost.",
         "About six minutes on software WebGPU at 192²."
+      ]
+    },
+    {
+      "name": "The oil's colour rides the oil past a bubble",
+      "shard": "plate",
+      "run": "npm run oilride -- --plate=air",
+      "timeout": 15,
+      "why": [
+        "PLAN 38w-32: the same hand with a bubble drifting through the oil, the",
+        "carries taking the air: the oil keeps its share of the dye (0.65% went",
+        "to the water before the split carry ran with air). About nine minutes."
+      ]
+    },
+    {
+      "name": "The oil's colour rides the oil on the old plate",
+      "shard": "plate",
+      "run": "npm run oilride -- --plate=old",
+      "timeout": 15,
+      "why": [
+        "PLAN 38w-32: the same hand with Thin Gap off: the oil keeps its share",
+        "of the dye (1.21% went to the water before the old plate's carry was",
+        "split). About five minutes."
+      ]
+    },
+    {
+      "name": "The oil's colour rides the oil in one pass",
+      "shard": "plate",
+      "run": "npm run splitcarry",
+      "timeout": 15,
+      "why": [
+        "PLAN 38w-33: the dye's two liquids' shares carried in one pass, split and",
+        "joined in every substep, where 38w-29 took four. On the thin plate, with",
+        "a bubble and on the old plate, the same start carried both ways for the",
+        "last step: the same oil's share and dye to the float's rounding,",
+        "every amount kept, and on the thin plate cheaper on the GPU's queue."
       ]
     },
     {
@@ -3653,7 +3748,9 @@
       "run": "npm run grating",
       "why": [
         "No grating over the dye: the grid's one-cell checkerboard goes in a",
-        "second, in every look, and edges, blobs and fine diagonals stay."
+        "second on the old plate, and edges, blobs and fine diagonals stay; on a",
+        "thin gap (PLAN 18a-8b) presses grow no more of it with no pass than with",
+        "one, and the finest diagonals keep."
       ]
     },
     {
@@ -3729,6 +3826,20 @@
         "within 1%; with two projectors B goes soft while A stays sharp, and the",
         "crossfade's middle is half of each in light. Sharp is the plate to the",
         "byte. Beside `projectors` in the open shard, about a minute."
+      ]
+    },
+    {
+      "name": "The A/B deck dissolve",
+      "shard": "open",
+      "run": "npm run decks",
+      "why": [
+        "Decks (PLAN 51c-2): a Go goes to the dark projector, its dish changes",
+        "there, the crossfade carries the light over the middle half and the",
+        "racks take the lit one out and the dark one in. On a made-up clock:",
+        "nothing lit changes sharp, a rack jumps only in the dark, a second Go",
+        "carries on from its blur. Through the real pass: the light kept within",
+        "1%, a dark deck off the wall to the byte (and its melt not drawn), the",
+        "ends the plain A and B. Beside `focus` in the open shard."
       ]
     },
     {

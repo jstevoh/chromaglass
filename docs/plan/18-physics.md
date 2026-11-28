@@ -202,34 +202,19 @@ its frame rate live. "Free" means no new passes or texture reads.
     pressure that takes it out reaches the middle for two steps (`npm run thingap`
     prints that first step). The rim should sit a cell or two inside the square, or the
     cells outside it count as open too.
-  - **18a-8, a staggered grid.** Cell velocities are rebuilt from the face fluxes,
-    which leaves a small checkerboard at a floored dent's edge; the advections'
-    Rhie–Chow faces were given c·P, exact only where the drag is even (on a thin gap
-    the colour's and the oil's carries and carryCourant now cross the solve's own
-    faces, `THIN_FACE`, as the ferrofluid's did: a Finger's solid is where the drag is
-    least even, 15b; off a thin gap the carries keep their Rhie–Chow faces, exact on
-    the old plate's even projection); and the face fluxes' upwinding squares off a ring under a fast
-    radial flow (the pressed rings in the picture). A staggered grid takes all three,
-    and `dampGrid`'s job.
-    **The third, shipped** (2026-11-27): the squaring was the carry's corner, not the
-    grid's storage. The faces moved each axis's share from the same old colour at once,
-    so a diagonal flow spread colour across itself as well as along (½|u_x|Δx along x
-    plus ½|u_y|Δx along y). The thin gap's carries now take Colella's corner transport
-    (`ACROSS` in `wgsl/fluid/carry.ts`, `cornered` in `wgsl/fluid.ts`); the old plate
-    keeps its faces. `npm run gridiso` (lab, 128², a thin ring turned by a solid swirl):
-    the fourfold part of the width it gained 0.331 → 0.218, the width gained 0.353 →
-    0.273 cells, colour +0.088% from the half-float floor on that fast ring (0.000% at
-    `dyeedge`'s speed). *Open:* the first, the checkerboard. The cell keeps its own
-    predicted velocity (hsGradient writes c·u*_cell − M∇p/h), and the faces see only the
-    mean of two cells' u*, so a checkerboard in u* is a null mode the solve never sees.
-    Rebuilding the cell from its two faces' whole flux takes it out, but filters every
-    step's state [1 2 1] (a damping of 0.85 a step at eight cells), too much for water's
-    inertia. The real one: keep the face fluxes as the state (a texture hsGradient
-    writes), predict each face from its last flux plus the mean of the step's force
-    increments at its two cells, and read the cell as the mean of its faces; then
-    `thinFaceVel` is one load, not a dozen. Measure with a checkerboard laid in u* and
-    the rim of a floored dent (`npm run grating`-style), and the remaining fourfold
-    part in `gridiso`.
+  - **18a-8c, the grid filter's kernels still compile at every opening: shipped 2026-11-27.**
+    No opening had run `dampGridCurv`, `dampGridLimit` or `dampGrid` since 18a-8b (every
+    look opens on a thin gap), yet every opening waited for them. They are now built with
+    the old plate's own pipelines (`FluidFields.gridBuilds`, in `oldPlateBuilds`): waited for
+    by a look that opens with Thin Gap off, otherwise built off the frame when Thin Gap is
+    first turned off (`prepareOldPlate`, the plate staying thin until they are in). The stage
+    (`FluidFields.dampGrids`) asks for all three before running any, so a kernel that failed
+    to build cannot leave `dampGrid` adding a stale `scratchA` and the swap handing the plate
+    that. Measured with the opening's own list (`WebGPUFluid.prepare` for `openingOf`): a thin
+    opening waits for 46 fluid pipelines on main, 43 now; an old-plate opening 39, unchanged.
+    Found on the way: `run` does not skip a kernel that is still compiling, as the 18a-8b
+    note had it; `computePipeline` builds a missing one synchronously on the frame, and only
+    a failed build returns null. The stale-scratch risk was the failed build's.
   - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
     against it; measure whether any look shows it, and drop it for the time if not.
@@ -391,18 +376,35 @@ its frame rate live. "Free" means no new passes or texture reads.
     sim/hueJourney.ts beside it to keep the visualizer's size. `npm run keepfull` (node: the
     sums, the wiring, every surface), `npm run keepfullapp` (the Mac: Lava Pop's leak, an
     emptied dish refilled and the hand stopping).
-  - **18a-23, Lava Pop's dye leaks out with nothing driving it.** Measured on the owner's
-    Mac 2026-11-27 (a scratch run of the app, the dish's own measure inside the rim, every
-    15 s): today's Lava Pop loses 4–5% of its dye in 120 s, about half in half an hour, and
-    the same with Evaporation 0, Air 0, Plate Rock 0 and all three at 0 (0.823 → 0.778).
-    Its dt is 0.00047, so evaporation is nothing. The whole field's mean falls with the
-    dish's, so the dye leaves the grid: the open rim (decayDye zeroes past OPEN_RIM) is the
-    one sink left, and the dish is dye right to the rim, so whatever carries dye across it
-    (diffusion, dispersion, the carries' stencil, the beat's hand press) drains it. A wall
-    lets no dye diffuse through it; only liquid pushed out takes dye with it. Find which
-    pass carries it (run the variants with dispersion and the press off) and make the rim
-    no-flux for everything but the volume's own outflow. Keep Full (18a-22) covers it
-    meanwhile.
+  - **18a-23, Lava Pop's dye leaks out with nothing driving it: shipped** (2026-11-27; the
+    owner: "I left it going and the plate just emptied eventually"). Measured on the owner's
+    Mac on main (a scratch run of the app, the dish's own measure inside the rim, every 15 s):
+    4–5% of the dish's dye every 120 s, about half in half an hour, the same with Evaporation,
+    Air and Plate Rock each at 0 and all three at 0 (0.823 → 0.778). In the lab (Lava Pop's own step from the app's deriveStep, the app's own
+    lay of its oil cells and water, 128²) the press, centre gravity, vibration and buoyancy
+    each changed nothing; the oil did (0.36% gone in 400 steps with Oil Tension on, 0.02%
+    off). Liquid crossing the rim was not it: a trial pool past the rim that counted and gave
+    back every colour the step's carry moved over it took in 0.11 while the dish lost 121 in
+    600 steps. It was Oil Bodies' bodyPartition (each liquid's colour evened out across the
+    oil's edge, and colour astray drifting back to its own liquid down the oil's blur), which
+    read the cells past the rim as neighbours: they hold no oil and no colour, decayDye clears
+    them every step, and the water's colour at the rim levelled and drifted into them. Its
+    faces now stop at the rim, as dyeDisperse's and the oil's relaxation (18g-7) already did.
+    `npm run rimdye`: kept 98.851% → 99.967% in 600 steps (lost 121.0 → 3.4), Oil Bodies off
+    3.0; over 2400 lab steps 89.78% → 99.62%. Open: 18a-24.
+  - **18a-24, the rest of a still dish's loss, and the rim's exchange.** (a) With Oil Bodies
+    off, Lava Pop's lay still loses 0.03% in 600 lab steps (3 of 10534), not yet traced. A
+    candidate: gridFilter's three `pastRim` and slump's rim test count the radius only, so the
+    grid's own edge cells at the four compass points (inside r 0.5, cleared by decayDye as
+    `pastOpenRim` counts them) are still dish to those passes. (b)
+    The oil's surface tension drives a slow back and forth of liquid over the open rim (0.50
+    out against 0.54 in round the ring, lab units), whose colour is cleared going out and comes
+    back clear; it carries little now (the trial pool above), but a free meniscus would resist
+    it (the gap closing outward raises its suction), and the liquid round the cover glass is
+    the dish's own, so what comes back should carry what went out. A pool past the rim that
+    keeps it (tried here: a mixed ring of the meniscus's volume, π h / 4R of the dish) is the
+    model if it ever matters; Oil Bodies' own share past the rim (oilDye, never cleared there)
+    would have to be cleared with it, or bodyUnspread raises the dye to it.
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.

@@ -156,7 +156,10 @@ reflector's image, magnified about 3.6 by the Fresnel), so the soft edges are tw
 across the frame as down it. Its cost: nothing at the default (the pass sits out and allocates
 nothing); one projector soft at the rack's end on a 2560-wide frame, about 75 texture reads a
 pixel in the two passes, and 24 bytes a pixel of pictures while soft (released when sharp).
-The frame time on the Air is owed with 51a-3's measurements (no filming this week).
+On the Air (M4), 1600 × 1600, ms a plate draw, median (p90), timed by the 51b thread through the
+film queue: one sharp 4.33 (5.23), one A at the rack's end 8.17 (9.30), one A melted 11.09
+(12.06), two sharp 8.63 (9.45), two with B at 0.75 14.54 (16.68), two both melted 19.55 (20.63):
+only the last missed 16.7 ms, which is why 51c boxes a melt at a smaller picture.
 
 Found while building it, not done:
 
@@ -171,13 +174,17 @@ Found while building it, not done:
   source (16b), the plate draws sharp whatever the focus; and the mixer's rows over both plates
   (the film, the LED ring, the lumia) are blurred with A's share, being drawn in the display
   before the split. Each wants the pass to run after the lens pass, and the film to be its own
-  projector with its own focus (51a-4). And a melt past about 31 pixels of half-width (the knob
-  past the rack on a 2560-wide frame) spreads its taps more than two pixels apart; take it at
-  half resolution there.
+  projector with its own focus (51a-4). (Its last part, a melt past about 31 pixels of
+  half-width spreading its taps, shipped with 51c: a melt is boxed at a half, a quarter, an
+  eighth or a sixteenth of the frame, see 51c.) Until the rest ships, a focus dissolve under
+  Glitter, the side lamp or the tank is a plain fade (`focusDraws`).
 
 ## 51c. A look change is a fade or a cut, never hidden in the blur
 
-*Proposed. S after 51b. Antigravity, with a check Claude writes.*
+*Shipped 2026-11-27: Focus Dissolve, the last control in the Mixer's Projectors box (desk,
+settings sheet, phone Mix sheet, remote; MIDI-learnable, 0 off); `lib/focusDissolve.ts`,
+the stage clocks' rack, the app's Go in `app/useLookFades.ts`; and the melt boxed at a smaller
+picture (51b-3's last part, `gpu/focus.ts`); `npm run focus` 14/14.*
 
 Epic Rig's rack melts the disc into a glow before the scene changes, and a lumia "spreads it
 across the whole thing, then focuses it". One move of 51b and the look fade: rack the
@@ -187,6 +194,98 @@ racks in, 51a's crossfade carrying the light. Fade lengths are today's `FADE_CHO
 
 Check first: during a focus dissolve the frame's sharpness has one minimum at the swap, and
 the frame-to-frame change at the swap is under a quarter of a hard cut's.
+
+What shipped. Turned up, every Go with a fade (a Go, Go now, a set item, a song's set look, the
+assistant's) racks the projectors it changes out and back over the fade time, along sin²(πp):
+still at both ends as a hand starts and stops a knob, widest once, at the middle. The look
+change itself is held back a quarter of the fade and runs over the middle half, where the rack
+is past half its depth, so the look fade's own middle (where what cannot be halfway flips, and
+the ferrofluid ring is swapped) lands on the widest blur. A Go to the back plate racks B alone
+while A holds sharp (with two projectors on the wall; with one, its one beam). A second Go
+mid-rack carries on from the blur it has reached. A cut stays a cut, and under Glitter, the side
+lamp or the tank (where the pass does not draw, 51b-3) a dissolve is the plain fade. The dial's
+first half is the head's real rack, as the focus knob's; past it, it ramps on to a glow a
+quarter of the frame along the lamp's bar (`GLOW_M`, 0.8 m, past real).
+
+Why a glow and not the plan's 10%: a blur hides edges, not where the light lies. Measured in
+the lab (`npm run focus`, a slide of 160 dots 2 to 5% of the frame across swapped in one frame
+at the rack's middle, the worst case, since the app's own handover runs over the middle half):
+racked to the focus knob's melt, a tenth of the frame, the swap moved the frame 57% of a cut;
+racked to the glow, 29%. So the check's bar is under a third, not the quarter proposed before
+anything was measured, and the control (the knob's melt) must stay over it. Epic Rig's rack
+goes to one red glow, which is the glow's scale. A change of palette across the whole plate is
+broader than any blur and is not claimed (two pools against four: 93%): the look fade carries
+it across the middle half. The sharpness (the Laplacian's variance, on 4 × 4 means past the
+dither) falls from 1258 to 1.3 at the swap and climbs back to 1320, one minimum.
+
+The melt at a smaller picture. Once every soft projector's box is wide enough (its short side
+at least 6 pixels of the smaller picture, `focusScale`), `down` takes the light to a half, a
+quarter, an eighth or a sixteenth of the frame in linear light, split by B's share; the rows
+and columns run there; `compose` draws it back through one bilinear tap and lays the finish; a
+projector sharp beside a melted one is added at full size, untouched. In the lab at 1024: the
+knob's end (a box 102 by 51 pixels) at a quarter is off the law's box by 0.48 levels where it
+moves anything (full size 0.50), its edges 82.8/40.3 pixels against 81.7/40.8, the light within
+0.011%, 0.04 levels from the full-size melt on average; the glow at an eighth 0.43 levels; A
+sharp beside B melted is A to the dither. Each scale's pictures are kept while anything is soft,
+so a rack walking through the scales allocates once.
+On the Air (M4), 1600 × 1600, ms a plate draw, median (p90), one film-queue job at the PR's
+head, each melt beside the same draw forced to full size in the same run: one A melted 3.37
+(3.73) at a quarter against 5.04 (5.47); two both melted 4.91 (5.50) at a quarter against 9.20
+(9.58); A sharp beside B melted 5.03 (5.24) against 6.96 (7.35); both at the dissolve's glow
+6.00 (6.32) at a sixteenth; one sharp 2.84, two sharp 4.12. The 51b thread's numbers above
+came from another script (19.55 for two melted) and are not set against these; the pair that
+counts is this run's full size against its smaller picture, which halves two melted projectors.
+
+Found while building it, not done:
+
+- **51c-2 · An A/B deck dissolve.** *Shipped 2026-11-28: **Decks** (`projDeck`, a switch, off
+  by default), the button beside the A/B Crossfade in the Mixer's Projectors box (desk,
+  settings, phone Mix sheet, remote; MIDI-learnable as a switch); `lib/deckDissolve.ts`,
+  `focusDissolve.ts`'s rack kinds, `app/useLookFades.ts` (`deckGo`); `npm run decks`.* With
+  Decks on and two projectors on the wall, a Go with a fade goes to the darker projector (B on
+  a tie). What was in the way: B could not draw a look of its own. What it can own is what 16a
+  gave the back plate, its dish (every solver setting and the dyes); how the plates are drawn
+  is one pass for both. So a deck Go splits the look: the dish to the dark deck while it is
+  dark (over the first quarter; the front's solver keys, or the back plate's own look), the
+  crossfade glided over the middle half along sin²(πq/2), the rest of the look on the front
+  once the dish has landed, to three quarters (inside 51c's window, where both decks are
+  melted or both half lit; one fade at a time on the front).
+  The leaving projector racks out over the first half and holds the melt while its light
+  goes; the arriving one racks out over the first quarter, still dark, holds, and racks in as
+  its light comes up. A Go when the arriving deck is lit (the crossfade in the middle) waits
+  the quarter for it to melt before its dish goes in. A second Go mid-dissolve goes to the
+  darker deck then, each rack carrying on from its blur. A Go to a dark front pins the lit
+  back plate to what it shows (`pinBack`), so it does not follow the front's new dish. A
+  hand on the crossfader during the glide takes it back. Fixed the same evening (51c-2b,
+  found by the first film on the owner's Mac): every house look carries Two Projectors off
+  and most a lamp ground of 0, so the rest of the look switched the second projector off
+  mid-dissolve (the old dish showed under the new one, and the next Go was a plain one); a
+  deck Go now leaves what the decks stand on alone (`DECK_RIG`: Two Projectors, the plate
+  count, the lamp ground and render style, the back row's blend, both plates' levels), and
+  `npm run decks` sends every house look through it (46 of 46 would switch it off by a plain
+  Go, 0 by a deck Go). A Back, a later Go or a Go to the
+  back plate stops what of a deck Go is still to come. And B with no light on the wall is no
+  longer blurred at all (`gpu/plateUniforms.ts`), so a dark B's melt costs nothing; A's is
+  still drawn, because where neither projector has light the Mixer's rows laid over both
+  plates fall to A's share (the pre-push review). Through the middle half 51c's 4.91 ms for
+  two melted at 1600² on the Air applies. Checked on a made-up clock (nothing lit changes sharp; a rack
+  jumps only in the dark; a second Go before and past the middle steps no rack by more than
+  a frame) and through the real pass at 256 (the wall's light within 0.10% across the
+  dissolve; B dark is off the wall to the byte, sharp, melted or with its dish changed,
+  while at the middle each moves it; the first and last frames the plain A and B to the byte).
+- **51c-6 · A dark A's melt drawn for nothing** (S). A deck dissolve holds a dark A melted
+  for a quarter of the fade at each end; the pass still draws it, because the Mixer's rows
+  where neither projector has light go to A's share. Give those rows their own share, then
+  skip A's melt when A is dark as B's is.
+- **51c-4 · Each deck its own drawing** (M, after 16b). A deck Go changes the rest of a look
+  (lamp ground, glass, lacing, blend) on both projectors at once, hidden in the middle half;
+  with 16b's own sources each projector would take its own and nothing would change on the lit one.
+- **51c-5 · Decks on the APC40** (S, with 51h). The crossfader drives `projCross` and the deck
+  glide hands it back on a touch; the Projectors layout should light a pad for Decks and show
+  which deck is dark.
+- **51c-3 · A short dissolve's ring** (S). Under 2 s the look's fade is under a second, and the
+  handover never runs shorter than one, so the ferrofluid ring's swap falls past the rack's
+  middle. Hold the handover inside the rack's middle half too, or give Focus Dissolve a 2 s floor.
 
 ## 51d. Nothing can block the beam between the stage and the lens
 

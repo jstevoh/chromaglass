@@ -232,7 +232,10 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
   each on software WebGPU); a look that opens on the camera (`open.camera`) or film stock
   (`open.stock`) waits for one whole display in its opening. A lean flipped display for
   those looks is the same mechanism with `toTexture`; `leandisplay` would need a flipped
-  draw.
+  draw. Now red in the cloud on main too (2026-11-27, 51c's thread: `npm run leandisplay` FAILs
+  mushy-mushy and soapy-mess, plate and closeup, "drew with display rgba16float flipped aux,
+  0 of 102400 bytes differ"): two of the owner's house looks (34b-7) open under the lens pass,
+  so they draw its whole flipped display, and the check wants their lean one.
 - **14v-15. Found: on a slow phone network the intro gives way to "Still loading" at 8 s.**
   `main.tsx`'s `Loading` turns into the stale-copy message and takes the intro down after
   eight seconds of download, which a phone on a weak signal can take for the app's 760 kB

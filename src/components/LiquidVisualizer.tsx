@@ -43,7 +43,7 @@ import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
 import { AutoSpin, GRIP_SECONDS, SpinHand, dishFollow, dishFrame, lookMotor, lookMotorRate } from '../lib/turntable';
 import { pointerOnPlate } from '../lib/pointerPlate';
-import { stageClocks, turnClocks } from '../lib/stageClocks';
+import { rackDeck, rackStage, stageClocks, turnClocks } from '../lib/stageClocks';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL } from '../lib/detailFlow';
 import { levelHandTilt, makeHandTilt, stepHandTilt, tipPlate } from '../lib/handTilt';
@@ -285,7 +285,7 @@ const c01 = (v: number) => Math.max(0, Math.min(1, v));
 export type { LiquidVisualizerHandle };
 
 
-// ─── React Component ─────────────────────────────────────────────────
+// ─── React Component ────────────────────────────────────────
 
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
@@ -392,21 +392,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const paletteWindowRef = useRef<{ size: number | null; lead: number }>({ size: null, lead: 0 });
   const journeyRef = useRef({ lead: 0, lastAt: -1 });
   /*
-    The back plate's own look (PLAN.md §16a; the why is in lib/backLook.ts).
-
-    Two halves. How it moves is `backLookRef`, which the patch bay folds in as
-    the back plate's base, so the solver for layer 1 steps with the look's
-    settings and every patch still rides them. What it pours is
-    `backDyesRef`: the look's dyes, pour styles and liquids, which every pour
-    aimed at plate 1 reads through `harmonyOf` and its two siblings instead
-    of the front's refs. Null is the back plate following the front, which is
-    every show until someone presses Go to Back Plate, so nothing here changes
-    a plate that never asks for it.
-
-    While the back plate has dyes of its own a front Go is the front's: its
-    handoff thins and lays plate 0 only. It thinned every plate before, which
-    was right for twins and would wipe a back plate that had just been given
-    a look of its own.
+    The back plate's own look (PLAN.md §16a, lib/backLook.ts). How it moves
+    is `backLookRef`, the patch bay's base for layer 1, so every patch still
+    rides it. What it pours is `backDyesRef` (dyes, pour styles, liquids),
+    read by every pour aimed at plate 1 through `harmonyOf` and its siblings.
+    Null follows the front, as every show does until a Go to Back Plate or
+    a deck Go (51c-2, which pins what the back shows: `pinBack`). With dyes
+    of its own, a front Go's handoff lays plate 0 only (thinning both wiped
+    a back plate just given a look), and a focus dissolve racks A alone.
   */
   const backLookRef = useRef(new BackLook());
   const backDyesRef = useRef<{ id: string; contract: number[] | null; harmony: number[]; styles: string[]; liquids: string[] } | null>(null);
@@ -1699,16 +1692,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const now = showNow();
       handoffRef.current = { start: now, dur: seconds * 1000, last: now, poured: 0, dosed: 0, seeds: null, phase };
     },
+    rack: (seconds, back, two) => rackStage(clocks, seconds, !!back, !backDyesRef.current, !!two),
+    deck: (seconds, to) => rackDeck(clocks, seconds, to),
+    pinBack: (id, name) => {
+      if (stageRef.current || backLookRef.current.active) return false;
+      backDyesRef.current = { id, contract: presetContractRef.current, harmony: harmonyRef.current.slice(), styles: injectStyleRef.current, liquids: plateLiquidsRef.current };
+      backLookRef.current.send({ ...settingsRef.current }, settingsRef.current, showNow(), 0, id, name);
+      return true;
+    },
     sendBack: (presetId, look, seconds, name = null, extras) => {
-      // Not while a render has the plate (a pad pressed mid-render): the
-      // render owns both plates until it hands back (see `resetStamps`).
+      // Not while a render owns both plates (see `resetStamps`).
       if (stageRef.current) { onBackLookClearedRef.current?.(); return; }
       const now = showNow();
       if (presetId === null || !look) {
-        // Following the front again: the solver settings fade back to the
-        // front's, and from now the back plate pours the front's dyes. What
-        // is on it stays; the front's pours take it over the way a stage
-        // change does, rather than a wipe.
+        // Following the front again: its settings fade back to the front's and
+        // it pours the front's dyes; what is on it stays, taken over, not wiped.
         backLookRef.current.send(null, settingsRef.current, now, seconds);
         backDyesRef.current = null;
         backHandoffRef.current = null;
@@ -1731,8 +1729,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         liquids: PRESET_LIQUIDS[presetId] ?? [],
       };
       backLookRef.current.send(look, settingsRef.current, now, seconds, presetId, name);
-      // The same handover a Go gives the front, over at least a second: a
-      // cut to a look on a plate full of the last one reads as a glitch.
+      // A Go's handover, at least a second: a cut onto a full plate reads as a glitch.
       backHandoffRef.current = { start: now, dur: Math.max(1, seconds) * 1000, last: now, poured: 0, seed: null };
     },
     setPaletteWindow: (size: number | null, lead: number) => {
@@ -2060,7 +2057,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // ── The show's own frame loop ─────────────────────────────────────
+    // ── The show's own frame loop ────────────────────────────
     // Engine-free: it decides what a frame is and hands it to whichever
     // renderer started (docs/webgpu-plan.md, P3). Both branches below build
     // one and call `startWith`.
@@ -2714,7 +2711,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           stepsPerSecRef.current += (simSteps / realDt - stepsPerSecRef.current) * k;
         }
 
-        // ── Drain animation ────────────────────────────────────
+        // ── Drain animation ───────────────────────────
         if (drainTriggerRef.current > lastDrainTrigger.current) {
           lastDrainTrigger.current = drainTriggerRef.current;
           drainFrameRef.current = 1;
@@ -2741,7 +2738,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           }
         }
 
-        // ── Clear trigger ──────────────────────────────────────
+        // ── Clear trigger ─────────────────────────────
         if (clearTriggerRef.current > lastClearTrigger.current) {
           lastClearTrigger.current = clearTriggerRef.current;
           const af = fluidsRef.current[activeLayerRef.current];
@@ -2749,7 +2746,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (activeLayerRef.current === 0) bubblesRef.current.clear();
         }
 
-        // ── Solver engine ──────────────────────────────────────
+        // ── Solver engine ─────────────────────────────
         // The GPU solver runs the same scheme at 2-4x the grid; the CPU solver
         // stays as the fallback for contexts without float render targets.
         const governor = governorRef.current!;
@@ -4723,7 +4720,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           harmony: harmonyRef.current,
           lamp: lampRef.current,
           magnets: magnetsOnPlate(fluidsRef.current[0]?.lastStep ?? null),
-          gelAngle: clocks.gel, moireTurn: clocks.moire, shutters: clocks.shutters,
+          gelAngle: clocks.gel, moireTurn: clocks.moire, shutters: clocks.shutters, rack: clocks.rack.share,
           kaleidoPhase: kaleidoPhaseRef.current,
           layer1: layer1ViewRef.current,
           bubbles: bubbleDebugRef.current,

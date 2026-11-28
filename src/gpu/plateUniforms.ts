@@ -87,6 +87,8 @@ export interface PlateView {
   dimmerGain: number;
   /** Where each projector's shutter vane is, 0 open to 1 shut, as the frame walks it (lib/projectorBank.ts); left out, where the settings put it. */
   shutters?: ArrayLike<number>;
+  /** Each projector's share of a focus dissolve's rack this frame, A's then B's (lib/focusDissolve.ts, PLAN 51c); left out, at rest. */
+  rack?: ArrayLike<number>;
   /** The exposure the film histogram settled on. */
   filmLevel: number;
   filmGain: number;
@@ -276,6 +278,13 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('boundaryContrast', s.boundaryContrast ?? 0.35);
   pack.set('projectorFocus', clamp01(s.projectorFocus ?? 0.5));
   /*
+    The dye's refractive index at its measured strength times this (PLAN
+    38u-10): 1, real, for every look saved before the dial, which is the
+    owner's call (2026-11-14) rather than today's look. Below 1 would be less
+    than the dye does, so the floor is real; the top is the dial's.
+  */
+  pack.set('dyeIndexBoost', Math.max(1, Math.min(4000, s.dyeIndexBoost ?? 1)));
+  /*
     Glitter, the lens photographing it and the side lamp (PLAN 47e, 47d,
     47b-side; lib/glint.ts). At 0 and 0 the lens pass does not run, and the
     display is drawn as it was. Focus (projectorFocus) is the lens's focal
@@ -402,8 +411,13 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     projectorGains(bankGains, s, two, view.shutters);
     pack.set('projA', bankGains[0], bankGains[1], bankGains[2], bankGains[3]);
     pack.set('projB', bankGains[4], bankGains[5], bankGains[6], bankGains[7]);
-    // Each projector's focus (PLAN 51b): the box its defocus spreads a point into, in this frame's pixels (gpu/focus.ts).
-    focusBoxPx(focusBox, s, two, Math.max(width, height), view.shot.zoom);
+    // Each projector's focus (PLAN 51b), racked by a dissolve (51c): the box its defocus spreads a point into, in this frame's pixels (gpu/focus.ts).
+    focusBoxPx(focusBox, s, two, Math.max(width, height), view.shot.zoom, view.rack);
+    // B with no light on the wall has no picture to blur (its share of every
+    // pixel is 0): a deck dissolve (51c-2) holds it melted while dark, and the
+    // pass sits out for it. Not A: where neither has light the Mixer's rows
+    // laid over both plates fall to A's share, so A's box still reaches them.
+    if (two && !(bankGains[4] + bankGains[5] + bankGains[6] > 0)) focusBox[2] = focusBox[3] = 0;
     pack.set('projFocus', focusBox[0], focusBox[1], focusBox[2], focusBox[3]);
     pack.set('paperA', pa.r, pa.g, pa.b);
     pack.set('paperB', pb.r, pb.g, pb.b);

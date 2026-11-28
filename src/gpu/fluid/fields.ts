@@ -36,6 +36,52 @@ export class FluidFields extends FluidCore {
     return this.argWrite(name);
   }
 
+  /**
+   * The grid filter's three kernels in the dye's format (PLAN 18a-8c), with
+   * the old plate's builds (WebGPUFluid.oldPlateBuilds). Every opening waited
+   * for them until 18a-8c, though none had run them since 18a-8b took the
+   * filter off the thin gap, which every look opens on: three compiles of the
+   * show's wait for a stage that stayed dark. Built with the old plate's own
+   * pipelines instead, they are waited for by a look that opens with Thin Gap
+   * off and otherwise built off the frame when Thin Gap is first turned off
+   * (prepareOldPlate), the plate staying thin until they are in, so the first
+   * old step finds all three.
+   */
+  protected static gridBuilds(dye: GPUTextureFormat): [string, string][] {
+    return (['dampGridCurv', 'dampGridLimit', 'dampGrid'] as const).map((name): [string, string] => [`${name}:${dye}`, kernel(name, dye)]);
+  }
+
+  /**
+   * The grid's checkerboard out of the dye (dampGrid, and why), topped up to
+   * GRID_DAMP a step on the old plate: `top` is what is left of it after the
+   * Jacobi diffusion's 8a/(1+8a). None on a thin gap, whose faces lay no
+   * checkerboard (GRID_DAMP's note, 18a-8b).
+   *
+   * All three kernels are asked before any runs. Each reads the one before
+   * it, and `run` skips a kernel that failed to build and goes on to the
+   * next, so a dampGridCurv that never built would leave dampGrid adding the
+   * last field's scratchA into the dye, and the swap would hand the plate
+   * that. All three or none, as the slump asks. They are built wherever the
+   * old plate runs (gridBuilds); only a lab that forces `gridDamp` onto a
+   * thin gap (`npm run grating`, section 7) builds them here, on its frame.
+   * Three calls rather than a walk over a list: no closure made a step.
+   */
+  protected dampGrids(pass: GPUComputePassEncoder, top: number, bodiesOn: boolean): void {
+    const f = this.dye.write.format;
+    if (!this.pipeline('dampGridCurv', f) || !this.pipeline('dampGridLimit', f) || !this.pipeline('dampGrid', f)) return;
+    const k = this.arg4('dye grid', top);
+    this.dampGridOf(pass, this.dye, k);
+    // The oil's share has the same grid in it, from the same faces.
+    if (bodiesOn && this.oilDye) this.dampGridOf(pass, this.oilDye, k);
+  }
+
+  private dampGridOf(pass: GPUComputePassEncoder, field: PingPong, k: GPUBuffer): void {
+    this.run(pass, 'dampGridCurv', this.scratchA, [field.read, field.write], k);
+    this.run(pass, 'dampGridLimit', this.scratchB, [field.read, this.scratchA], k);
+    this.run(pass, 'dampGrid', field.write, [field.read, this.scratchA, this.scratchB], k);
+    field.swap();
+  }
+
   /** `pipeline`'s key for a kernel built under a suffix of its own (`hsRun`'s `:thin`), made once. */
   protected pipelineKey(name: string, suffix: string): string {
     let bySuffix = this.pipelineKeys.get(name);
@@ -72,6 +118,23 @@ export class FluidFields extends FluidCore {
     let group = at.group;
     if (!group) {
       group = bindGroup(this.device, pipe, [this.sim, args, ...reads, dst, this.press]);
+      at.group = group;
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(this.N / 8);
+    pass.dispatchWorkgroups(w, w);
+  }
+
+  /** As runPressed, for a kernel that writes two textures (bodyAdvectSplit): the reads, both written, then the pressure. */
+  protected runPressed2(pass: GPUComputePassEncoder, name: string, dst0: GPUTexture, dst1: GPUTexture, reads: GPUTexture[], args: GPUBuffer): void {
+    const pipe = this.pipeline(name, dst0.format);
+    if (!pipe) return;
+    let at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'press'), pipe), dst0), dst1), args);
+    for (const r of reads) at = this.groupAt(at, r);
+    let group = at.group;
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, args, ...reads, dst0, dst1, this.press]);
       at.group = group;
     }
     pass.setPipeline(pipe);
@@ -267,6 +330,12 @@ export class FluidFields extends FluidCore {
     return this.oilDye;
   }
 
+  /** The water's share of the dye between the substeps of its carry with the oil's (PLAN 38w-33, carrySubsteps): made the first time Oil Bodies carries in one pass. */
+  protected ensureWaterShare(): PingPong {
+    if (!this.waterShare) this.waterShare = new PingPong(this.device, this.disposer, [this.N, this.N], this.dyeFormat, 'water share');
+    return this.waterShare;
+  }
+
 
   /** Whether the layer holds an allocated air field (bubbles or boil). */
   get airLive(): boolean { return this.air !== null; }
@@ -409,9 +478,12 @@ export class FluidFields extends FluidCore {
       this.hsSealSrc = this.disposer.track(this.device.createBuffer({ label: 'seal source', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE }));
       this.hsSealPsi = this.disposer.track(this.device.createBuffer({ label: 'seal psi', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
       // The thin solve's own P, packed as the old solver's pressure is. The thin
-      // carries read it (THIN_FACE); hsGradient hands phaseAdvect's area form c·P
+      // carries read the faces since 18a-8 (hsFlow); hsGradient hands phaseAdvect's area form c·P
       // in that one (wgsl/thinGap.ts, hsGradient).
       this.hsP = buf('thin gap pressure', this.N);
+      // The solve's faces, the flow's state, and what u* would carry through them (PLAN 18a-8, wgsl/thinFlow.ts).
+      this.hsFlow = this.disposer.track(this.device.createBuffer({ label: 'thin gap faces', size: Math.max(16, 4 * this.N * this.N * 4), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
+      this.hsFlowStar = this.disposer.track(this.device.createBuffer({ label: 'thin gap faces before', size: Math.max(16, 2 * this.N * this.N * 4), usage: GPUBufferUsage.STORAGE }));
       // The warm start's sums and fit, and the step before last's P (wgsl/thinWarm.ts, PLAN 38r-12).
       this.hsWarm = this.disposer.track(this.device.createBuffer({ label: 'thin warm start', size: (WARM_FIT + 4) * 4, usage: GPUBufferUsage.STORAGE }));
       this.hsP2 = buf('thin gap pressure before', this.N);
@@ -473,9 +545,13 @@ export class FluidFields extends FluidCore {
   /** The print stops: the plate shows the solver's dye alone again (no reaction on the plate, or a look that does not print). */
   endPrint(): void { this.printLive = false; }
 
+  /** Submit count of writes to this solver's fields, so `WebGPUPlate.draw` packs only after a write (PLAN H2c-9). */
+  get fieldWrites(): number { return this.reads.count; }
+
   /** The fields, for the compositor (P3) to read directly. */
   get fields() {
     return {
+      writes: this.reads.count,
       dye: this.printLive && this.printDye ? this.printDye : this.dye.read,
       vel: this.vel.read,
       velForced: this.velForced,

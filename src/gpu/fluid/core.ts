@@ -239,6 +239,12 @@ export class FluidCore {
   protected hsSealPsi: GPUBuffer | null = null;
   protected liftN = 2;
   protected hsP: GPUBuffer | null = null;
+  /**
+   * The thin solve's faces as the flow's state (PLAN 18a-8, wgsl/thinFlow.ts): each cell's east and
+   * north face velocity as hsGradient left them, and what the step's u* would carry through each.
+   */
+  protected hsFlow: GPUBuffer | null = null;
+  protected hsFlowStar: GPUBuffer | null = null;
   /** The warm start's sums and fit, and the step before last's P (wgsl/thinWarm.ts, PLAN 38r-12). */
   protected hsWarm: GPUBuffer | null = null;
   protected hsP2: GPUBuffer | null = null;
@@ -322,6 +328,8 @@ export class FluidCore {
     the dye needs to know it exists.
   */
   protected oilDye: PingPong | null = null;
+  /** The water's share of the dye between its carry's substeps (ensureWaterShare). */
+  protected waterShare: PingPong | null = null;
   /** The slump's K Δt/Δx² a cell, once a step (PLAN 18m, wgsl/slump.ts); made on the first step that slumps. */
   protected slumpK: GPUTexture | null = null;
   /** The oil blurred wide, for colour astray from its liquid to find the way back (bodyPartition). */
@@ -382,6 +390,21 @@ export class FluidCore {
    * stage of its own, and ask that both ways give the same fields.
    */
   fuseSpecies = true;
+  /**
+   * Whether the dye's two liquids' shares go through the faces in one pass
+   * (PLAN 38w-33, wgsl/fluid/split.ts). Only `npm run splitcarry` turns it
+   * off, to carry the same plate the way 38w-29 did (split, two carries,
+   * join) and ask that both ways give the same fields, and time them.
+   */
+  fuseSplit = true;
+  /** How the last step carried the dye's two shares (carryShares): in one pass, apart, or whole (the split's kernels not built yet); null with no Oil Bodies. For `npm run splitcarry`. */
+  lastShareCarry: 'one pass' | 'apart' | 'whole' | null = null;
+  /** How many drifts of the glass moved both shares together (driftShiftSplit). For `npm run splitcarry`. */
+  sharesDrifted = 0;
+  /** The last share carry's plate and arguments, which benchShares repeats. */
+  protected sharesThin = false;
+  protected sharesArgs: GPUBuffer | null = null;
+  protected sharesAt: GPUBuffer[] | undefined = undefined;
   /** How the last step carried the species: with the colour ('pair'), in its own stage ('alone'), or not at all (null). For `npm run thick`. */
   lastSpeciesCarry: 'pair' | 'alone' | null = null;
   /*
@@ -813,10 +836,11 @@ export class FluidCore {
     this.airQuietSeconds = 0;
     this.air?.setBoilAlpha(null);
     if (this.grain) {
-      // Identity coordinates: reseed both phases without sampling the previous frame.
-      const identity = this.arg('grain clear', [0, 0, 0, 0]);
-      this.run(pass, 'grainStep', this.grain.a, [this.grain.b, this.velForced, this.sampler], identity);
-      this.run(pass, 'grainStep', this.grain.b, [this.grain.a, this.velForced, this.sampler], identity);
+      // Identity coordinates: seedGrain with both phases reseeded. It reads the
+      // other texture of the pair — a dispatch may not sample what it writes.
+      const identity = this.arg('grain identity', [0, 0, 0, 0]);
+      this.run(pass, 'seedGrain', this.grain.a, [this.grain.b], identity);
+      this.run(pass, 'seedGrain', this.grain.b, [this.grain.a], identity);
     }
     // The mix and the reactions go with the plate they were poured on.
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
@@ -847,6 +871,8 @@ export class FluidCore {
     if (this.hsLiftPsi) enc.clearBuffer(this.hsLiftPsi);
     // And the sealed bottle's, the last wax's.
     if (this.hsSealPsi) enc.clearBuffer(this.hsSealPsi);
+    // And the thin solve's faces, the flow's state (PLAN 18a-8): a wiped plate is still.
+    if (this.hsFlow) enc.clearBuffer(this.hsFlow);
     this.submit(enc);
     this.grainAge = 0;
   }

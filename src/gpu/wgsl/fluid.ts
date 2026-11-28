@@ -16,7 +16,8 @@ import { REACTION_KERNELS } from './fluid/reactions';
 import { FIELD_KERNELS } from './fluid/fields';
 import { SEAL_KERNELS } from './fluid/seal';
 import { OUZO_KERNELS } from './fluid/ouzo';
-import { HEAD, NOISE_WGSL, THIN_FACE, W } from './fluid/shared';
+import { SPLIT_KERNELS, monomorph, perShare } from './fluid/split';
+import { HEAD, NOISE_WGSL, PACKED, THIN_FACE, W } from './fluid/shared';
 import { thinGapKernels } from './thinGap';
 import { filmKernels } from './film';
 import { slumpKernels } from './slump';
@@ -46,6 +47,8 @@ export const KERNELS: Record<string, string> = {
   ...SEAL_KERNELS,
   // Anise oil out of solution where its alcohol is watered down (PLAN 48s): see wgsl/fluid/ouzo.ts.
   ...OUZO_KERNELS,
+  // The dye's two liquids' shares through the faces in one pass (PLAN 38w-33): see wgsl/fluid/split.ts.
+  ...SPLIT_KERNELS,
   // The plate as a Hele-Shaw cell (PLAN §18a): see wgsl/thinGap.ts.
   ...thinGapKernels(HEAD, W, NOISE_WGSL),
   // A clear film that tears (PLAN §20b): see wgsl/film.ts.
@@ -72,8 +75,9 @@ function substepped(name: string): string {
 /*
   The same carries on a thin gap, through the faces the thin solve made
   conserve liquid (THIN_FACE) in place of faces rebuilt from the cells'
-  velocities: `pr` is bound to the solve's own P, and the gap and the
-  mobility follow everything the kernel already takes. A.b.w is the rest gap.
+  velocities: the pressure's slot holds the solve's faces (`flow`, PLAN
+  18a-8), and the gap and the mobility follow everything the kernel already
+  takes. A.b.w is the rest gap.
 */
 function thinFaced(src: string, name: string): string {
   const block = /  let t = vec2i\(e\.y, e\.x\);\n[^]*?  let ve = [^\n]*\n/;
@@ -85,6 +89,10 @@ function thinFaced(src: string, name: string): string {
   const bindings = `@group(0) @binding(${last + 1}) var sq: texture_2d<f32>;\n@group(0) @binding(${last + 2}) var<storage, read> mob: array<f32>;\n`;
   const withFace = src.slice(0, at) + `${THIN_FACE}\n` + src.slice(at);
   return withFace
+    .replace('var<storage, read> pr: array<f32>;', 'var<storage, read> flow: array<vec4f>;')
+    // The packed pressure's reader goes with it: what still asks a cell's P (the oil's lip) reads the faces' copy (tfP).
+    .replace(PACKED, '')
+    .replace(/packedAt\(([^,()]+), ([^,()]+), n\)/g, 'tfP(vec2i($1, $2), n)')
     .replace(block, '  let ve = thinFaceVel(a, e, n);\n')
     .replace(new RegExp(`(@group\\(0\\) @binding\\(${last}\\)[^\\n]*\\n)`), `$1${bindings}`);
 }
@@ -216,7 +224,8 @@ function airLiquid(src: string, name: string, frac: string): string {
   }
   // The pair carry reads either of its two textures through one mx(t, …).
   const t = src.match(outA)![2];
-  const tParam = t ? 't: texture_2d<f32>, ' : '';
+  // A texture for the pair; the split carry's share index (wgsl/fluid/split.ts), whatever type its mx takes.
+  const tParam = t ? `t: ${src.match(/fn mx\(t: ([^,]+),/)?.[1] ?? 'texture_2d<f32>'}, ` : '';
   const liquid = `@group(0) @binding(${last + 1}) var airWas: texture_2d<f32>;
 @group(0) @binding(${last + 2}) var airNow: texture_2d<f32>;
 @group(0) @binding(${last + 3}) var airGive: texture_2d<f32>;
@@ -278,7 +287,7 @@ function airGiveKernel(planned: boolean): string {
   return `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var give: texture_storage_2d<r32float, write>;
-@group(0) @binding(4) var<storage, read> pr: array<f32>;
+@group(0) @binding(4) var<storage, read> flow: array<vec4f>;
 ${sub}@group(0) @binding(${b}) var sq: texture_2d<f32>;
 @group(0) @binding(${b + 1}) var<storage, read> mob: array<f32>;
 @group(0) @binding(${b + 2}) var airWas: texture_2d<f32>;
@@ -374,6 +383,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
   textureStore(dst, p, v);
 }`;
+// And for both of the dye's shares at once (PLAN 38w-33, wgsl/fluid/split.ts): airShed floors what a dry cell keeps, so each share sheds its own.
+KERNELS.airShedSplit = perShare(KERNELS.airShed, 'airShedSplit');
 KERNELS.airGiveSub = airGiveKernel(true);
 KERNELS.airGiveThin = airGiveKernel(false);
 KERNELS.bodyAdvectSub = cornered(thinFaced(substepped('bodyAdvect'), 'bodyAdvectSub'), 'bodyAdvectSub');
@@ -408,7 +419,7 @@ KERNELS.bodyAdvectPairSub = `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var vel: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
-@group(0) @binding(5) var<storage, read> pr: array<f32>;
+@group(0) @binding(5) var<storage, read> flow: array<vec4f>;
 @group(0) @binding(6) var<storage, read> sub: array<f32>;
 @group(0) @binding(7) var sq: texture_2d<f32>;
 @group(0) @binding(8) var<storage, read> mob: array<f32>;
@@ -503,6 +514,19 @@ KERNELS.bodyAdvectSharp = KERNELS.bodyAdvect.replace(MC_SLOPE, `fn sb1(a: f32, b
 }
 fn mm(a: vec4f, b: vec4f) -> vec4f { return vec4f(sb1(a.x, b.x), sb1(a.y, b.y), sb1(a.z, b.z), sb1(a.w, b.w)); }`);
 KERNELS.bodyAdvectSharpSub = thinFaced(substepped('bodyAdvectSharp'), 'bodyAdvectSharpSub');
+/*
+  And taking the air (PLAN 38w-32): the oil's colour with a bubble on the
+  plate, the same room the water's colour is carried in (airLiquid), so the
+  split carry runs whether or not there is air. Where either cell of a face
+  has air the face is first order in both carries, so the limiter only
+  differs away from the bubble, which is where the oil's edge is.
+*/
+KERNELS.bodyAdvectSharpSubAir = airLiquid(KERNELS.bodyAdvectSharpSub, 'bodyAdvectSharpSubAir', 'A.a.x * sub[0]');
+// Both shares in one pass (PLAN 38w-33, wgsl/fluid/split.ts), in the same room.
+for (const name of ['bodyAdvectSplitSub', 'bodyAdvectSplitOnSub']) {
+  KERNELS[`${name}Air`] = monomorph(airLiquid(KERNELS[name], `${name}Air`, 'A.a.x * sub[0]'), `${name}Air`);
+  KERNELS[name] = monomorph(KERNELS[name], name);
+}
 
 KERNELS.bodyAdvectThin = cornered(thinFaced(KERNELS.bodyAdvect, 'bodyAdvectThin'), 'bodyAdvectThin');
 KERNELS.bodyAdvectThinAir = airLiquid(KERNELS.bodyAdvectThin, 'bodyAdvectThinAir', 'A.a.x');

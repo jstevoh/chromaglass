@@ -2,7 +2,9 @@
 /**
  * The oil's colour rides the oil (PLAN 38w-29).
  *
- *   npm run oilride      (any adapter that computes: scripts/lab.mjs)
+ *   npm run oilride                  (any adapter that computes: scripts/lab.mjs)
+ *   npm run oilride -- --plate=air   a bubble drifting through the oil (PLAN 38w-32)
+ *   npm run oilride -- --plate=old   Thin Gap off, the old plate's carry (PLAN 38w-32)
  *
  * Reported by the owner (Classic, round five, 2026-11-22): "the colors seem
  * to get washed out". Measured then on the live app under a hand (Beat
@@ -54,14 +56,37 @@
  *     0.37%, 20.8%
  *   and the colour riding Cahn–Hilliard's flux too (tried, left out): share
  *     5132.5 (98.83%)
+ *
+ * And with air and on the old plate (PLAN 38w-32), before the split ran
+ * there (b5585d2) and with it:
+ *
+ *   --plate=air  share 5193.2 → 5159.5 (99.35%, FAIL), inside 98.1% (FAIL);
+ *                split 5193.2 → 5194.5 (100.03%), inside 98.8%; the split
+ *                ran 241 steps of 240 with a bubble (and the one after its
+ *                lift, its hole), the bubble on oil in 22 of 24 reads
+ *   --plate=old  share 5193.7 → 5130.9 (98.79%, FAIL), inside 97.8% (FAIL);
+ *                split 5193.7 → 5199.6 (100.11%), inside 99.0%
+ *
+ * (On a thin gap the dye falls about a quarter in the five seconds, with
+ * or without air or the split: the water's colour laid to the corners,
+ * carried over the open rim by the hand. The old plate's walls hold it.)
  */
 import { openLab } from './lab.mjs';
 
+const PLATE = (process.argv.find((a) => a.startsWith('--plate=')) ?? '--plate=thin').slice(8);
+if (!['thin', 'air', 'old'].includes(PLATE)) throw new Error(`--plate=${PLATE}: thin, air or old`);
 const N = 192;
 const STEPS = 300;
 const MOVED = 0.1;  // half the 21% the hand moves
 const SHARE_KEPT = 0.998;
-const KEPT = 0.99;     // of what lay inside the oil at the start: main 98.8%, this 99.3%
+/*
+  Of what lay inside the oil at the start. Thin: main 98.8%, 38w-29 99.3%.
+  With a bubble (38w-32): 98.1% before, 98.8% split; the bubble's room is
+  taken by the colour's carries and not by the oil's own (mixAdvect, owed
+  as 15g-8e), so its rim pushes the oil's colour off oil that stays. Old
+  plate: 97.8% before, 99.0% split. Each bar between the two.
+*/
+const KEPT = { thin: 0.99, air: 0.985, old: 0.985 }[PLATE];
 const CONC = 0.03;     // the colour per unit of oil in the bodies, against the start's: a floor, not the fix's line
 const ASTRAY = 0.01;   // floors: main and this both read about 0.4% here (the lines above tell them apart)
 const AMBER_OUT = 0.02;
@@ -83,10 +108,11 @@ page.on('pageerror', (e) => gpuErrors.push(String(e).slice(0, 200)));
 try {
   const over = await page.evaluate(() => {
     const s = lab.look('classic').settings;
-    return { thinGap: 1, advection: s.advection, plateCurve: s.plateCurve, depthDrag: s.depthDrag, platePressure: s.platePressure,
+    return { thinGap: 1, bubbleClear: 1, advection: s.advection, plateCurve: s.plateCurve, depthDrag: s.depthDrag, platePressure: s.platePressure,
       oilTension: s.oilTension, oilBodies: s.oilBodies, filmHold: s.filmHold, diff: s.diffusionRate, turbScale: 0 };
   });
-  console.log(`Classic's liquid: ${JSON.stringify(over)}`);
+  if (PLATE === 'old') over.thinGap = 0;
+  console.log(`Classic's liquid on the ${PLATE} plate: ${JSON.stringify(over)}`);
   if (!(over.oilBodies > 0)) throw new Error('Classic no longer turns Oil Bodies on: this check reads the oil\'s share, which only Oil Bodies keeps');
 
   await page.evaluate(async ({ N, over, TEAL, AMBER }) => {
@@ -138,16 +164,44 @@ try {
     new place round the middle, and Plate Rock tipping the plate round in a
     three-second circle (rockX, rockY).
   */
-  await page.evaluate(async ({ n, o, KICK, ROCK }) => {
+  /*
+    With --plate=air, a bubble as well (PLAN 38w-32), put down at a new place
+    each second and drifting a fifth of the plate across it, so its rim
+    sweeps through oil and water alike; lifted for the last second, so its
+    hole fills back before the read. Counted while it is down: the steps
+    whose oil's colour was carried in the air's room (sharpAirCarries, so
+    the kernel ran, not only that there was air), and the steps whose
+    bubble stood on oil (some cell of its disc over half oil, read every
+    tenth step), so a bubble misplaced into open water fails. Its own
+    random places, so the hand's kicks land where the thin plate's do.
+  */
+  const airSeen = await page.evaluate(async ({ n, o, KICK, ROCK, air, N }) => {
     let seed = 3; const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+    let seedB = 11; const rndB = () => (seedB = seedB * 16807 % 2147483647) / 2147483647;
+    const s = lab.solver();
+    const ran0 = s.sharpAirCarries;
+    let bx = 0.5, by = 0.5, read = 0, onOil = 0;
     for (let k = 0; k < n; k++) {
       const t = k / 60;
       if (k % 30 === 0) lab.sheetPress(0.3 + 0.4 * rnd(), 0.3 + 0.4 * rnd(), KICK, 1e-6);
+      if (air && k % 60 === 0) { bx = 0.25 + 0.3 * rndB(); by = 0.3 + 0.4 * rndB(); }
+      const x = bx + 0.2 * (k % 60) / 60;
+      if (air && k < n - 60) s.setBubbles(new Float32Array([x, by, 0.045, 1]), 1, 0.25, new Float32Array(4));
+      else if (air && k === n - 60) s.setBubbles(new Float32Array(4), 0, 0.25, new Float32Array(4));
       lab.sheetStep();
       lab.flush();
       await lab.step(1, { ...o, rockX: ROCK * Math.sin(2 * Math.PI * t / 3), rockY: ROCK * Math.cos(2 * Math.PI * t / 3) }, true);
+      if (air && k < n - 60 && k % 10 === 5) {
+        const m = await s.readChemistry('mix');
+        let hit = false;
+        for (let j = 0; j < N && !hit; j++) for (let i = 0; i < N; i++) {
+          if (Math.hypot((i + 0.5) / N - x, (j + 0.5) / N - by) < 0.045 && m.data[(i + j * N) * 4] >= 0.5) { hit = true; break; }
+        }
+        read++; if (hit) onOil++;
+      }
     }
-  }, { n: STEPS, o: over, KICK, ROCK });
+    return { ran: s.sharpAirCarries - ran0, read, onOil };
+  }, { n: STEPS, o: over, KICK, ROCK, air: PLATE === 'air', N });
   const end = await read();
   const thin = await page.evaluate(() => lab.solver().thinGapLive);
   console.log(`  ${STEPS} steps in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
@@ -163,7 +217,7 @@ try {
   check('the oil keeps its colour', Math.abs(end.share / start.share - 1) <= 1 - SHARE_KEPT,
     `${pct(end.share / start.share)} of the oil's share laid is still the oil's after ${STEPS} steps (bar within ${pct(1 - SHARE_KEPT, 1)}, either way)`);
   check('the oil\'s colour stays in the oil', end.inOil / start.inOil >= KEPT,
-    `${pct(end.inOil / start.inOil, 1)} of what lay inside the oil (${pct(start.inOil / start.share, 1)} of the share at the start) is inside it after the hand (bar ${pct(KEPT, 0)})`);
+    `${pct(end.inOil / start.inOil, 1)} of what lay inside the oil (${pct(start.inOil / start.share, 1)} of the share at the start) is inside it after the hand (bar ${pct(KEPT, 1)})`);
   check('at the strength it was laid', Math.abs(end.conc / start.conc - 1) <= CONC,
     `colour per unit of oil in the bodies ${start.conc.toFixed(3)} → ${end.conc.toFixed(3)} (bar within ${pct(CONC, 0)})`);
   check('and none of it is stranded in the open water', end.inWater / Math.max(1e-9, end.share) < ASTRAY,
@@ -171,7 +225,12 @@ try {
   check('the amber you see stays out of the open water', end.amberOut / end.amber < AMBER_OUT,
     `${pct(end.amberOut / end.amber)} of the amber in open water (bar ${pct(AMBER_OUT, 1)})`);
   check('no oil made or lost', Math.abs(end.oil / start.oil - 1) < 0.01, `oil ${pct(end.oil / start.oil - 1)}`);
-  check('on the thin gap, where the fix runs', thin === true, `thinGapLive ${thin}`);
+  check(`on the ${PLATE} plate, where this run asks`, thin === (PLATE !== 'old'), `thinGapLive ${thin}`);
+  if (PLATE === 'air') {
+    check('and the oil\'s colour was carried in the air\'s room', airSeen.ran >= STEPS - 60 - 5 && airSeen.ran <= STEPS,
+      `${airSeen.ran} steps with the oil's share in the air's room (bodyAdvectSplitSubAir, or bodyAdvectSharpSubAir apart), of ${STEPS - 60} with a bubble down (bar all but 5)`);
+    check('and the bubble stood on oil', airSeen.onOil >= airSeen.read / 4 && airSeen.read > 0, `on oil in ${airSeen.onOil} of ${airSeen.read} reads (bar a quarter)`);
+  }
   check('no GPU errors', gpuErrors.length === 0, gpuErrors[0] ?? '');
 } finally {
   await close();

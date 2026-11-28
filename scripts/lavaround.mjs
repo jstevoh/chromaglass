@@ -96,12 +96,25 @@ async function inLab(opts) {
 /** In the page: the look's settings as the app hands them to the solver, and its wax laid as the app lays it. */
 async function layLamp({ N }) {
   const look = lab.look('lava-lamp').settings;
+  /*
+    The wax's own thickness, as lavacycle and lavawax already hand it over. This
+    line was written (27f-9q, #866) before the look carried an Oil Thickness;
+    38w-31 (#954) gave it paraffin's 0.32 (about 9 mm²/s) and taught the other
+    two checks to pass it, and this one went on running the solver's default
+    oil, OIL_THICKNESS, about 50 mm²/s, five and a half times thicker than the
+    lamp's wax. That oil creeps: in two minutes it neither reaches the lip nor
+    packs against the wall, so both meters read nothing (lip 0.66%, guard
+    0.04% on deploy 1053) and the bodies never had time to round (0.552). It
+    was measuring another lamp. Thrown on, like lavacycle's, if the look stops
+    carrying a number, so the check cannot drift back onto the default.
+  */
+  if (!Number.isFinite(look.oilThickness)) throw new Error(`lavaround: Lava Lamp's Oil Thickness is ${look.oilThickness}, not a number`);
   const WAX = lab.dyeOf([0.86, 0.08, 0.24]);
   const visc = look.viscosity === 'thick' ? 1.5 : 0.5;
   const sh = Math.max(0, Math.min(1, look.sharpness ?? 0)), tu = Math.max(0, Math.min(1, look.turbulenceScale));
   window.__lamp = { thinGap: 1, gapThickness: look.gapThickness ?? 0.45, plateUpright: look.plateUpright, solutalBuoyancy: look.solutalBuoyancy,
     gravityX: 0, gravityY: -1, gravityReach: 0.3, dt: 0.00133, magnetSeconds: 1 / 30, heatDecay: look.heatDecay, currentBuoy: look.buoyancy * 0.3, maxCurrent: 0.3,
-    doubleDiffusion: look.doubleDiffusion, oilTension: look.oilTension, oilBodies: look.oilBodies, oilWeight: look.oilWeight,
+    doubleDiffusion: look.doubleDiffusion, oilTension: look.oilTension, oilBodies: look.oilBodies, oilWeight: look.oilWeight, oilThickness: look.oilThickness,
     advection: look.advection, diff: look.diffusionRate ?? 0, damping: look.damping || 0.99, visc, nu: visc * 0.0001,
     sharpness: sh * (0.225 - 0.09 * sh), turbScale: tu * (1 + 3 * tu ** 3), turbDetail: Math.round(look.turbulenceDetail ?? 3),
     platePressure: look.platePressure ?? 0.4 };

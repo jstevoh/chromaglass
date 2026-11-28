@@ -2,7 +2,7 @@ import { HIT_FEATURES } from '../lib/hitSource';
 import { VOICE_DEFAULTS, type VoiceTool } from '../lib/noteVoices';
 import { DEFAULT_LIQUID_TYPES } from '../types';
 import { useEffect, useRef, useState } from 'react';
-import { Sheet, LIT } from './ui';
+import { Sheet, LIT, Toggle } from './ui';
 import { Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid, Music } from 'lucide-react';
 import {
   ACTION_LABELS, LEARNABLE_SETTINGS, sourceLabel, targetLabel,
@@ -20,7 +20,7 @@ import { SURFACES, surfaceFor } from '../lib/controllerSurface';
  * (choose what a control should do, then touch the control), and keep the
  * result as a file so the next laptop learns it in one click.
  */
-interface MidiPanelProps {
+export interface MidiPanelProps {
   midi: MidiController;
   presets: { id: string; name: string }[];
   setItems?: { index: number; name: string }[];
@@ -30,13 +30,15 @@ interface MidiPanelProps {
   /** Open Settings at its Controller section, which is where the setup lives. */
   onSetup: () => void;
   onClose: () => void;
+  /** Rendered inside a PhoneSheet rather than its own Sheet overlay (PLAN 49h). */
+  embed?: boolean;
 }
 
-const inputCls = 'w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/40';
+const inputCls = 'w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/40 pointer-coarse:min-h-11 pointer-coarse:text-[16px]';
 /** A chip, lit when it is the chosen one (a bank, a tab, the map that is plugged in): PLAN 35a. */
-const chip = (active: boolean) => `px-2.5 py-1.5 rounded-lg border text-[12px] font-medium transition-colors ${active ? LIT : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'}`;
+const chip = (active: boolean) => `px-2.5 py-1.5 pointer-coarse:min-h-11 rounded-lg border text-[12px] font-medium transition-colors ${active ? LIT : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'}`;
 /** The one action a step of the panel is for (Bind, Finish): white, the primary, never a state. */
-const primaryChip = 'px-2.5 py-1.5 rounded-lg border text-[12px] font-medium transition-colors bg-white text-black border-white hover:opacity-90';
+const primaryChip = 'px-2.5 py-1.5 pointer-coarse:min-h-11 rounded-lg border text-[12px] font-medium transition-colors bg-white text-black border-white hover:opacity-90';
 
 /** A depth as the panel prints it: signed, in percent of the setting's travel. */
 const depthLabel = (d: number | undefined): string => `${(d ?? 0) >= 0 ? '+' : '−'}${Math.round(Math.abs(d ?? 0) * 100)}%`;
@@ -141,7 +143,7 @@ function SoundLearnEditor({ target, label, existing, onBind }: {
   );
 }
 
-export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, onSetup, onClose }: MidiPanelProps) {
+export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, onSetup, onClose, embed = false }: MidiPanelProps) {
   const [tab, setTab] = useState<'settings' | 'actions' | 'presets' | 'setlist' | 'dyes' | 'voices'>('settings');
   const lastEvent = useMidiLastEvent(midi);
   /*
@@ -193,7 +195,7 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
             aria-pressed={!!isLearning}
             onClick={() => (isLearning ? midi.cancelLearn() : midi.learn(target, encoder && target.kind === 'setting' ? 'relative' : 'absolute'))}
             disabled={!midi.enabled}
-            className={`px-2 py-1 rounded-md border text-[12px] font-medium disabled:opacity-65 ${isLearning ? `${LIT} animate-pulse` : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`px-2 py-1 pointer-coarse:min-h-11 rounded-md border text-[12px] font-medium disabled:opacity-65 ${isLearning ? `${LIT} animate-pulse` : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid={`midi-learn-${key}`}
           >
             {isLearning ? 'Touch it…' : 'Learn'}
@@ -208,7 +210,7 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
             title={notMusic ?? `Bind ${label} to the music`}
             aria-label={`Bind ${label} to the music`}
             aria-expanded={open}
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border disabled:opacity-65 ${open || heard.length ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded-md border disabled:opacity-65 ${open || heard.length ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid={`sound-learn-${key}`}
           >
             <Music size={12} />
@@ -230,13 +232,13 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
   // the cue list, which is the one column you need while teaching a pad to
   // fire cues.
   return (
-    <Sheet title={<><Sliders size={16} /> MIDI</>} onClose={onClose} testId="midi-panel">
+    <Sheet embed={embed} title={<><Sliders size={16} /> MIDI</>} onClose={onClose} testId="midi-panel">
       {showSurface && (
         <ControllerSurface midi={midi} presets={presets} surface={surface} onClose={() => setShowSurface(false)} />
       )}
-      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6 text-white">
+      <div className={`min-h-0 flex-1 overflow-y-auto scrollbar-hide text-white ${embed ? 'p-1' : 'p-6'}`}>
       <p className="text-[12px] leading-relaxed text-muted mb-4">
-        Faders ride the show, pads cue presets and dyes, buttons fire the one-shots. Teach your controller here: choose what a control should do, then touch it.
+        Faders ride the show, pads cue looks and dyes, buttons fire the one-shots. Teach your controller here: choose what a control should do, then touch it.
         Or teach it to the music with the note beside Learn: a slider follows a drum or a band, a button fires on its hits.
         Both are kept in the same map and the same file.
       </p>
@@ -355,7 +357,7 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
           </div>
           <p className="mt-1.5 text-[12px] leading-relaxed text-dim">
             Nine faders cannot reach forty settings. Learn a control while a layer is chosen and it belongs to that layer;
-            learn it on <span className="text-white/60">1</span> and it is live on all of them, which is where presets, dyes and the transport belong.
+            learn it on <span className="text-white/60">1</span> and it is live on all of them, which is where looks, dyes and the transport belong.
             Put <span className="text-white/60">Bank +</span> on a button to step them in the dark.
             Changing layer drops every fader out of soft takeover, so nothing jumps to where the hardware happens to be standing.
           </p>
@@ -370,24 +372,37 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
         slot on it or riding blind. This puts a running list of what changed
         and where it landed in the corner instead.
       */}
-      <label className="mb-3 flex items-center gap-2 text-[12px]" data-testid="midi-activity-toggle">
-        <input type="checkbox" checked={activity} onChange={e => onActivity(e.target.checked)} />
-        Show what the controller is doing, on the desk
-      </label>
+      <div className="mb-2">
+        <Toggle
+          label="Show what the controller is doing, on the desk"
+          on={activity}
+          onChange={onActivity}
+          testId="midi-activity-toggle"
+        />
+      </div>
 
       {/* Fader manners */}
-      <div className="flex items-center gap-2 mb-4 text-[12px]">
-        <label
-          className="flex items-center gap-1.5 flex-1"
-          title="A fader does nothing until it passes through the value the setting is already at, so one left at the top does not slam the look back the moment it twitches — after a preset loads, or after a bank change hands it a different setting. The cost is that a fader out of position waits, and the activity readout says which one and what it is waiting for. Turn this off and every fader takes hold the instant it moves."
-        ><input type="checkbox" checked={midi.softTakeover} onChange={e => midi.setSoftTakeover(e.target.checked)} data-testid="midi-soft" /> Soft takeover</label>
-        <label className="flex items-center gap-1.5 flex-1" title="Learn the next setting as an endless encoder (relative nudges)"><input type="checkbox" checked={encoder} onChange={e => setEncoder(e.target.checked)} data-testid="midi-encoder" /> <Zap size={10} /> Endless encoder</label>
+      <div className="mb-4 flex flex-col gap-1">
+        <Toggle
+          label="Soft takeover"
+          on={midi.softTakeover}
+          onChange={midi.setSoftTakeover}
+          title="A fader does nothing until it passes through the value the setting is already at, so one left at the top does not slam the look back the moment it twitches — after a look loads, or after a bank change hands it a different setting. The cost is that a fader out of position waits, and the activity readout says which one and what it is waiting for. Turn this off and every fader takes hold the instant it moves."
+          testId="midi-soft"
+        />
+        <Toggle
+          label="Endless encoder"
+          on={encoder}
+          onChange={setEncoder}
+          title="Learn the next setting as an endless encoder (relative nudges)"
+          testId="midi-encoder"
+        />
       </div>
 
       {/* Learn targets */}
       <div className="flex flex-wrap gap-1 mb-3" role="tablist" aria-label="Learn targets">
         {(['settings', 'actions', 'presets', 'setlist', 'dyes', 'voices'] as const).map(t => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`${chip(tab === t)} flex-1`} data-testid={`midi-tab-${t}`}>{t === 'setlist' ? 'set list' : t}</button>
+          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`${chip(tab === t)} flex-1`} data-testid={`midi-tab-${t}`}>{t === 'setlist' ? 'set list' : t === 'presets' ? 'looks' : t}</button>
         ))}
       </div>
       {midi.learning && (
@@ -434,7 +449,7 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
               >
                 {b.bank === undefined ? 'all' : `bk${b.bank + 1}`}
               </button>
-              <button onClick={() => midi.removeBinding(b.id)} className="p-1 text-dim hover:text-red-300" aria-label="Remove binding"><Trash2 size={11} /></button>
+              <button onClick={() => midi.removeBinding(b.id)} className="flex items-center justify-center p-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 text-dim hover:text-red-300" aria-label="Remove binding"><Trash2 size={11} /></button>
             </div>
             {b.target.kind === 'voices' && (() => {
               const vt = b.target;
@@ -500,7 +515,7 @@ export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, 
             <span className="shrink-0 font-mono text-[12px] text-white/60">{isMapping(b) ? depthLabel(b.depth) : 'on hit'}</span>
             <button
               onClick={() => midi.removeSound(b.id)}
-              className="flex h-6 w-6 shrink-0 items-center justify-center text-dim hover:text-red-300"
+              className="flex h-6 w-6 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center text-dim hover:text-red-300"
               aria-label="Remove binding"
             >
               <Trash2 size={11} />

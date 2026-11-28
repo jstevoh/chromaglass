@@ -59,6 +59,8 @@ import { WebGPUFrameProbe } from './probe';
 import { WebGPUAir } from './air';
 import { WebGPUSlosh } from './slosh';
 import { SoapFilmPlate } from './soapFilmPlate';
+import { TankPlate } from './tankPlate';
+import { preparePlateBoil } from './lampBoil';
 import { FaradayPlate } from './faraday';
 import { GlowPlate } from './glow';
 import { WebGPUParticles } from './particles';
@@ -67,6 +69,8 @@ import { WebGPUCamera } from './camera';
 import { WebGPUOutput } from './output';
 import { PICTURE_FORMAT, WebGPUPostChain } from './post';
 import { PipelineCache, type BuildTimes, type Prep } from './kit';
+import { RGBA32, VEL } from './fluid/constants';
+import { kernel } from './wgsl/fluid';
 import type { Opening } from './opening';
 
 /**
@@ -513,18 +517,56 @@ export interface Quiet {
   progress?(settled: number, asked: number, rendering: number): void;
 }
 
+const pendingLater = new WeakMap<GPUDevice, () => void>();
+
+/**
+ * Start building the deferred `later` pipelines for `device` once the first
+ * solver step has run, so `openingtime` never counts `later` compiles asked
+ * before step 1 while `startup` still finishes them behind the running show.
+ */
+export function startLaterPrepare(device: GPUDevice): void {
+  const start = pendingLater.get(device);
+  if (!start) return;
+  pendingLater.delete(device);
+  start();
+}
+
+/**
+ * Thin-gap air-carry kernels (`bodyAdvectSubAir`, `bodyAdvectPairSubAir`,
+ * `bodyAdvectThinAir`, `airShed`) triggered when boil steam or bubbles turn
+ * `airCarry` on, built behind the show in the `fluid` cache scope.
+ */
+function prepareAirCarry(device: GPUDevice, opts: { float32Filterable: boolean }, open: Opening): Prep[] {
+  if (!open.thinGap) return [];
+  const cache = PipelineCache.for(device, 'fluid');
+  const dye: GPUTextureFormat = opts.float32Filterable ? RGBA32 : VEL;
+  const out: Prep[] = [];
+  for (const f of [...new Set([dye, VEL, RGBA32])]) {
+    out.push(cache.computePrep(`bodyAdvectSubAir:${f}`, kernel('bodyAdvectSubAir', f), true));
+    out.push(cache.computePrep(`airShed:${f}`, kernel('airShed', f), true));
+  }
+  out.push(cache.computePrep(`bodyAdvectPairSubAir:${dye}`, kernel('bodyAdvectPairSubAir', dye), true));
+  for (const f of [...new Set([dye, RGBA32])]) {
+    out.push(cache.computePrep(`bodyAdvectThinAir:${f}`, kernel('bodyAdvectThinAir', f), true));
+  }
+  return out;
+}
+
 /**
  * Builds what the show opens with and returns when it is done; then goes on
- * building the rest behind the show, which is under way by then.
+ * building the rest behind the show once the first step is under way.
  */
 export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, opts: { float32Filterable: boolean; quiet?: Quiet }, open: Opening): Promise<Prepared> {
   const builds = [
     ...WebGPUFluid.prepare(device, opts, open),
+    ...preparePlateBoil(device),
+    ...prepareAirCarry(device, opts, open),
     ...WebGPUPlate.prepare(device, format, PICTURE_FORMAT, open),
     ...WebGPUFrameProbe.prepare(device),
     ...WebGPUAir.prepare(device),
     ...WebGPUSlosh.prepare(device, open),
     ...SoapFilmPlate.prepare(device, open),
+    ...TankPlate.prepare(device),
     ...FaradayPlate.prepare(device, open),
     ...GlowPlate.prepare(device, open),
     ...WebGPUParticles.prepare(device, open),
@@ -564,12 +606,15 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
   const rank = (b: Prep) => (b.key.startsWith('fluid/fill:') ? 0 : b.kind === 'render' ? 1 : 2);
   const ahead = builds.filter((b) => !b.later).sort((a, b) => rank(a) - rank(b));
   const opening = await buildInTurn(device, 'opening', ahead, OPENING_LANES, opts.quiet);
+  const later = builds.filter((b) => b.later).sort((a, b) => rank(a) - rank(b));
   // Nobody waits on it, so nobody would hear it fail: the builds cannot
   // throw, but reading the lists can (a kernel renamed under one).
   // Render pipelines first here too, so the plate's whole display
   // (`displayLean.ts`), which a look reaching past its opening's effects
   // waits on, comes before the hundred-odd kernels of other looks.
-  void buildInTurn(device, 'later', builds.filter((b) => b.later).sort((a, b) => rank(a) - rank(b)), LATER_LANES)
-    .catch((err) => console.warn('ChromaGlass: the rest of the pipelines could not be built behind the show; the frame builds them.', err));
+  pendingLater.set(device, () => {
+    void buildInTurn(device, 'later', later, LATER_LANES)
+      .catch((err) => console.warn('ChromaGlass: the rest of the pipelines could not be built behind the show; the frame builds them.', err));
+  });
   return opening;
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Music, Disc3, History, Fingerprint, Mic2, Play, Square, FileAudio, Hourglass, Circle } from 'lucide-react';
+import { X, Music, Disc3, History, Mic2, Play, Square, FileAudio, Hourglass, Circle } from 'lucide-react';
 import { MusicIntelState, PerformanceState } from '../hooks/useMusicIntelligence';
 import { MusicSettings } from '../lib/musicTypes';
 import { followLine } from '../lib/followedPlace';
@@ -126,14 +126,13 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
           </div>
         ) : (
           <div className="text-xs opacity-50 leading-relaxed">
-            No track identified yet.
-            {!state.fingerprintEnabled && ' Fingerprinting is not configured — tag the track manually below, or set VITE_FINGERPRINT_PROXY_URL for automatic identification.'}
+            {/* Automatic song identification was retired on 2026-11-27 (archive/song-id/): a song is named by hand. */}
+            No song named yet. Tag the song playing below: its map, lyrics and look follow from the tag.
           </div>
         )}
 
         {/* Status row */}
         <div className="flex gap-2 mt-3 text-[9px] uppercase tracking-wider">
-          {state.identifying && <span className="flex items-center gap-1 text-blue-300"><Fingerprint size={10} /> identifying…</span>}
           {state.recording && <span className="flex items-center gap-1 text-blue-300"><Mic2 size={10} /> learning this song</span>}
           {state.analyzing && <span className="flex items-center gap-1 text-yellow-300"><FileAudio size={10} /> analyzing structure…</span>}
         </div>

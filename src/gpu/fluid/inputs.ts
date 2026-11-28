@@ -1254,6 +1254,7 @@ export class FluidInputs extends FluidPasses {
       hsGap: this.hsGap,
       hsP: this.hsP,
       hsP2: this.hsP2,
+      hsFlow: this.hsFlow,
       ensureThinGap: () => this.ensureThinGap(),
       scalars: {
         phaseLive: this.phaseLive,

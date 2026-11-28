@@ -21,6 +21,15 @@ import { bankHasTwo } from '../lib/projectorBank';
  * Each projector's Focus sits under its lamp (PLAN 51b, lib/projectorFocus.ts):
  * the head's rack, sharp at the middle, so a knob learned to it rests sharp
  * and either way softens.
+ *
+ * Focus Dissolve sits last, under both (PLAN 51c, lib/focusDissolve.ts): how
+ * far a Go racks the projectors it changes out and back, the look changing
+ * behind the blur; 0 a Go fades as it always has.
+ *
+ * Decks sits beside the crossfade it drives (PLAN 51c-2, lib/deckDissolve.ts),
+ * a button for the same reason the shutters are: it is a switch, on or off.
+ * Lit, each Go with a fade goes to the dark projector and the crossfade
+ * carries the light to it, so it is drawn only where there is a B to go to.
  */
 export interface ProjectorBankProps {
   settings: VisualizerSettings;
@@ -30,7 +39,7 @@ export interface ProjectorBankProps {
   testId?: string;
 }
 
-type BankKey = 'projLampA' | 'projLampB' | 'projShutterA' | 'projShutterB' | 'projCross' | 'projFocusA' | 'projFocusB';
+type BankKey = 'projLampA' | 'projLampB' | 'projShutterA' | 'projShutterB' | 'projCross' | 'projFocusA' | 'projFocusB' | 'projRack' | 'projDeck';
 
 const valueOf = (s: VisualizerSettings, k: BankKey): number => {
   const v = s[k];
@@ -55,19 +64,24 @@ export function ProjectorBank({ settings, onSetting, touch = false, chips, testI
       </div>
     );
   };
-  const shutter = (k: 'projShutterA' | 'projShutterB', name: string) => {
-    const shut = valueOf(settings, k) > 0.5;
+  const toggle = (k: 'projShutterA' | 'projShutterB' | 'projDeck', title: string, on: string, off: string) => {
+    const lit = valueOf(settings, k) > 0.5;
     return (
-      <button type="button" aria-pressed={shut} onClick={() => onSetting({ [k]: shut ? 0 : 1 })}
-        title={`${name}'s shutter: a vane over the lens, ${shut ? 'shut; press to open' : 'open; press to shut'}`}
-        data-testid={`${testId}-${k}`}
+      <button type="button" aria-pressed={lit} onClick={() => onSetting({ [k]: lit ? 0 : 1 })}
+        title={title} data-testid={`${testId}-${k}`}
         className={`mt-4 shrink-0 rounded-md border px-2 text-[12px] font-medium transition-colors ${touch ? 'h-12 min-w-[64px]' : 'h-7 min-w-[52px]'} ${
-          shut ? LIT : 'border-border text-text-2 hover:bg-hover'
+          lit ? LIT : 'border-border text-text-2 hover:bg-hover'
         }`}>
-        {shut ? 'Shut' : 'Open'}
+        {lit ? on : off}
       </button>
     );
   };
+  const shutter = (k: 'projShutterA' | 'projShutterB', name: string) =>
+    toggle(k, `${name}'s shutter: a vane over the lens, ${valueOf(settings, k) > 0.5 ? 'shut; press to open' : 'open; press to shut'}`, 'Shut', 'Open');
+  // Decks (PLAN 51c-2, lib/deckDissolve.ts): a Go to the dark projector, the crossfade carrying the light over.
+  const decks = () => toggle('projDeck', valueOf(settings, 'projDeck') > 0.5
+    ? 'Decks on: each Go with a fade goes to the dark projector, and the crossfade carries the light to it; press for a Go on the spot'
+    : 'Decks off: a Go changes the projectors where they are; press to send each Go to the dark projector, the crossfade carrying the light', 'Decks', 'Decks');
   return (
     <div className="rounded-lg border border-border px-2 pb-1 pt-1" data-testid={testId} data-two={two ? '1' : '0'}>
       <div className={`${touch ? 'text-[14px]' : 'text-[13px]'} font-medium text-text`}>Projectors</div>
@@ -77,13 +91,14 @@ export function ProjectorBank({ settings, onSetting, touch = false, chips, testI
         <>
           <div className="flex items-start gap-2">{slider('projLampB', 'Lamp B')}{shutter('projShutterB', 'Projector B')}</div>
           {slider('projFocusB', 'Focus B')}
-          {slider('projCross', 'A/B Crossfade')}
+          <div className="flex items-start gap-2">{slider('projCross', 'A/B Crossfade')}{decks()}</div>
         </>
       ) : (
         <p className={`${touch ? 'text-[13px]' : 'text-[12px]'} pb-1 leading-snug text-muted`}>
           A second projector, its own lamp and focus and an A/B crossfade come with Two Projectors, a back plate on its own blend, and the lamp ground.
         </p>
       )}
+      {slider('projRack', 'Focus Dissolve')}
     </div>
   );
 }

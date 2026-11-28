@@ -190,7 +190,7 @@ function CuesBody({ p }: { p: DeskProps }) {
           <span className="ml-auto shrink-0 whitespace-nowrap pl-2 font-mono text-[12px] text-faint" data-testid="set-count">{p.cues.length} {p.cues.length === 1 ? 'item' : 'items'}</span>
         </div>
         <span className="flex items-center gap-1 whitespace-nowrap [&>*]:flex-1">
-          <Button height={28} onClick={p.onAddToSet} testId="set-add" title="Add a preset palette, a saved one, a sequence or a file to the set">+ Add</Button>
+          <Button height={28} onClick={p.onAddToSet} testId="set-add" title="Add a look, a saved look, a sequence or a file to the set">+ Add</Button>
           <Button
             height={28}
             onClick={() => { setAct('save'); setSaved(true); window.setTimeout(() => setSaved(false), 1400); }}
@@ -222,7 +222,7 @@ function CuesBody({ p }: { p: DeskProps }) {
               </>
             )}
             <MenuItem onClick={() => setAct('new')} testId="set-new">New empty set</MenuItem>
-            <MenuItem onClick={() => setAct('clear')} testId="set-clear">Start from all preset palettes</MenuItem>
+            <MenuItem onClick={() => setAct('clear')} testId="set-clear">Start from all looks</MenuItem>
             <div className="my-1 h-px bg-border" />
             <MenuItem onClick={() => setAct('import')} testId="set-import">Import a set list…</MenuItem>
             <MenuItem onClick={() => setAct('export')} testId="set-export">Export this set</MenuItem>
@@ -248,7 +248,7 @@ function CuesBody({ p }: { p: DeskProps }) {
           {p.cues.map((c, i) => {
             const state = c.id === p.liveId ? 'live' : c.id === p.nextId ? 'next' : 'idle';
             const fade = c.fade === 0 ? 'cut' : `${c.fade}s fade`;
-            const tip = `${String(i + 1).padStart(2, '0')} · ${c.name} · ${fade}${c.song ? ` · goes up when ${c.song} plays` : ''}${c.kind === 'sequence' ? ' · a stage sequence' : ''}${c.missing ? ' · not here any more' : ''}`;
+            const tip = `${String(i + 1).padStart(2, '0')} · ${c.name}${c.note ? ` (${c.note})` : ''} · ${fade}${c.song ? ` · goes up when ${c.song} plays` : ''}${c.kind === 'sequence' ? ' · a stage sequence' : ''}${c.missing ? ' · not here any more' : ''}`;
             return (
               <LookChip
                 key={c.id}
@@ -268,12 +268,15 @@ function CuesBody({ p }: { p: DeskProps }) {
               >
                 {c.kind === 'sequence' && <span aria-hidden className="pointer-events-none absolute -inset-[3px] rounded-full border border-dashed border-text-2" />}
                 {c.song && <span className="pointer-events-none absolute -bottom-1 -left-1 rounded-full bg-elevated px-1 text-[11px] leading-4 text-muted" title={`Goes up on its own when ${c.song} plays`} data-testid={`cue-song-${c.id}`}>♪</span>}
+                {/* 24 px, not the 16 it shipped at (34b-6): the smallest target `npm run qa`
+                    lets a desk draw ("nothing is smaller than 24px"), and a corner button on a
+                    40 px chip is the one place a hand is likeliest to miss. */}
                 <button
                   type="button"
                   onClick={e => { e.stopPropagation(); p.onItemAction(c.id, 'remove'); }}
                   title="Remove from the set"
                   aria-label={`Remove ${c.name} from the set`}
-                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full border border-border-strong bg-elevated text-[11px] leading-none text-muted opacity-0 hover:text-text focus:opacity-100 group-hover:opacity-100"
+                  className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-border-strong bg-elevated text-[13px] leading-none text-muted opacity-0 hover:text-text focus:opacity-100 group-hover:opacity-100"
                   data-testid={`cue-remove-${c.id}`}
                 >×</button>
               </LookChip>
@@ -300,7 +303,7 @@ function CuesBody({ p }: { p: DeskProps }) {
         ) : (
           <div className="px-3 py-8 text-center text-[13px] text-muted" data-testid="set-empty">
             <p>This set is empty.</p>
-            <p className="mt-1 text-[12px] text-faint">+ Add preset palettes to it, or start from all of them in the ⋯ menu.</p>
+            <p className="mt-1 text-[12px] text-faint">+ Add looks to it, or start from all of them in the ⋯ menu.</p>
           </div>
         )}
       </div>
@@ -319,7 +322,7 @@ function CuesBody({ p }: { p: DeskProps }) {
             className="flex w-full items-center justify-between rounded-md px-2 py-1 text-[12px] text-muted hover:text-text"
             data-testid="perform-saved-toggle"
           >
-            <span>Your preset palettes</span>
+            <span>Your saved looks</span>
             <span className="font-mono text-[12px] text-faint">{p.savedLooks.length} {savedOpen ? '▾' : '▸'}</span>
           </button>
           {savedOpen && (
@@ -334,7 +337,7 @@ function CuesBody({ p }: { p: DeskProps }) {
                     swatch={l.swatch}
                     size={40}
                     state={state}
-                    title={`${l.name}${state === 'live' ? ' (live)' : state === 'next' ? ' (next)' : ''}. Click cues it, Go sends it; double-click sends it now.`}
+                    title={`${l.name}${l.description ? ` (${l.description})` : ''}${state === 'live' ? ' (live)' : state === 'next' ? ' (next)' : ''}. Click cues it, Go sends it; double-click sends it now.`}
                     onClick={() => p.onCueSaved(l.id)}
                     onDoubleClick={() => p.onSendSaved(l.id)}
                     testId={`perform-saved-${l.id}`}
@@ -344,7 +347,7 @@ function CuesBody({ p }: { p: DeskProps }) {
                       onClick={() => p.onAddSavedToSet(l.id)}
                       title={`Add ${l.name} to the set`}
                       aria-label={`Add ${l.name} to the set`}
-                      className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full border border-border-strong bg-elevated text-[11px] leading-none text-muted opacity-0 hover:text-text focus:opacity-100 group-hover:opacity-100"
+                      className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-border-strong bg-elevated text-[13px] leading-none text-muted opacity-0 hover:text-text focus:opacity-100 group-hover:opacity-100"
                       data-testid={`perform-saved-add-${l.id}`}
                     >+</button>
                   </LookChip>
@@ -449,7 +452,7 @@ function RidesBody({ p, narrow = false }: { p: DeskProps; narrow?: boolean }) {
           })}
           <div className="mt-1.5 border-t border-border pt-1.5">
             <Toggle
-              label="Random evolve"
+              label="Evolve"
               // The real switch. This used to write automateRate between 0 and
               // 0.15, which only sets how often an evolving plate does something:
               // with evolving off (the default) it showed "on" and did nothing.
@@ -576,7 +579,7 @@ function RecipeBody({ p }: { p: DeskProps }) {
           {!ridesOut && (
             <div className="mt-2 border-t border-border pt-1">
               <Toggle
-                label="Random evolve"
+                label="Evolve"
                 on={p.automated}
                 onChange={on => {
                   p.onAutomate(on);

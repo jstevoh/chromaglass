@@ -106,3 +106,41 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   was) reaches hsPrep through the Sim struct's slot 55, the lift and the spin; Lava Lamp sets
   0.32. Measured: lavacycle 7/7 (peaks 0.63 at 18 s, down to 0.15 by 40 s, round again to
   0.62), lavawax 3/3 (25% of the cold wax stays up).
+- ~~**38w-32. The oil's colour rides the oil with air on the plate and on the old plate**~~ (S–M;
+  Medium, after 38w-29). The split carry runs only on a thin gap with no air: the air's
+  carries (bodyAdvectSubAir, airLiquid) are built for the one MC limiter, and the old
+  plate's single carry (bodyAdvect, runPressed) still carries the oil's share with MC. Give
+  bodyAdvectSharp an Air variant and the pressed path the same split, and run oilride with
+  a bubble down and with Thin Gap off. Fusing bodyWater into the dye's first substep and
+  bodyJoin into its last would also save the two passes.
+  *Shipped 2026-11-27:* bodyAdvectSharpSubAir (airLiquid on the oil's carry) and the old
+  plate's split (bodyWater, bodyAdvectSharp through runPressed, bodyJoin); each path waits
+  for its kernels (splitReady) and carries the old way until they are built. `npm run
+  oilride -- --plate=air` (a bubble drifting through the oil under the same hand): the
+  oil's share 99.35% → 100.03% kept, inside the oil 98.1% → 98.8%, the split run on every
+  step with a bubble down and the bubble on oil in 22 of 24 reads; `--plate=old`: 98.79% →
+  100.11%, inside 97.8% → 99.0%. The thin plate unchanged (100.01%, 99.3%). The fusion is
+  38w-33. Found on the way: on a thin gap the hand carries about a quarter of the dye over
+  the open rim in these five seconds (31,222 → 23,889, the same with air and before the
+  split), the water's colour laid to the corners; the old plate's walls keep all of it.
+- ~~**38w-33. The split carry's two passes fused into the carry**~~ (S; Low, after 38w-32).
+  bodyWater and bodyJoin are two pointwise passes a step round the dye's carry (one or two
+  loads a cell each). Fold the split into the dye's first substep (read dye less the oil's
+  share there) and the join into its last, in the plain, pair and Air kernels alike, and
+  the old plate's single bodyAdvect; `npm run oilride` on all three plates and `npm run
+  thick`'s timing say it is the same carry and cheaper.
+  *Shipped 2026-11-27 (`npm run splitcarry`, wgsl/fluid/split.ts):* both shares through
+  each face once, in one pass. The first substep splits (the dye less the oil's share at
+  each cell it reads) and writes the water's share to a texture of its own; the rest carry
+  that; every substep writes the joined dye beside it, so the last one carryPlan runs
+  leaves the join there and no pass is needed after. The glass's drift and the air's shed,
+  which are nonlinear in the field (a limited flux; a floor), run per share in one pass
+  each (driftShiftSplit, airShedSplit, `perShare`). Measured at 128² on SwiftShader, the
+  last step carried both ways from the same plate: the same fields to the bit on the old
+  plate and without the drift, 3e-7 of the largest cell with it (rounding), and a step's
+  share carry 76.1 ms against 92.1 apart (0.83). *Failed:* splitting in every substep
+  (the water's share read as the dye less the oil's at every neighbour, two loads each):
+  the same fields but 104–110 ms against 86–90, slower than the four passes; and airShed
+  run once on the joined dye: 0.27% of the largest cell apart under a bubble, its floor is
+  per share. The species no longer rides the dye's carry with Oil Bodies on (the one pass
+  has no third field): it takes its own stage, as many face passes as before; 38w-34.

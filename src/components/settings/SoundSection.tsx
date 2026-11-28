@@ -291,12 +291,12 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
           </div>
         )}
 
-        {/* Song detection: the master switch for everything that follows a song. */}
+        {/* Song detection: the master switch for everything that follows a song. It kept its name when automatic song identification was retired (2026-11-27, archive/song-id/): a song is named by hand now, and this still turns following it on and off. */}
         {onSongDetection && (
           <div className="mb-4 mt-2 flex items-center justify-between gap-3" data-testid="song-detection">
             <div className="min-w-0">
               <div className="text-[13px] font-medium text-text">Song Detection</div>
-              <div className="text-[12px] text-muted">Listen for which song is playing, so set items, song shows and looks made for a song go up on their own.</div>
+              <div className="text-[12px] text-muted">Follow the song playing once it is named (the Track panel's tag, Listen's Name it), so set items, song shows and looks made for a song go up on their own.</div>
             </div>
             <button
               type="button"
@@ -304,7 +304,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
               aria-checked={!!songDetection}
               onClick={() => onSongDetection(!songDetection)}
               className="flex h-8 w-11 shrink-0 items-center justify-center rounded-md p-1"
-              title={songDetection ? 'On: songs are identified' : 'Off: nothing is identified'}
+              title={songDetection ? 'On: the song named is followed' : 'Off: nothing is followed'}
               data-testid="song-detection-toggle"
             >
               <SwitchPill on={!!songDetection} />
@@ -316,7 +316,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
         <div className="flex flex-col gap-2 mb-4 mt-2">
           <div className="text-[13px] font-medium text-text">On a New Song</div>
           <div className="grid grid-cols-3 gap-1">
-            {([['off', 'Keep'], ['preset', 'New preset'], ['random', 'Random']] as const).map(([mode, label]) => (
+            {([['off', 'Keep'], ['preset', 'New look'], ['random', 'Random look']] as const).map(([mode, label]) => (
               <button
                 aria-pressed={(settings.onNewSong ?? 'off') === mode}
                 key={mode}

@@ -59,8 +59,7 @@ Antigravity builds; Claude writes the checks; Antigravity never writes or loosen
   could in principle cost more to compile than the two it replaced; the 46a PR quotes
   startup's first step on CI's Mac before and after, and startup's "no later than the old
   way" line comes back from quarantine on 2026-11-15.
-- **46b · The frame budget's written items** (Antigravity): H2c-7, H2c-labels, ~~H2c-6~~ (shipped, 2026-11-13), H2c-9
-  (briefs of 2026-11-07), ~~H2c-8 and H2c-5~~ (**shipped**: `encode` cleared `h2c5` and `h2c8`, `samelook` passed), then H2c-2 once H2c-3 and H2c-1 merge. Each
+- **46b · The frame budget's written items** (Antigravity): H2c-7, H2c-labels, ~~H2c-6~~ (shipped, 2026-11-13), ~~H2c-9~~ (shipped, 2026-11-26, 19ak-24a), ~~H2c-8 and H2c-5~~ (**shipped**: `encode` cleared `h2c5` and `h2c8`, `samelook` passed), then H2c-2 once H2c-3 and H2c-1 merge. Each
   takes its id out of its owed line and carries `same-look`; H2c-5 (first-order velocity) is
   a physics trade and ships only if `samelook` stays green.
 - **46c · Smooth on every look, on the owner's Mac** (Antigravity, by hand): `npm run stutter`
@@ -156,10 +155,7 @@ again ten times a second for three meters and a percentage.
   where the lamp ground is off (ten a pixel on Classic); the ferrofluid dome's curvature
   loading again the four neighbours it holds; the projector's `scene` sample overwritten
   when the surface is not the wall. `samelook`, `lamp`, `spikes`, `ferrolook`, `wall`.
-- **46m · Tank and the lamp's boil compile on the frame that turns them on** (S): eleven and
-  two pipelines in no `prepare` list, a stop of two to six seconds at the Mac's compile
-  pace. Built behind the show as glint's are. Check to write first (Claude): a
-  `startup`-style line that turns each on after the opening and counts none built on a frame.
+- ~~**46m · Tank and the lamp's boil compile on the frame that turns them on** (S):~~ **shipped** (`TankPlate.prepare` in `src/gpu/tankPlate.ts`, `prepareTankDraw` in `src/gpu/tankDraw.ts` + `src/gpu/plate.ts`, `preparePlateBoil` in `src/gpu/lampBoil.ts`, `air boil` in `src/gpu/air.ts`, and `prepareAirCarry` (`bodyAdvectSubAir`/`bodyAdvectPairSubAir`/`bodyAdvectThinAir`/`airShed`) in `src/gpu/prepare.ts`, all with `later = true` so Classic's opening count stays unchanged; cold-cache 3 s Tank/boil frame gaps dropped to `16.8 ms` (`builtOnFrame=0`), `samelook` 0.00 %, `wgsl` 224/224, `tankgpu` 24/24). **Open:** check owed — `startup`-style line turning Tank then boil on after the opening and counting none built on a frame.
 - **46n · Device calls a frame can lose** (S each): up to eight `queue.submit` a frame (the
   readback's and the probe's into the frame's encoder; the deltas' needs its own copy of
   `sim`); the flash guard's probe encoding both dispatches with every ring slot busy and
@@ -169,7 +165,7 @@ again ten times a second for three meters and a percentage.
   the aux target stored where nothing reads it (`storeOp: 'discard'`, an interim to H2c-6);
   derive drawn on frames H2c-9 skips the pack; `packDye` and `packVel` as one kernel.
   `framereads`, `framegroups`, `encode`, `samelook`.
-- **46o · Song ID listens and matches on the page's thread** (M): every six seconds with a
+- ~~**46o · Song ID listens and matches on the page's thread**~~ **retired with Song ID (2026-11-27)**: the owner retired automatic song identification, so nothing captures or matches any more and the hitch is gone with it; the brief was pulled from Antigravity's queue. The item stands for the day Song ID comes back from `archive/song-id/` (M): every six seconds with a
   local library, a new AudioContext and a ScriptProcessor for four seconds, then the match
   (a 192k-sample resample, about 86 FFTs) in one block. Into the ear's context by a worklet
   and the index's worker. Check: long tasks over 8 ms in 30 s with the band and one track.

@@ -23,11 +23,12 @@ comments, which moved with it.
 | `useSceneSource` | the room camera as a sensor |
 | `usePaletteLock` | the palette held across looks; since PLAN 43d also `paletteFromFile` (a picture or video file's colours as the palette, "From picture", the lock `PICTURE_LOCK`), `palettes` (the list the desk and the phone draw, the picture's last) and `pictureDyes` (sent to a projector with the lock) |
 | `useLayerReport` | each layer's fill and colour, for the desk in Preview |
+| `useLookDocument` | the open saved look (`docId`, `docDirty`) and save, overwrite and delete for the desk and phone |
 | `useSetListState` | the set list, the armed look, the Go's fade; publishes them to `setNow.ts` for the assistant, and its fade and cancel |
 | `usePhoneLayout` | phone or desks (the old narrow overlay is unhooked, PLAN 49c); Live or Preview |
 | `useWallLook` | Preview's copy for the wall, and Send to wall |
 | `useBlackout` | blackout and the dimmer's fades |
-| `useLookFades` | Go, Go now, the back plate, Revert; sets `setNow.ts`'s Go door for the assistant |
+| `useLookFades` | Go, Go now, the back plate, Revert; sets `setNow.ts`'s Go door for the assistant; with Focus Dissolve up, a Go's look change waits inside the visualizer's `rack` (PLAN 51c); with Decks on and two projectors, a Go goes to the dark one, its dish there, the crossfade glided over and the racks from the visualizer's `deck` (`pinBack` keeps a lit back plate's look, PLAN 51c-2) |
 | `useTimecode` | MIDI timecode, for the sequence |
 | `useShowLibrary` | songs' shows, action sets, what a cloud sync reloads; Follow songs for the assistant (`songShowNow.ts`) |
 | `useSetActions` | the set list's own edits and files; sets `editNow.ts`'s door for the owner's assistant (PLAN 44k-16a) |
@@ -40,10 +41,10 @@ comments, which moved with it.
 | `useGlides` | a setting walked to a value over seconds |
 | `useRowFades` | a mixer row's take button |
 | `useRemote` | the phone remote's link, both ways; and the TVs at home, `tv` (a `TvAtHome`: watching, asking to pair, paired, and Allow, No, Forget; PLAN 12-tv, 12-tv-2, `lib/tvFeed.ts`) |
-| `useInkTitle` | the identified song's title poured as ink when it changes and the Title switch is on (PLAN 37x-10), called by `useRemote` |
+| `useInkTitle` | the named song's title (named by hand since song ID was retired, 2026-11-27) poured as ink when it changes and the Title switch is on (PLAN 37x-10), called by `useRemote` |
 | `useLogoMelt` | the wordmark poured and melted when the Live Show goes live or a Record take starts, with Logo melt on (PLAN 37x-11), called by `useRemote` |
 | `useShowFeed` | the plate's colour to the rig, and colour, sound and the beat to a VJ app (OSC out's switch) |
-| `useSongSequences` | the set item, sequence or preset made for a song, up when it is identified; a song's sequence stopped at its end (moved out of App for 28h-8) |
+| `useSongSequences` | the set item, sequence or preset made for a song, up when it is named; a song's sequence stopped at its end (moved out of App for 28h-8) |
 | `useSongScore` | a song's show while it plays, and its score (`lookPlaying`: the look that is up, as a show names it); publishes the shows to `songShowNow.ts` and sets its door for the assistant |
 | `useListen` | Listen in the Songs panel: the song named, added, and its show designed once heard through (PLAN 28h-8) |
 | `musicNow.ts` (not a hook) | the music player, for the remote link to report (`usePlayerNow`, `publishPlayer`, `usePlayerReport` from `useSoundState`), and the door the owner's assistant opens, plays, seeks, loops and closes it through (`askMusic`, `setMusicDoor` from `useSoundSource`, `setLoopDoor`, `shelfTrack`, `ASSISTANT_MUSIC_PATH`) (PLAN 44k-2) |
@@ -69,7 +70,7 @@ comments, which moved with it.
 | `useCheckHooks` | the checks' `?debug` doors (`lib/checkHooks.ts` declares them) |
 | `useCrashState` | the black box's half from here |
 
-`shared.ts` holds what App and several hooks read: the look the page opens on, `randomLook` (the phone's Surprise me and a new song's look, through `pickLook`, PLAN 45a-13), the shapes
+`shared.ts` holds what App and several hooks read: the look the page opens on, `randomLook` (the phone's Random look and a new song's look, through `pickLook`, PLAN 45a-13), the shapes
 of an armed look and the wall's look, and the keys the sound and the room camera are kept
 under (`MAC_SYSTEM_AUDIO_KEY` since PLAN 14y-2: the Mac app's System audio, kept across a
 relaunch). A check that reads App's source as text reads App and these together
