@@ -431,7 +431,8 @@
     "watchshots": "node scripts/watchshotstest.mjs",
     "watchbatch": "node scripts/watchbatchtest.mjs",
     "ratepage": "node scripts/ratepagetest.mjs",
-    "reelset": "node scripts/reelsettest.mjs"
+    "reelset": "node scripts/reelsettest.mjs",
+    "reelpack": "node scripts/reelreaderpacktest.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

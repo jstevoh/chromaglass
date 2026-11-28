@@ -17,6 +17,18 @@ and is copied into the release as it stands:
   - `testset/`: four short clips with known answers (`README.md` is the key, `answers.json`
     its measured half), plus a linked real show that is not shipped.
 
+- `release/`: what only the public repository has: its README (the front page, with a demo
+  run), `package.json` (the copy's `files` list and test line are written by the build), the
+  MIT licence, the changelog, `bin/reelreader.mjs` (the npx command), `claude-plugin/` (the
+  plugin and its own marketplace, `.claude-plugin/` in the copy), the `/reelreader` command,
+  `gitignore` and `github-workflows/` (its CI, and a release on a `v` tag: the skill zip on the
+  GitHub release and the package on npm with the repository's `NPM_TOKEN`). Dotted names are
+  kept undotted here so this repository's own tools never read them as their own.
+
+The public repository is built from this folder and `scripts/` by
+`node scripts/reelreaderpack.mjs --out DIR --demo --zip --test` (PLAN 47p-6), one commit a
+release; never edit the copy by hand. `npm run reelpack` holds the build.
+
 `npm run reelset` holds the folder: every link inside it resolves, no page names this project,
 its owner, its places, its plan or a model, and every test clip still measures what the key
 says (`-- --fetch` adds the linked real show).

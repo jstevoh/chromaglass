@@ -677,6 +677,23 @@
       ]
     },
     {
+      "name": "reelreader's public copy is whole and runs as npx runs it",
+      "shard": "sound",
+      "run": "npm run reelpack",
+      "why": [
+        "reelreader's public repository and npm package are builds of this one",
+        "(scripts/reelreaderpack.mjs, PLAN 47p-6). This builds a copy into a temp",
+        "folder and holds that every relative import of every shipped module",
+        "resolves, npm packs no test, test clip or demo, the package, plugin and",
+        "marketplace carry one version, the plugin finds its skill, agent and",
+        "command, no file holds a home folder, an address or a model name, the",
+        "command run through a bin link watches the test set's cartoon (seven cuts,",
+        "general), and the skill zip runs from its own folder. Each check is shown",
+        "failing on a copy made wrong on purpose. In the sound shard for its ffmpeg",
+        "and unzip. About 25 seconds."
+      ]
+    },
+    {
       "name": "Watching in words",
       "shard": "sound",
       "run": "npm run watchwords",
