@@ -123,10 +123,6 @@ export class WebGPUFluid extends FluidCover {
       ['scaleDye', [dye], open.oilBodies],
       // The slosh's flow over the dye's (18a-13): waited for when the look tips its dish.
       ['addSlosh', [VEL], open.slosh],
-      // The dye's grid pattern on the old plate (dampGrid; none on a thin gap since 18a-8b).
-      ['dampGridCurv', [dye], true],
-      ['dampGridLimit', [dye], true],
-      ['dampGrid', [dye], true],
       // Viscosity diffuses velocity only; no caller diffuses dye via jacobi.
       ['jacobi', [VEL], true],
       ['dyeDisperse', [dye], true],
@@ -383,6 +379,8 @@ export class WebGPUFluid extends FluidCover {
       // The dye's backtrace and the velocity's self-advection (one key when the dye is half float).
       ...[...new Set([dye, VEL])].map((f): [string, string] => [`advect:${f}`, kernel('advect', f)]),
       ...[...new Set([dye, VEL])].map((f): [string, string] => [`macCormack:${f}`, kernel('macCormack', f)]),
+      // The grid filter's, the old plate's alone (PLAN 18a-8c; dampGrids says why).
+      ...WebGPUFluid.gridBuilds(dye),
     ];
   }
 
@@ -1180,28 +1178,10 @@ export class WebGPUFluid extends FluidCover {
     });
     // The lamp's heat, carried with the colour (PLAN 38f, carryHeat).
     stage('carry heat', (pass) => this.carryHeat(pass, disp, thinAt), thin && !this.boilLive);
-    /*
-      The grid's checkerboard out of the dye (dampGrid, and why), topped up to
-      GRID_DAMP a step on the old plate. Jacobi diffusion took 8a/(1+8a) of it a
-      step; at molecular diffusion (dm ≈ 0) gridDiff is ~0, so the damping
-      runs at full GRID_DAMP there.
-
-      None on a thin gap, whose faces lay no checkerboard (GRID_DAMP's note, 18a-8b).
-    */
+    // The grid's checkerboard out of the dye, the old plate's alone (dampGrids, PLAN 18a-8b/8c).
     const gridDiff = (8 * dm) / (1 + 8 * dm);
     const gridTop = ((p.gridDamp ?? (thin ? 0 : GRID_DAMP)) - gridDiff) / (1 - gridDiff);
-    stage('dye grid', (pass) => {
-      const k = this.arg('dye grid', [gridTop, 0, 0, 0]);
-      const damp = (field: PingPong) => {
-        this.run(pass, 'dampGridCurv', this.scratchA, [field.read, field.write], k);
-        this.run(pass, 'dampGridLimit', this.scratchB, [field.read, this.scratchA], k);
-        this.run(pass, 'dampGrid', field.write, [field.read, this.scratchA, this.scratchB], k);
-        field.swap();
-      };
-      damp(this.dye);
-      // The oil's share has the same grid in it, from the same faces.
-      if (bodiesOn) damp(this.oilDye!);
-    }, gridTop > 0.002);
+    stage('dye grid', (pass) => this.dampGrids(pass, gridTop, bodiesOn), gridTop > 0.002);
     /*
       Marangoni flow (see marangoniFlux): the dye, and the mix itself, carried
       away from soap along the surface, conservatively. The mix goes second,
