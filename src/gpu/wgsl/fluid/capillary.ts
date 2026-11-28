@@ -59,7 +59,14 @@ export const THREAD_REACH = 12;
   their tips. The real fix is the capillary laid implicitly (PLAN 27f-9s),
   which takes the factor out.
 
-  Wide bodies (threadCurve 0) are as they were, to the bit.
+  Wide bodies (threadCurve 0) are as they were, to the bit, and that is
+  this factor's own limit: a bead or a pool wider than the gap still pushes
+  at the clip beside a slowed neck, so late in a break-up, and where a
+  thread leaves a pool, the two sides are not on one law (the skeptic pass
+  on \`npm run pinch\`, 2026-11-28). And while the factor binds, which on
+  the thin gap is from Oil Tension 0.05 or so up, the dial no longer
+  changes a thread's speed; on main the clip made it barely change either.
+  Both go with the factor (27f-9s).
 */
 export const THREAD_PULL = 8;
 /*
