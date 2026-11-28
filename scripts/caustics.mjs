@@ -3,7 +3,7 @@
  * The lamp's light traced through the liquid to the wall (PLAN 31s-2).
  *
  *   npm run caustics
- *   npm run caustics -- --first-order   (control: the old law, which cannot fold or gather light, fails 3, 4, 7, 8 and 6)
+ *   npm run caustics -- --first-order   (control: the old law, which cannot fold, gather or lose light, fails 3, 4, 7, 10, 8 and 6)
  *
  * The trace (src/gpu/caustic.ts) is handed a path you know (the derive pass's
  * .w, OPL less 1.333 in rest gaps of DISH_GAP_METRES) through the lab's
@@ -31,6 +31,10 @@
  *      cross (one bright line a period becomes two) between c 0.9 and 2,
  *      as that law has them at 1, the pair standing where the law draws
  *      it (within a texel); its light is kept within 2%.
+ *  10. A ray bent past the head lens (PROJECTOR_NA) reaches no wall: a
+ *      pancake of oil, its meniscus bending its rays 0.8 rad, keeps the light
+ *      the aperture passes, worked out vertex by vertex, and none of its rim
+ *      lands further in than a passing ray can carry it.
  *   8. The back plate: two layers traced at once land each in its own half
  *      of the buffer, the lens as layer 1 lighting as it does alone.
  *   9. The derive pass writes an oil layer's height h (31s-1) as path in
@@ -42,7 +46,7 @@
  *      (a header the display refused, or binding 27 left blank, draws the
  *      fallback both times), and at Focus 0.5 nothing is traced.
  *
- * The lamp's disc (LAMP_HALF_ANGLE) is a choice of lamp, not a law: lines 7's
+ * The lamp's disc (LAMP_HALF_ANGLE) is a choice of lamp, not a law: line 7's
  * target draws through the same disc, so a wrong angle is not caught here
  * (docs/judging.md §153 asks it of the owner's eyes).
  */
@@ -60,6 +64,9 @@ const PLATE = 0.2;
 const GAP = 0.002;
 const DEFOCUS = 0.183;
 const DN = 0.137;
+const NA = 0.25; // PROJECTOR_NA (src/gpu/wgsl/caustic.ts), the head lens's half angle
+const LAMP = 0.02; // LAMP_HALF_ANGLE
+const SPLAT_FROM = 1.0, SPLAT_FULL = 2.0; // CAUSTIC_SPLAT_FROM, _FULL
 const SIZE = 512; // the derive pass's texture; the trace's m is half (256)
 /** Line 7: at c = 2 the fold pair of a period lands (2 sqrt 3 - 2 pi / 3) / k apart, k a period of 64 texels: 13.96 texels. */
 const FOLD_PAIR = (2 * Math.sqrt(3) - 2 * Math.PI / 3) * 64 / (2 * Math.PI);
@@ -293,14 +300,35 @@ try {
       };
       if (c <= 0.8) {
         /*
-          The law as the wall is drawn: point by point at a tenth of a texel,
-          then through what the trace draws it with, the lamp's disc (its
-          Gaussian, the same sigma as caustic.ts) and the splat's tent (a
-          texel each side: where c = 0.8 peaks every triangle is splatted).
+          The law as the wall is drawn, each part by what draws it. A
+          triangle at gain g (its light, I = 1/|1 - c sin kx| here) goes
+          (1 - s) drawn and s splatted, s = (g - CAUSTIC_SPLAT_FROM) /
+          (FULL - FROM) clamped (wgsl/caustic.ts). The drawn part is read
+          at the texel's centre; the splatted part lands as a tent a texel
+          each side (worked through at a tenth of a texel). Their sum per
+          texel then goes through the lamp's disc as the blur draws it: the
+          same Gaussian (sigma as caustic.ts), the same reach (2.5 sigma),
+          on texels. The first form of this target ran every texel through
+          the tent, drawn or not, and was 5.3% off in the cloud and 6.4% on
+          the owner's Mac at c = 0.5's peak, where most triangles are drawn.
         */
-        const fine = [];
-        for (let q = a0 * sub; q < a1 * sub; q++) fine.push(exact(c, (q + 0.5) / sub / r.m));
-        for (let i = Math.round(0.375 * r.m); i < Math.round(0.625 * r.m); i++) worstLaw = Math.max(worstLaw, Math.abs(col[i] / drawn(fine, i) - 1));
+        const share = (g) => Math.min(1, Math.max(0, (g - SPLAT_FROM) / (SPLAT_FULL - SPLAT_FROM)));
+        const tex = new Array(a1 - a0).fill(0);
+        for (let j = a0; j < a1; j++) { const g = exact(c, (j + 0.5) / r.m); tex[j - a0] += g * (1 - share(g)); }
+        for (let q = (a0 - 2) * sub; q < (a1 + 2) * sub; q++) {
+          const x = (q + 0.5) / sub, g = exact(c, x / r.m), sp = g * share(g) / sub;
+          if (!sp) continue;
+          for (let j = Math.floor(x - 1); j <= Math.ceil(x + 1); j++) {
+            const w = 1 - Math.abs(x - (j + 0.5));
+            if (w > 0 && j >= a0 && j < a1) tex[j - a0] += w * sp;
+          }
+        }
+        const reachT = Math.min(24, Math.ceil(2.5 * sigma));
+        for (let i = Math.round(0.375 * r.m); i < Math.round(0.625 * r.m); i++) {
+          let sum = 0, ws = 0;
+          for (let d = -reachT; d <= reachT; d++) { const w = Math.exp(-0.5 * (d / sigma) ** 2); sum += w * tex[i + d - a0]; ws += w; }
+          worstLaw = Math.max(worstLaw, Math.abs(col[i] / (sum / ws) - 1));
+        }
       }
       const at = [];
       for (let i = Math.round(0.375 * r.m); i < Math.round(0.625 * r.m); i++) if (col[i] > 1.5 && col[i] > col[i - 1] && col[i] >= col[i + 1]) at.push(i);
@@ -334,6 +362,58 @@ try {
     check('a rippled layer follows I = 1/|1 - c sin kx| within 6%, first folds between c 0.9 and 2 (the pair where the law draws it, within a texel), its light kept within 2%',
       worstLaw <= 0.06 && lines[0.9] === 1 && lines[2] === 2 && gaps.length === 1 && lawGaps.length === 1 && Math.abs(gaps[0] - lawGaps[0]) <= 1 && worstKept <= 0.02,
       `worst against the law ${(worstLaw * 100).toFixed(1)}%; bright lines a period at c 0.9: ${lines[0.9]}, at 2: ${lines[2]} (${gaps.join(', ')} texels apart, the law drawn ${lawGaps.join(', ')}, undrawn ${FOLD_PAIR.toFixed(1)}); light kept to ${(worstKept * 100).toFixed(2)}%`);
+  }
+
+  /*
+    10. A ray bent past the head lens reaches no wall (PROJECTOR_NA). A
+    pancake of oil, the path stepping 0.4 rest gaps over a meniscus a few
+    texels wide (31s-1 lays 1.5 mm of oil, its edge as sharp as the oil's
+    share), bends its edge's rays about 0.8 rad: past the lens's 0.25. The
+    light the wall keeps must be what the head lens takes, the share of each
+    ray's cone inside its aperture, worked out here vertex by vertex as the
+    trace samples the path (a triangle the least of its corners') (within half a percent of the plate's light, and
+    the light lost within a tenth of what the aperture takes, which is the
+    rim's share of the plate, about 1.2%); and none of the rim's light may land further
+    in than a ray the lens still takes can carry it (k times 0.27 rad's
+    slope, plus the lamp's disc and the tent): without the aperture the
+    rim's rays all cross on the pancake's axis.
+  */
+  {
+    const R = 0.3, W = 0.002, STEP = 0.4, dz = 0.4;
+    const path = field((x, y) => STEP * (0.5 - 0.5 * Math.tanh((Math.hypot(x - 0.5, y - 0.5) - R) / W)));
+    const r = await trace(path, dz);
+    const m = r.m, cell = 1 / m;
+    const tex = (u, v) => {
+      const x = Math.min(SIZE - 1, Math.max(0, u * SIZE - 0.5)), y = Math.min(SIZE - 1, Math.max(0, v * SIZE - 0.5));
+      const i0 = Math.floor(x), j0 = Math.floor(y), i1 = Math.min(SIZE - 1, i0 + 1), j1 = Math.min(SIZE - 1, j0 + 1), fx = x - i0, fy = y - j0;
+      const at = (i, j) => path[j * SIZE + i];
+      return (at(i0, j0) * (1 - fx) + at(i1, j0) * fx) * (1 - fy) + (at(i0, j1) * (1 - fx) + at(i1, j1) * fx) * fy;
+    };
+    const passOf = (i, j) => {
+      const u = i * cell, v = j * cell;
+      const gx = (tex(u + 0.5 * cell, v) - tex(u - 0.5 * cell, v)) / cell, gy = (tex(u, v + 0.5 * cell) - tex(u, v - 0.5 * cell)) / cell;
+      const bend = Math.hypot(gx, gy) * GAP / PLATE;
+      return Math.min(1, Math.max(0, (NA + LAMP - bend) / (2 * LAMP)));
+    };
+    const pv = [];
+    for (let j = 0; j <= m; j++) for (let i = 0; i <= m; i++) pv.push(passOf(i, j));
+    let want = 0;
+    for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) {
+      const a = pv[j * (m + 1) + i], b = pv[j * (m + 1) + i + 1], c = pv[(j + 1) * (m + 1) + i], d = pv[(j + 1) * (m + 1) + i + 1];
+      want += (Math.min(a, b, c) + Math.min(b, d, c)) / 2;
+    }
+    want /= m * m;
+    const got = r.light.reduce((x, y) => x + y, 0) / (m * m);
+    const k = dz * DEFOCUS * GAP / (PLATE * PLATE);
+    const sigma = Math.max(0.5, dz * DEFOCUS * LAMP / (PLATE / m) / 2);
+    const inner = R - (k * (NA + LAMP) * PLATE / GAP + (3 * sigma + 2) / m);
+    let stray = 0, strayAt = null;
+    for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) {
+      if (Math.hypot((i + 0.5) / m - 0.5, (j + 0.5) / m - 0.5) < inner && r.light[j * m + i] > stray) { stray = r.light[j * m + i]; strayAt = [i, j, Math.hypot((i + 0.5) / m - 0.5, (j + 0.5) / m - 0.5).toFixed(3)]; }
+    }
+    check('a ray bent past the head lens (0.25 rad) reaches no wall: a pancake of oil keeps the light its lens takes (within 0.5% of the plate, and its loss within a tenth), and none of its rim lands past where a ray the lens takes can (within 2%)',
+      Math.abs(got - want) <= 0.005 && Math.abs((1 - got) / (1 - want) - 1) <= 0.1 && 1 - want > 0.005 && stray <= 1.02,
+      `kept ${got.toFixed(4)} against ${want.toFixed(4)} the aperture passes (lost ${((1 - got) * 100).toFixed(2)}% against ${((1 - want) * 100).toFixed(2)}%); inside ${inner.toFixed(3)} of the plate the brightest ${stray.toFixed(3)} (texel ${strayAt})`);
   }
 
   /*

@@ -1,4 +1,4 @@
-import { DISH_GAP_FIELD_METRES, DISH_GAP_METRES } from '../../lib/turntable';
+import { DISH_GAP_FIELD_METRES, DISH_GAP_METRES, DISH_METRES } from '../../lib/turntable';
 
 /**
  * The lamp's light traced through the liquid to the wall (PLAN 31s-2).
@@ -23,7 +23,8 @@ import { DISH_GAP_FIELD_METRES, DISH_GAP_METRES } from '../../lib/turntable';
  * its area at the wall (`CAUSTIC_MESH_WGSL`), added up where triangles
  * overlap (a fold of the map, where the caustic line is). That is the light
  * kept exactly: a triangle carries the same light wherever it lands, so the
- * wall's total is the plate's (less what is thrown off the plate's edge).
+ * wall's total is the plate's (less what is thrown off the plate's edge,
+ * and what is bent past the head lens: PROJECTOR_NA).
  *
  * The lamp is not a point. Each point of the stage sees it as a disc of
  * angular radius LAMP_HALF_ANGLE, so each ray is a cone, and the wall's light
@@ -59,6 +60,23 @@ export const LAMP_HALF_ANGLE = 0.02;
  * past real at its ends, the law under it is the real one.
  */
 export const PROJECTOR_DEFOCUS_METRES = 0.183;
+
+/**
+ * The projector's aperture half angle as the stage sees it, in radians: the
+ * head lens's acceptance, the same as DROP_NA (plateTransmit.ts), which the
+ * in-focus pupil loss and the drops' optics use. A ray bent past it misses
+ * the lens and reaches no wall at any Focus. Each ray is the lamp's cone
+ * (LAMP_HALF_ANGLE), so the share of it that passes runs from 1 at a bend of
+ * NA - angle to 0 at NA + angle (linear across the cone: a disc's chord
+ * would round the ends, a fifth of a percent of the plate's light here).
+ * Measured on the owner's Mac (Oil & Water at Focus 0.6 and 0.8, the first
+ * films of 31s-2): without it an oil body's meniscus, 31s-1's 1.5 mm of oil
+ * over a cell or two, bends its rays about 0.5 rad and the trace threw that
+ * light 15 to 44 mm across the plate as streaks, leaving the drops black and
+ * smudged. A real head never passes those rays: they are the dark line an
+ * oil drop draws on a projector, in focus and out.
+ */
+export const PROJECTOR_NA = 0.25;
 
 /**
  * Cells of mesh round the plate, so a ray from just outside the edge (where
@@ -131,7 +149,7 @@ export const CAUSTIC_KERNELS = {
 ${PARAMS}
 @group(0) @binding(1) var derived: texture_2d<f32>;
 @group(0) @binding(2) var samp: sampler;
-@group(0) @binding(3) var<storage, read_write> rays: array<vec2f>;
+@group(0) @binding(3) var<storage, read_write> rays: array<vec4f>;
 
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) id: vec3u) {
@@ -144,7 +162,10 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   let wy1 = textureSampleLevel(derived, samp, at + vec2f(0.0, 0.5) * cell, 0.0).w;
   let wy0 = textureSampleLevel(derived, samp, at - vec2f(0.0, 0.5) * cell, 0.0).w;
   let grad = vec2f(wx1 - wx0, wy1 - wy0) / cell;
-  rays[id.y * side + id.x] = at + P.k * grad;
+  // The ray's bend in radians (.w's slope in rest gaps per plate width, times gap over plate) and how much of its cone the head lens takes.
+  let bend = length(grad) * ${(DISH_GAP_METRES / DISH_METRES).toPrecision(6)};
+  let passed = clamp((${PROJECTOR_NA.toFixed(3)} + ${LAMP_HALF_ANGLE.toFixed(3)} - bend) / ${(2 * LAMP_HALF_ANGLE).toFixed(3)}, 0.0, 1.0);
+  rays[id.y * side + id.x] = vec4f(at + P.k * grad, passed, 0.0);
 }
 `,
 
@@ -223,7 +244,7 @@ export type CausticKernel = keyof typeof CAUSTIC_KERNELS;
 */
 export const CAUSTIC_MESH_WGSL = /* wgsl */ `
 ${PARAMS}
-@group(0) @binding(1) var<storage, read> rays: array<vec2f>;
+@group(0) @binding(1) var<storage, read> rays: array<vec4f>;
 
 struct MeshOut {
   @builtin(position) pos: vec4f,
@@ -232,7 +253,8 @@ struct MeshOut {
   @location(1) tent: vec2f,
 }
 
-struct Tri { a: vec2f, b: vec2f, d: vec2f, gain: f32 }
+/* gain: plate area over wall area; passed: the share of its rays the head lens takes (PROJECTOR_NA), its corners' least */
+struct Tri { a: vec2f, b: vec2f, d: vec2f, gain: f32, passed: f32 }
 
 /* Triangle t of the mesh: 2 a cell, 0 is (0,0) (1,0) (0,1), 1 is (1,0) (1,1) (0,1); its corners where they land and its gain. */
 fn landed(t: u32) -> Tri {
@@ -246,9 +268,23 @@ fn landed(t: u32) -> Tri {
   let d = vec2u(qi, qj + 1u);
   if (t % 2u == 1u) { a = vec2u(qi + 1u, qj); b = vec2u(qi + 1u, qj + 1u); }
   var o: Tri;
-  o.a = rays[a.y * side + a.x];
-  o.b = rays[b.y * side + b.x];
-  o.d = rays[d.y * side + d.x];
+  let ra = rays[a.y * side + a.x];
+  let rb = rays[b.y * side + b.x];
+  let rd = rays[d.y * side + d.x];
+  o.a = ra.xy;
+  o.b = rb.xy;
+  o.d = rd.xy;
+  /*
+    The least of its corners', not their mean: a triangle whose corners land
+    either side of the lens's edge is stretched from where the passing rays
+    land to where the blocked ones would, and drawn evenly over all of it.
+    With the mean it carried a third to two thirds of its light that whole
+    way, and a pancake of oil drew a haze 4 to 10% over the lamp across its
+    middle, where no passing ray lands (npm run caustics line 10). With the
+    least, the ring of triangles across the lens's edge goes dark, which is
+    a cell's width of the meniscus's dark line.
+  */
+  o.passed = min(ra.z, min(rb.z, rd.z));
   let e1 = o.b - o.a;
   let e2 = o.d - o.a;
   let cell = 1.0 / f32(P.m);
@@ -272,7 +308,7 @@ fn clip(p: vec2f) -> vec4f { return vec4f(p.x * 2.0 - 1.0, 1.0 - p.y * 2.0, 0.0,
   if (share >= 1.0) { p = t.a; }
   var o: MeshOut;
   o.pos = clip(p);
-  o.gain = t.gain * (1.0 - share);
+  o.gain = t.gain * (1.0 - share) * t.passed;
   o.tent = vec2f(0.0);
   return o;
 }
@@ -291,7 +327,7 @@ fn clip(p: vec2f) -> vec4f { return vec4f(p.x * 2.0 - 1.0, 1.0 - p.y * 2.0, 0.0,
   let share = splatShare(t.gain);
   o.pos = select(vec4f(2.0, 2.0, 0.0, 1.0), clip(centre + c / f32(P.m)), share > 0.0);
   // Its share of half a cell's light, the triangle's area at the plate in texels.
-  o.gain = 0.5 * share;
+  o.gain = 0.5 * share * t.passed;
   o.tent = c;
   return o;
 }

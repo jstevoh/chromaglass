@@ -46,7 +46,7 @@ story in `docs/plan-shipped.md` §31p-3; `npm run polar`).
   traced light now), and the derive pass reads the height for the traced path's oil every frame
   (`SURFACE_PATH_WGSL`), so the step has its reader.
 - ~~**31s-2. Light traced through the surface, gathered on the wall.**~~ **Shipped** (2026-11-28,
-  `npm run caustics` 9/9; with 48b and 47j's projected half). The derive pass's whole-column path
+  `npm run caustics` 10/10; with 48b and 47j's projected half). The derive pass's whole-column path
   (`.w`), its oil now from 31s-1's height (dn h, bilinear) and not the view's share, is turned into
   a mesh of landed rays, x + dz grad(OPL), one vertex a cell; each triangle carries its plate area
   over its wall area, gathered ones splatted with a tent so a focus or a fold keeps its light;
@@ -62,7 +62,15 @@ story in `docs/plan-shipped.md` §31p-3; `npm run polar`).
   the lamp's disc has it; the back plate traces in its own half; the derive pass writes a 0.4 mm
   oil cap as 0.0274 rest gaps (dn h / gap exactly); and the display drawn with the trace differs
   from the first-order fallback on 9.1% of a dyed plate. The old law fails 5 of the 9 as a
-  control. `npm run nolight`'s turnover (lines 7 and 13) is now asked either side of the middle
+  control. The first films on the owner's Mac (Oil & Water at Focus 0.6 and 0.8) showed the oil
+  bodies' meniscus, 31s-1's 1.5 mm of oil over a cell or two, bending its rays about 0.5 rad and
+  the trace throwing them 15 to 44 mm across the plate as streaks, the drops left black and
+  smudged: a ray bent past the head lens's aperture (`PROJECTOR_NA` 0.25, plateTransmit's
+  DROP_NA) now carries no light, each ray the share of the lamp's cone inside it, a triangle the
+  least of its corners' (a pancake of oil keeps 0.9800 of the plate's light against 0.9797
+  predicted, and nothing lands past where a passing ray can, line 10). The ripple's law is now
+  drawn as the trace draws each part (drawn triangles at texel centres, splats as tents): 4.8% in
+  the cloud, where the first target read 5.3% and the Mac 6.4%. `npm run nolight`'s turnover (lines 7 and 13) is now asked either side of the middle
   (Focus 0.56 against 0.44), where the traced map is linear: at 0.8 against 0.2 the oil turned
   over at 75% (3761 of 5010), the trace moving light rather than flipping it pixel for pixel; at
   0.56/0.44 4057 of 4074. A glycerine pour's sharp edge throws its rays wider than its ramp even

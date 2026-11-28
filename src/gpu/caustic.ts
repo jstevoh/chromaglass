@@ -104,7 +104,7 @@ export class PlateCaustics {
     if (this.lit) this.disposer.release(this.lit);
     const side = m + 2 * CAUSTIC_BORDER + 1;
     const buf = (label: string, bytes: number, usage = GPUBufferUsage.STORAGE) => this.disposer.track(this.device.createBuffer({ label, size: bytes, usage }));
-    this.rays = buf('caustic rays', side * side * 8);
+    this.rays = buf('caustic rays', side * side * 16);
     this.rows = buf('caustic rows', m * m * 4);
     // COPY_SRC so npm run caustics can read the light the display reads.
     this.light = buf('caustic light', (4 + 2 * m * m) * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);

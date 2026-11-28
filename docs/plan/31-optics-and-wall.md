@@ -262,7 +262,10 @@ lens-shaped drop, no shadow beside it.*
   (m + 9)^2 vertices, 2 (m + 8)^2 triangles drawn and splatted (m = half the packed dye, at most
   512, so about 0.54 M triangles at grid 768) and two blur passes. Measure the frame on the Air at
   1600^2 at Focus 0.8 against 0.5 (`npm run encode` counts the passes); if it is past a
-  millisecond, trace at m/2 when the lamp's disc is wider than two texels.
+  millisecond, trace at m/2 when the lamp's disc is wider than two texels. Measured on the
+  owner's Mac in the first films (Oil & Water, 1440x900, 10.8 s takes): Focus 0.8 recorded 485
+  frames against main's 566 (about 45 fps against 52); at 0.5 and 0.6 both 646 to 647 (60 fps).
+  So it is the far throw that costs, where more triangles gather into splats and folds overlap.
 - **31s-2e. The pupil's conversion still takes a rest gap as 6 mm** (S, found building 31s-2).
   `oplPupilLoss` turns rest gaps per texel into plate widths by `DISH_REST_GAP * logicalGrid`,
   which is a rest gap of 0.03 plate widths (6 mm); since 38r the gap is 2 mm
