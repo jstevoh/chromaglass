@@ -243,7 +243,8 @@ try {
   */
   {
     const { ctx, page } = await open({ width: 900, height: 800, ready: 'save-look' });
-    check('window: the folded desk is up, not the phone', await count(page, 'perform-desk') === 1 && await count(page, 'phone-stage') === 0);
+    check('window: the folded desk is up, not the phone', await count(page, 'perform-desk') === 1 && await count(page, 'phone-stage') === 0
+      && await page.getByTestId('perform-desk').getAttribute('data-narrow') === 'true');
     await page.getByTestId('save-look').click();
     check('window: Save asks for a name', await count(page, 'save-sheet') === 1);
     const confirm = await page.getByTestId('save-confirm').innerText();

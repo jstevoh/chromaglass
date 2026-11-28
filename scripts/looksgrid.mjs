@@ -289,7 +289,7 @@ const decode = (page, srcs) => page.evaluate(async (srcs) => {
  */
 const SURFACES = [
   { name: 'the Perform desk', w: 1440, h: 900, touch: false, opener: 'looks-grid-open', root: 'looks-grid', prefix: 'looks-grid-' },
-  { name: 'the narrow window', w: 900, h: 800, touch: false, opener: 'looks-grid-open', root: 'looks-grid', prefix: 'looks-grid-' },
+  { name: 'the narrow window', w: 900, h: 800, touch: false, folded: true, opener: 'looks-grid-open', root: 'looks-grid', prefix: 'looks-grid-' },
   { name: 'the phone', w: 390, h: 844, touch: true, opener: 'phone-open-looks', root: 'phone-sheet-looks', prefix: 'phone-look-' },
 ];
 
@@ -311,6 +311,9 @@ async function openSurface(sf, query) {
     await (sf.touch ? opener.tap({ timeout: 5_000 }) : opener.click({ timeout: 5_000 })).catch(() => {});
     grid = await page.getByTestId(sf.root).first().waitFor({ timeout: 4_000 }).then(() => true, () => false);
   }
+  // The narrow window's grid only counts as the folded desk's: a desk that
+  // came up unfolded at 900 px would be the Perform desk's grid twice.
+  if (sf.folded && await page.getByTestId('perform-desk').first().getAttribute('data-narrow').catch(() => null) !== 'true') grid = false;
   return { ctx, page, grid, hasOpener };
 }
 

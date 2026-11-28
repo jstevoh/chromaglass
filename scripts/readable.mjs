@@ -79,10 +79,24 @@ const browser = await launchChromium(chromium, { headless: true });
  */
 function measure({ floorPx, floorOpacity }) {
   const CONTROL = 'button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=switch], [role=slider], [role=tab], [role=checkbox], [role=radio], [role=menuitem], [role=option]';
-  const alpha = (c) => { const m = c.match(/rgba?\(([^)]+)\)/); if (!m) return 1; const p = m[1].split(/[\s,/]+/).filter(Boolean); return p.length > 3 ? Number(p[3].replace('%', '')) / (p[3].includes('%') ? 100 : 1) : 1; };
+  // A colour's alpha, whatever syntax the browser computes it to: Tailwind 4's
+  // `text-white/40` is `oklab(… / 0.4)` or a `color-mix()`, which a parse of
+  // rgba() read as 1 (the review of this check). Painted on one pixel and
+  // read back, which is the browser's own answer.
+  const px = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  const alphas = new Map();
+  const alpha = (c) => {
+    if (!alphas.has(c)) {
+      px.clearRect(0, 0, 1, 1); px.fillStyle = '#000'; px.fillStyle = c; px.fillRect(0, 0, 1, 1);
+      alphas.set(c, px.getImageData(0, 0, 1, 1).data[3] / 255);
+    }
+    return alphas.get(c);
+  };
   const running = new Set();
   for (const a of document.getAnimations()) {
-    if (a.playState !== 'running') continue;
+    // Only an animation on its way somewhere: one that never ends (a pulse,
+    // a spinner) is what the element looks like, and is judged.
+    if (a.playState !== 'running' || !Number.isFinite(a.effect?.getComputedTiming?.().endTime)) continue;
     const t = a.effect?.target;
     if (t instanceof Element) running.add(t);
   }
@@ -138,6 +152,9 @@ async function walk(page, ms = 4000) {
 }
 
 const results = [];
+/** The test ids drawn now: a view counts as opened only when it draws one it did not before. */
+const drawnIds = (page) => page.evaluate(() => [...document.querySelectorAll('[data-testid]')].filter(e => e.getClientRects().length).map(e => e.dataset.testid));
+const opensNew = async (page, before) => { const b = new Set(before); return (await drawnIds(page)).some(i => !b.has(i)); };
 const record = (surface, view, m) => results.push({ surface, view, ...m });
 
 async function openPage({ width, height, touch = false, url, ready, init }) {
@@ -163,13 +180,15 @@ try {
       <button data-testid="faint" style="opacity:.4;font-size:14px">Faint</button>
       <div style="opacity:.7"><span data-testid="compound" style="opacity:.8">Compounded</span></div>
       <span data-testid="grey" style="color:rgba(255,255,255,.9);font-size:12px">Grey enough</span>
+      <span data-testid="oklab" style="color:oklab(0.9 0 0 / 0.4)">Faint in oklab</span>
+      <span data-testid="mix" style="color:color-mix(in oklab, white 40%, transparent)">Faint in a mix</span>
       <span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">screen reader only, 9 px</span>
       <span aria-hidden="true" style="font-size:8px">decoration</span>
     </body>`);
     const m = await page.evaluate(measure, { floorPx: FLOOR_PX, floorOpacity: FLOOR_OPACITY });
     const ids = (l) => l.map(s => s.split(' ')[0]).sort().join(',');
-    check('a made-up page fails its 10 px label, its 0.4 button and a 0.8 label in a 0.7 box, and nothing else',
-      ids(m.small) === 'small' && ids(m.faint) === 'compound,faint' && m.judged === 5,
+    check('a made-up page fails its 10 px label, its 0.4 button, a 0.8 label in a 0.7 box and two 0.4 colours (oklab, color-mix), and nothing else',
+      ids(m.small) === 'small' && ids(m.faint) === 'compound,faint,mix,oklab' && m.judged === 7,
       `small: ${ids(m.small) || 'none'}; faint: ${ids(m.faint) || 'none'}; ${m.judged} judged`);
     await ctx.close();
   }
@@ -180,19 +199,26 @@ try {
     const tabs = await page.locator('[data-testid="desk-tabs"] button:not([data-testid="tabs-edit"])').all();
     const names = [];
     for (const t of tabs) names.push((await t.innerText()).replace(/\s+/g, ' ').trim());
+    const deskIds = new Set();
     for (let i = 0; i < tabs.length; i++) {
       await tabs[i].click();
       await page.waitForTimeout(600);
-      record('desk', `tab ${names[i] || i + 1}`, await walk(page));
+      // Each tab is its own desk (`perform-desk`, `sequence-desk`, …): one
+      // seen before means the click went nowhere.
+      const desk = await page.locator('[data-desk="v2"]').first().getAttribute('data-testid').catch(() => null);
+      const fresh = desk && !deskIds.has(desk);
+      if (desk) deskIds.add(desk);
+      record('desk', `tab ${names[i] || i + 1}`, fresh ? await walk(page) : undefined);
     }
     if (tabs.length) { await tabs[0].click(); await page.waitForTimeout(400); }
     // The sheets and menus the desk's header opens.
     for (const [opener, view] of [['looks-grid-open', 'Looks grid'], ['doc-menu-button', 'File menu'], ['palette-button', 'command palette'],
       ['shortcuts-button', 'shortcuts'], ['record-options-button', 'Record options'], ['open-mixer', 'Mixer'], ['panel-browser-button', 'panel browser']]) {
       if (!(await page.getByTestId(opener).count())) { record('desk', `${view} (no ${opener})`, null); continue; }
+      const before = await drawnIds(page);
       await page.getByTestId(opener).first().click();
       await page.waitForTimeout(600);
-      record('desk', view, await walk(page));
+      record('desk', view, await opensNew(page, before) ? await walk(page) : undefined);
       // From a fresh page each time: a sheet that Escape does not close
       // leaves its backdrop over the next opener.
       await page.goto(SHOW, { waitUntil: 'load' });
@@ -203,10 +229,18 @@ try {
     await page.getByTestId('open-all-settings').first().click();
     await page.waitForTimeout(800);
     const rail = await page.locator('[data-testid^="settings-nav-"]').evaluateAll(els => els.map(e => e.dataset.testid));
-    for (const id of rail) {
+    // A section's pane is told by its words, not its test ids: two sections
+    // can draw the same kinds of control. Words unchanged after a click mean
+    // the click went nowhere and the last pane would be walked again.
+    const paneText = () => page.evaluate(() => document.body.innerText);
+    let prev = await paneText();
+    for (const [n, id] of rail.entries()) {
       await page.getByTestId(id).first().click().catch(() => {});
       await page.waitForTimeout(350);
-      record('desk', `Settings › ${id.replace('settings-nav-', '')}`, await walk(page, 2500));
+      const now = await paneText();
+      const ok = n === 0 || now !== prev;
+      prev = now;
+      record('desk', `Settings › ${id.replace('settings-nav-', '')}`, ok ? await walk(page, 2500) : undefined);
     }
     await ctx.close();
   }
@@ -262,9 +296,10 @@ try {
     record('remote', 'Draw', await walk(page));
     const pages = await page.locator('[data-testid^="remote-nav-"], [data-testid^="remote-to-"]').evaluateAll(els => [...new Set(els.map(e => e.dataset.testid))]);
     for (const id of pages.filter(i => i !== 'remote-nav-draw')) {
+      const before = await drawnIds(page);
       await page.getByTestId(id).first().tap({ force: true }).catch(() => {});
       await page.waitForTimeout(700);
-      record('remote', id.replace(/^remote-(nav|to)-/, ''), await walk(page));
+      record('remote', id.replace(/^remote-(nav|to)-/, ''), await opensNew(page, before) ? await walk(page) : undefined);
     }
     await ctx.close();
   }
@@ -277,8 +312,8 @@ const walked = results.filter(r => r.judged !== undefined);
 const missing = results.filter(r => r.judged === undefined).map(r => `${r.surface} ${r.view}`);
 const per = (s) => walked.filter(r => r.surface === s).length;
 const judged = walked.reduce((n, r) => n + r.judged, 0);
-check('every surface walked, with views enough to mean it (desk 30, phone 12, remote 2)',
-  per('desk') >= 30 && per('phone') >= 12 && per('remote') >= 2 && judged >= 15000,
+check('every view found opened, and views enough to mean it (desk 30, phone 12, remote 2)',
+  missing.length === 0 && per('desk') >= 30 && per('phone') >= 12 && per('remote') >= 2 && judged >= 15000,
   `desk ${per('desk')}, phone ${per('phone')}, remote ${per('remote')} views; ${judged} elements judged, ${walked.reduce((n, r) => n + r.revealed, 0)} hidden until hovered${missing.length ? `; not found: ${missing.join(', ')}` : ''}`);
 const stillMoving = walked.filter(r => r.moving > 5);
 check('the animation exemption excuses no more than a few elements in any view', stillMoving.length === 0,
