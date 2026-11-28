@@ -341,6 +341,7 @@ lens-shaped drop, no shadow beside it.*
   (`sitefilms`, `film`, `showreel` …) to that checkout's `node_modules/.cache/<name>.mjs`, so two
   sessions running the same harness from two trees overwrite each other's bundle between build
   and start. Bundle into the tree's own `scratch/` (git-ignored), or name the bundle by the tree.
+- **31s-15. Open: at Dye Index Boost 1 the derive pass's .z is below a half float.** Found with 31s-14: a dye-only rim's |grad OPL| at the real index is about 1e-6, a half float's subnormal range, which the owner's Mac flushes to exactly 0 and the cloud lab keeps. Invisible either way (a real dilute dye's rim is), but any check that reads .z at Boost 1 measures the GPU's denormal mode, not the plate. Store .z scaled (as 38u-20 stored .w less 1.333) or read .z only at a lit boost.
 - **31s-5. A realism audit that starts from the rig, not from the code.** The four realism
   passes (§18, §38) went through the code's effects one at a time and asked whether each was a law or
   a stand-in. That way of asking can only find faults in effects someone already wrote. It cannot see
