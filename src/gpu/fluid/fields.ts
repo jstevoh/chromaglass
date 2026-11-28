@@ -256,6 +256,21 @@ export class FluidFields extends FluidCore {
     return this.lies;
   }
 
+  /*
+    The Gray–Scott reaction's field in the dye's format, allocated on the first
+    pour of Turing Reagent or step of Chemistry rather than for every look at
+    startup (PLAN 46n, 50g). Full floats wherever the GPU can filter them
+    (every Mac, and SwiftShader): a half float's step just under 1 is 1/2048,
+    so feed × (1 − u) stalled short of 1 and shifted the labyrinth's stripe
+    wavelength across rungs (`npm run turing`, line 1; PLAN 26d-5).
+  */
+  protected ensureChem(): PingPong {
+    if (!this.chem) {
+      this.chem = new PingPong(this.device, this.disposer, [this.N, this.N], this.dyeFormat, 'chem');
+    }
+    return this.chem;
+  }
+
   /** The gel as it starts: B spread evenly, nothing else. */
   private fillLies(): void {
     const enc = this.device.createCommandEncoder({ label: 'liesegang fill' });
@@ -572,7 +587,7 @@ export class FluidFields extends FluidCore {
       lies: this.liesLive && this.lies ? this.lies.read : null,
       /** All of it packed for the plate (see packView), once a step has run. */
       view: this.viewTex,
-      chem: this.chemLive ? this.chem.read : null,
+      chem: this.chemLive && this.chem ? this.chem.read : null,
       /*
         The oil's own share of the dye (Oil Bodies, bodyPartition), or null
         when the oil carries no colour of its own or the plate shows a print:

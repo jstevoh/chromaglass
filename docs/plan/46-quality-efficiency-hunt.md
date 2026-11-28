@@ -127,10 +127,10 @@ again ten times a second for three meters and a percentage.
   through one ref'd table), so a setting that moved renders the control that shows it.
   Check to write first (Claude): `renders`' fader phase holds `work` (components rendered a
   second) to a bar an order under main's, as 46f's lines do for the band.
-- **46i · State nobody reads, set many times a second** (S): `useFilmSense` sets
-  `{energy, ms}` every 150 ms though the App reads only its ref; `useSceneCamera` sets its
-  readout every 120 ms though only Settings' Room section shows it; `ControllerSurface`
-  forces a render every 120 ms while open with nothing lit. Seven to fifteen renders of the
+- **46i · State nobody reads, set many times a second** (S, partly shipped in 50g): ~~`useFilmSense` sets
+  `{energy, ms}` every 150 ms though the App reads only its ref~~ (shipped, 50g); `useSceneCamera` sets its
+  readout every 120 ms though only Settings' Room section shows it; ~~`ControllerSurface`
+  forces a render every 120 ms while open with nothing lit~~ (shipped, 50g: replaced by a `[lit]` expiry timeout). Seven to fifteen renders of the
   shell a second while a film or the room camera is on. Check: a film phase and a
   fake-camera phase in `renders`, the App still.
 - **46j · The frame's own garbage** (S each, M in all; the profile's top allocators with the
@@ -158,7 +158,7 @@ again ten times a second for three meters and a percentage.
   `sim`); the flash guard's probe encoding both dispatches with every ring slot busy and
   making its args and groups again each frame; the post chain writing its uniforms up to
   three times before one submit; `readbackAsync` rewriting the 224-byte `sim` (with H2c-7);
-  `activeMat` (two grids, never read or written) and `chem` allocated with chemistry off;
+  ~~`activeMat` (two grids, never read or written) and `chem` allocated with chemistry off~~ (shipped, 50g: 10 MB per solver layer at 512²);
   the aux target stored where nothing reads it (`storeOp: 'discard'`, an interim to H2c-6);
   derive drawn on frames H2c-9 skips the pack; `packDye` and `packVel` as one kernel.
   `framereads`, `framegroups`, `encode`, `samelook`.

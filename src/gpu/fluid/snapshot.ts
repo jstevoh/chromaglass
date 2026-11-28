@@ -77,8 +77,8 @@ export interface SnapshotTargets {
   ensureSpecies: () => PingPong;
   solvent: PingPong | null;
   ensureSolvent: () => PingPong;
-  chem: PingPong;
-  activeMat: PingPong;
+  chem: PingPong | null;
+  ensureChem: () => PingPong;
   rxn: PingPong | null;
   ensureRxn: () => PingPong;
   lies: PingPong | null;
@@ -113,7 +113,6 @@ export interface FieldSnapshot extends SolverSnapshot {
   readonly species: GPUTexture | null;
   readonly solvent: GPUTexture | null;
   readonly chem: GPUTexture | null;
-  readonly activeMat: GPUTexture | null;
   readonly rxn: GPUTexture | null;
   readonly lies: GPUTexture | null;
   readonly boilAlpha: GPUTexture | null;
@@ -184,7 +183,6 @@ export function captureFluidSnapshot(t: SnapshotTargets): FieldSnapshot | null {
     species: copyPp(t.species, s.speciesLive),
     solvent: copyPp(t.solvent, s.speciesLive && s.solventLive),
     chem: copyPp(t.chem, s.chemLive || s.reagentLive),
-    activeMat: copyPp(t.activeMat, s.chemLive || s.reagentLive),
     rxn: copyPp(t.rxn, s.rxnLive),
     lies: copyPp(t.lies, s.liesLive),
     boilAlpha: copyPp(t.boilAlpha, s.boilLive),
@@ -234,8 +232,7 @@ export function restoreFluidSnapshot(t: SnapshotTargets, snap: FieldSnapshot): b
   }
   if (snap.species) putPp(snap.species, t.ensureSpecies());
   if (snap.solvent) putPp(snap.solvent, t.ensureSolvent());
-  if (snap.chem) putPp(snap.chem, t.chem);
-  if (snap.activeMat) putPp(snap.activeMat, t.activeMat);
+  if (snap.chem) putPp(snap.chem, t.ensureChem());
   if (snap.rxn) putPp(snap.rxn, t.ensureRxn());
   if (snap.lies) putPp(snap.lies, t.ensureLies());
   if (snap.boilAlpha) putPp(snap.boilAlpha, t.ensureBoilAlpha());

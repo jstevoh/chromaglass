@@ -46,6 +46,9 @@ export interface FieldCarry extends SolverCarry {
   readonly speciesPoured: { sigma: number; rho: number } | null;
   /** The ouzo's ethanol and oil (PLAN 48s), which go wherever the species goes: null with no Ouzo on the plate. */
   readonly solvent: GPUTexture | null;
+  /** The Gray–Scott field and whether Turing Reagent fed it, carried across a rung change only while live (PLAN 46n, 50g). */
+  readonly chem: GPUTexture | null;
+  readonly reagentLive: boolean;
 }
 
 /** What the app used to scan the whole field for (see `measure`). */

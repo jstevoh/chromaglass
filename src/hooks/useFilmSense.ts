@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { MutableRefObject } from 'react';
 import type { SceneReading } from '../lib/sceneSense';
 import { VideoSampler } from '../lib/videoSense';
@@ -43,26 +43,13 @@ export interface FilmSenseOptions {
   hz?: number;
 }
 
-export interface FilmSenseState {
-  /** True once two frames have been analysed. */
-  reading: boolean;
-  /** Motion as the film's own recent range makes it, 0..1 — the meter. */
-  energy: number;
-  /** Milliseconds the last analysis took. */
-  ms: number;
-}
-
-const IDLE: FilmSenseState = { reading: false, energy: 0, ms: 0 };
-
 /** A film rarely beats 24-30 fps, and the plate cannot use more than this. */
 const DEFAULT_HZ = 20;
 
 export function useFilmSense(opts: FilmSenseOptions): {
   reading: MutableRefObject<SceneReading | null>;
-  state: FilmSenseState;
 } {
   const reading = useRef<SceneReading | null>(null);
-  const [state, setState] = useState<FilmSenseState>(IDLE);
 
   const optsRef = useRef(opts);
   optsRef.current = opts;
@@ -73,13 +60,11 @@ export function useFilmSense(opts: FilmSenseOptions): {
     const debug = new URLSearchParams(window.location.search).has('debug');
     if (!enabled) {
       reading.current = null;
-      setState(IDLE);
       if (debug) window.__cgFilmSense = () => ({ enabled: false, src: null, ready: false, energy: 0 });
       return;
     }
     const sampler = new VideoSampler();
     let last = performance.now();
-    let uiAt = 0;
     /** Which element the sampler has been learning, so a new film forgets the old. */
     let learning: HTMLVideoElement | null = null;
 
@@ -93,7 +78,7 @@ export function useFilmSense(opts: FilmSenseOptions): {
         // The film was switched off. Hold nothing rather than the last thing
         // it saw: a stale reading would go on stirring a plate that has no
         // film on it at all.
-        if (reading.current) { reading.current = null; setState(IDLE); }
+        if (reading.current) reading.current = null;
         learning = null;
         return;
       }
@@ -111,13 +96,6 @@ export function useFilmSense(opts: FilmSenseOptions): {
       if (!got) return;
       const r = got.reading;
       reading.current = r.ready ? r : null;
-
-      if (now - uiAt > 150) {
-        uiAt = now;
-        setState(s => (s.reading === r.ready && s.energy === r.energy && s.ms === r.ms
-          ? s
-          : { reading: r.ready, energy: r.energy, ms: r.ms }));
-      }
     };
 
     /*
@@ -138,5 +116,5 @@ export function useFilmSense(opts: FilmSenseOptions): {
     };
   }, [enabled, hz]);
 
-  return { reading, state };
+  return { reading };
 }

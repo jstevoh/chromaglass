@@ -201,6 +201,7 @@
     "rules": "node scripts/syncrules.mjs",
     "checkguard": "node scripts/checkguard.mjs",
     "readmes": "node scripts/readmedrift.mjs",
+    "unused": "node scripts/unused.mjs",
     "guidenames": "node scripts/guidenames.mjs",
     "readable": "npm run build && node scripts/readable.mjs",
     "mutate": "node scripts/mutate.mjs",
