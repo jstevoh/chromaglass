@@ -927,13 +927,14 @@ export class WebGPUFluid extends FluidCover {
     */
     if (thin) {
       /*
-        The lasting current before forcesB: on the old plate the current is laid
-        over the flow after both projections; here it goes into the same
-        velocity the solve makes conserve liquid with everything else.
+        No current of its own (PLAN 18a-4): forcesB takes what drives it at
+        this solver's cells, into the same velocity the solve makes conserve
+        liquid with everything else (CURRENT_DRIVE_WGSL, wgsl/fluid/forces.ts).
+        On the old plate the current is still laid over the flow after both
+        projections, from its own field on the M grid. A.a.x 2 is the boil.
       */
-      stage('current', (pass) => this.stepCurrent(pass));
       stage('forces', (pass) => {
-        this.run2(pass, 'forcesB', this.vel.write, this.velForced, [this.vel.read, this.dye.read, this.cur.read, this.squeeze.read, this.swirl.read, this.holdSoftStep(pass, p)], this.arg('current grid thin', [1, this.M, 0, swirlScale]));
+        this.run2(pass, 'forcesB', this.vel.write, this.velForced, [this.vel.read, this.dye.read, this.cur.read, this.squeeze.read, this.swirl.read, this.holdSoftStep(pass, p)], this.arg('current grid thin', [this.boilLive ? 2 : 1, this.M, 0, swirlScale]));
         this.vel.swap();
       });
       stage('thin gap', (pass) => {

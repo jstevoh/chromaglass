@@ -1953,6 +1953,18 @@
       ]
     },
     {
+      "name": "A thin gap takes the lasting current into its own field",
+      "shard": "lab2",
+      "run": "npm run thincurrent",
+      "why": [
+        "PLAN.md 18a-4 (scripts/thincurrent.mjs): a thin gap's step runs none of the current's four",
+        "kernels on the M grid (the old plate, the control, runs all four); a warm spot on a standing",
+        "plate rises, and a heavy one is drawn to the middle, at their settled speed from the first",
+        "step (the old plate's current lags by Damping); and the lift is laid at the solver's cells,",
+        "not as the M grid's 2x2 facets (the old plate, the control, reads as facets)."
+      ]
+    },
+    {
       "name": "A bubble's colour goes with its liquid",
       "shard": "lab2",
       "run": "npm run bubbledye",
