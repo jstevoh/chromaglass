@@ -11,7 +11,7 @@
 import { OPEN_RIM, DISH_GAP_FIELD_UV } from '../../../lib/turntable';
 import { HEAD, W } from './shared';
 import { RIM_SIDE } from './oil';
-import { OIL_SPINODAL, OIL_WELL, KAPPA_WAX, KAPPA_WATER, GLASS_FIN, LAMP_COOL_FROM, LAMP_GLASS } from '../../fluid/constants';
+import { OIL_SPINODAL, OIL_WELL, KAPPA_WAX, KAPPA_WATER, GLASS_FIN, LAMP_COOL_FROM, LAMP_GLASS, OIL_CELLS, OIL_WIDE_CELLS } from '../../fluid/constants';
 
 /*
   How far inside the rim the rim's pressure is laid in (CAPILLARY, below), in
@@ -27,6 +27,25 @@ export const RIM_SAMPLES = 1024;
 export const THREAD_CELLS = 2.0;
 /** How far THREAD reads across the oil each way, in cells: past a 768² grid's rest gap (7.7 cells) and its blur; a walk that runs out of it is across a wide body. */
 export const THREAD_REACH = 12;
+/*
+  How many gaps across a body of oil must be before its pull may pass the
+  cap (OIL_WIDE_CELLS, PLAN 38e-2). Measured (`npm run pinch`, 512², the
+  gap 5.1 cells): with every body that is not a thread held at the wide
+  cap, a thread's beads and bulges, wider than the gap but not by much,
+  pulled at six caps beside a neck that THREAD_PULL slows, so they sucked
+  the neck dry before Rayleigh–Plateau's wave could set the spacing: 8.18
+  widths a bead against the law's 4.7. A body is a Hele-Shaw pancake, the
+  drop whose rounding 38e-2 measures, once it is several gaps across and
+  curved in the plane more gently than the gap; under either its in-plane
+  curve is the gap's own size and it belongs with the thread it came from,
+  at the cap the thread is tuned to. Width alone was not enough (6.70
+  widths a bead): at a bead's shoulder or a thread's tip the walk runs
+  along the thread, not across it, and reads it wide, so the in-plane
+  curvature has to be under 1/h as well (4.43 widths, the law's within 6%).
+  Two gaps, and κh under one, keep the smallest drop droplaw reads (20
+  cells across, κh 0.51 at 512²) on the wide cap.
+*/
+export const WIDE_ACROSS = 2;
 /*
   A thread's pull, slowed as a whole (PLAN 47k, \`npm run pinch\`): σ in a
   thread's cells is at most THREAD_PULL caps (A.a.y, OIL_CELLS a step) per
@@ -59,11 +78,12 @@ export const THREAD_REACH = 12;
   their tips. The real fix is the capillary laid implicitly (PLAN 27f-9s),
   which takes the factor out.
 
-  Wide bodies (threadCurve 0) are as they were, to the bit, and that is
-  this factor's own limit: a bead or a pool wider than the gap still pushes
-  at the clip beside a slowed neck, so late in a break-up, and where a
-  thread leaves a pool, the two sides are not on one law (the skeptic pass
-  on \`npm run pinch\`, 2026-11-28). And while the factor binds, which on
+  Wide bodies (threadCurve 0) take none of the factor, and that is its own
+  limit: a bead or a pool wider than the gap pushes at its full tension
+  (under OIL_WIDE_CELLS on the open thin gap since PLAN 38e-2, at the clip
+  before) beside a slowed neck, so late in a break-up, and where a thread
+  leaves a pool, the two sides are not on one law (the skeptic pass on
+  \`npm run pinch\`, 2026-11-28). And while the factor binds, which on
   the thin gap is from Oil Tension 0.05 or so up, the dial no longer
   changes a thread's speed; on main the clip made it barely change either.
   Both go with the factor (27f-9s).
@@ -110,6 +130,10 @@ fn grad(p: vec2i, n: f32) -> vec2f {
 }
 // The edge's unit normal, fading to nothing where there is no edge to have one.
 fn nrm(p: vec2i, n: f32) -> vec2f { let g = grad(p, n); return g / sqrt(dot(g, g) + 0.0004); }
+// κ = −∇·n̂, by central differences of the normals themselves; positive where the oil is convex.
+fn curvature(p: vec2i, n: f32) -> f32 {
+  return -0.5 * ((nrm(p + vec2i(1, 0), n).x - nrm(p - vec2i(1, 0), n).x) + (nrm(p + vec2i(0, 1), n).y - nrm(p - vec2i(0, 1), n).y));
+}
 // The ring rimLaplace integrates along: two cells inside the rim, inside
 // every cell the solve holds (the rim's and the grid's edge, hsPrep).
 fn rimRing(n: f32) -> f32 { return ${OPEN_RIM.toFixed(2)} - 2.0 / n; }
@@ -166,13 +190,19 @@ fn csAt(g: vec2f, n: f32) -> f32 {
   let b = cs(c0 + vec2i(0, 1), n) + (cs(c0 + vec2i(1, 1), n) - cs(c0 + vec2i(0, 1), n)) * f.x;
   return a + (b - a) * f.y;
 }
-fn threadCurve(p: vec2i, g: vec2f, n: f32) -> f32 {
-  if (S.thinGap < 0.5) { return 0.0; }
+// x: the thread's own curvature across the gap (0 off a thread); y: 1 on a
+// body wider across than WIDE_ACROSS gaps and curved in the plane more gently
+// than the gap (κ, its in-plane curvature, under 1/h): the only oil whose pull
+// may pass the cap on the open thin gap (OIL_WIDE_CELLS; capillaryAt says why).
+fn threadCurve(p: vec2i, g: vec2f, n: f32, kappa: f32) -> vec2f {
+  if (S.thinGap < 0.5) { return vec2f(0.0, 0.0); }
   let h = max(textureLoad(sq, clampP(p, n), 0).r, 0.0) * ${DISH_GAP_FIELD_UV.toFixed(6)} * n;
   let gl = length(g);
-  if (h <= ${THREAD_CELLS.toFixed(1)} || gl < 0.004) { return 0.0; }
+  if (gl < 0.004) { return vec2f(0.0, 0.0); }
   let u = g / gl;
   let o = vec2f(p);
+  let far = ${WIDE_ACROSS.toFixed(1)} * h;
+  let wide = select(0.0, 1.0, abs(kappa) * h < 1.0);
   var w = cs(p, n);
   // A walk that runs out of reach still in the oil is across a wide body
   // (a lifted gap on a fine grid is wider than the reach), and reads as one.
@@ -181,30 +211,35 @@ fn threadCurve(p: vec2i, g: vec2f, n: f32) -> f32 {
     let s = csAt(o + u * f32(k), n);
     if (s < 0.02) { out++; break; }
     w += s;
-    if (w >= h) { return 0.0; }
+    if (w >= far) { return vec2f(0.0, wide); }
   }
   for (var k = 1; k <= ${THREAD_REACH}; k++) {
     let s = csAt(o - u * f32(k), n);
     if (s < 0.02) { out++; break; }
     w += s;
-    if (w >= h) { return 0.0; }
+    if (w >= far) { return vec2f(0.0, wide); }
   }
-  if (out < 2) { return 0.0; }
-  return 2.0 / max(w, ${THREAD_CELLS.toFixed(1)}) - 2.0 / h;
+  if (out < 2) { return vec2f(0.0, wide); }
+  if (w >= h || h <= ${THREAD_CELLS.toFixed(1)}) { return vec2f(0.0, 0.0); }
+  return vec2f(2.0 / max(w, ${THREAD_CELLS.toFixed(1)}) - 2.0 / h, 0.0);
 }
 // σ κ ∇c̃. The normal's divergence by central differences of the normals
 // themselves, not a second derivative of c: that is the step that keeps the
 // grid out of it. And the thread's own curvature across the gap (above),
 // its whole pull slowed by THREAD_PULL's one factor before the clip, so the
 // clip does not flatten Rayleigh–Plateau (PLAN 47k).
+// A.a.y is the cap (OIL_CELLS a step); negative, a wide body's (threadCurve's y: WIDE_ACROSS says which) is OIL_WIDE_CELLS instead (PLAN 38e-2), and a thread's, its beads' and anything curved tighter than the gap still |A.a.y|.
 fn capillaryAt(p: vec2i, n: f32) -> vec2f {
   let g = grad(p, n);
-  let kappa = -0.5 * ((nrm(p + vec2i(1, 0), n).x - nrm(p - vec2i(1, 0), n).x) + (nrm(p + vec2i(0, 1), n).y - nrm(p - vec2i(0, 1), n).y));
-  let t = threadCurve(p, g, n);
+  let kappa = curvature(p, n);
+  let tw = threadCurve(p, g, n, kappa);
+  let t = tw.x;
   var f = A.a.x * (kappa + t) * g;
-  if (t != 0.0) { f *= min(1.0, ${THREAD_PULL.toFixed(2)} * A.a.y / max(A.a.x, 1e-20)); }
+  let cap = abs(A.a.y);
+  if (t != 0.0) { f *= min(1.0, ${THREAD_PULL.toFixed(2)} * cap / max(A.a.x, 1e-20)); }
+  let most = select(cap, cap * ${(OIL_WIDE_CELLS / OIL_CELLS).toFixed(4)}, tw.y > 0.5 && A.a.y < 0.0);
   let l = length(f);
-  if (l > A.a.y) { f *= A.a.y / l; }
+  if (l > most) { f *= most / l; }
   return f;
 }
 `;
@@ -607,14 +642,38 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     exp(−h / FILM_DECAY), times how much edge the cell holds (|∇c̃|).
 
     A.a.x = the push at h = 0 per unit of edge (σ's own scale times Film
-    Hold), A.a.y = the most a cell may add, as mixForce's.
+    Hold), A.a.y = the most a cell may add, as mixForce's (negative: OIL_WIDE_CELLS),
+    A.a.z = σ times Film Hold for the waist's pull taken back (below; 0
+    where the cap stands).
+
+    The waist's pull taken back (PLAN 38e-2). The push held a crowd only
+    while mixForce was capped (OIL_CELLS): the blur reads two drops a film
+    apart as one body with a waist, whose curvature is up to about one over
+    a cell, and the push, FILM_PUSH at h = 0, is 0.55 at the two or three
+    cells a film is drawn as; the cap, which clipped the pull and the push
+    alike, was what kept the pull from winning. Uncapped on the thin gap,
+    the lab's crowd of 35 kept 19 (\`npm run filmhold\`, measured in October
+    on the 6 mm gap; the cap put back, 29); OIL_WIDE_CELLS is six caps. The pull is the blur's artefact,
+    not a force a real film feels: a held film's faces are each its own
+    drop's surface, flat or bowed into the bigger drop by the smaller's
+    1/R, never a neck as tight as the blur's. So in a film the concave part
+    of the blur's curvature is taken back out of the force and the push
+    answers the drops' own Laplace pressure, as a real disjoining pressure
+    does. A face's own convexity is left alone. A film is where
+    FILM_WGSL's filmSqueeze says so (oil past 0.55 on both sides of the cell
+    along one of four lines within FILM_REACH), the very cells whose water
+    the hold already charges for in mixMu; gated by the push's own ray, which
+    runs along the cell's normal and misses a neck's saddle, the crowd kept
+    28 of 35, by the four lines 31. A lone round drop is convex everywhere
+    and reads no film, so it is untouched to the bit.
   */
-  mixFilm: `${HEAD}${CAPILLARY}
+  mixFilm: `${HEAD}${CAPILLARY}${FILM_WGSL}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var mix: texture_2d<f32>;
 @group(0) @binding(4) var soft: texture_2d<f32>;
 @group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
 fn oilAt(q: vec2f, n: f32) -> f32 { return textureLoad(mix, clampP(vec2i(floor(q)), n), 0).r; }
+fn cc(p: vec2i, n: f32) -> f32 { return textureLoad(mix, clampP(p, n), 0).r; }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
@@ -636,9 +695,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     if (h > 0.0) {
       var f = A.a.x * exp(-h / ${FILM_DECAY.toFixed(2)}) * g;
       let l = length(f);
-      if (l > A.a.y) { f *= A.a.y / l; }
+      let most = select(A.a.y, -A.a.y * ${(OIL_WIDE_CELLS / OIL_CELLS).toFixed(4)}, A.a.y < 0.0);
+      if (l > most) { f *= most / l; }
       v = vec4f(v.xy + f, v.zw);
     }
+    // And the waist's pull taken back wherever the cell is in a film (above).
+    if (A.a.z > 0.0 && filmSqueeze(p, n) > 0.01) { v = vec4f(v.xy - A.a.z * min(curvature(p, n), 0.0) * g, v.zw); }
   }
   textureStore(dst, p, safeVel(v));
 }`,

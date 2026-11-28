@@ -195,3 +195,31 @@ written first. Line numbers are as read on main at d07ac31.
   "a bubble dial for them to melt away"): a factor on air's diffusivity in the Henry's-law
   shrink, 1 at 0, then 10^(6 + 5v), very gentle to very extreme (`meltFactor`, `lib/bubbles.ts`); Settings → Look, desks,
   MIDI, patches, the phone. `npm run bubblephysics` 28/28. Story in `docs/plan-shipped.md` §38b-2.
+- ~~**38e-1**~~ σ in N/m from each bottle: shipped 2026-11-27 (from PR #624, ported onto
+  38r's gap and the sealed bottle). The thin gap's pull is `oilMobility(σ)`, Darcy's
+  h₀²σ/12μ_ref, times the cover's (h/h₀)² as before; σ is each pour's own against water
+  (`interfacialTension`: the bottle's `interfacial`, sunflower 27 mN/m, silicone 37, or
+  Antonow's |γ_w − γ_o| for a Designer oil), averaged over the plate by what each covers
+  (`oilSigma`, carried and snapshotted with the oil). The dial keeps its 0–1 and is the share
+  of the oil's own. The old `OIL_TENSION_GAP` was σ = 0.0239 by the same law, so oil looks
+  round 13% faster with sunflower and 55% with silicone. `npm run gap` part 4 holds it.
+  Oil a look lays with no bottle (its bodies, a lava lamp's wax) stays at 0.0239, the
+  tension the looks were tuned at: with sunflower's 27 for it, `lavacycle`'s no-cool-glass
+  control fell 0.88 to 0.71 by 40 s on the Mac (main holds it), so only poured bottles change.
+- ~~**38e-2**~~ The cap on a wide body, on the open thin gap: shipped 2026-11-28 (47z-2,
+  `npm run droplaw`). At the Mac's 512² the half-cell cap bound on every drop under about
+  45 cells' radius (a drop rounded at 2% of the law at R 10); a wide body (no thread
+  curvature) on the open thin gap is now capped at six times it (`OIL_WIDE_CELLS`, three
+  cells a step), within 0.6–1.3 of Darcy's rounding from R 10 to 40 and as R^−3.2. Film
+  Hold takes the blur's waist pull back out in a film (from PR #624): `filmhold` 35 → 33
+  held. Only a body over two gaps across and curved more gently than the gap takes it
+  (`WIDE_ACROSS`): with every non-thread body at six caps a thread's beads outpulled the
+  slowed neck and `pinch` read 8.18 widths a bead; width alone 6.70; width and κh under
+  one 4.43 (the law 4.7). A thread and its beads keep OIL_CELLS and THREAD_PULL, the sealed bottle SEALED_CELLS (27f-9q),
+  the old plate OIL_CELLS. Not none: with no cap the edge read half again as wide (cells
+  0.1–0.45 oil 890 against the cap's 590) and a faint halo grew three times as fast, the
+  spurious current the cap had clipped; six caps 710 and a halo under two thirds of none's.
+- ~~**38h-14**~~ *shipped 2026-11-08.* The projector's bubble film at Film Physics 0 is
+  the light through it, cp·(1 − 0.55·k·filmC) (`projectorFilm`, bubbleFilm.ts), a
+  transmittance in 0.67..1 per channel, never over the lamp: 54 levels over to 0.
+  `npm run nolight` line 16. Story in `docs/plan-shipped.md` §38.

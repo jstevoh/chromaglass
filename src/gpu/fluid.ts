@@ -742,7 +742,8 @@ export class WebGPUFluid extends FluidCover {
     // A standing plate is a sealed bottle (PLAN 27f-9, wgsl/fluid/seal.ts): its weight goes round inside the wall, not out over the rim.
     const sealed = thin && upright > 0.001 && this.sealReady();
     const pull = oil * oilTensionOf(this.oilSigma, thin) * (thin ? this.coverH2 * (sealed ? SEALED_TENSION : 1) : 1) * perSecond * N * N;
-    const cells = (sealed ? SEALED_CELLS : OIL_CELLS) / Math.max(disp * N, 1e-9);
+    // The cap, negative on the open thin gap, where a wide body's is OIL_WIDE_CELLS (it says why) and a thread's still this.
+    const cells = (thin && !sealed ? -1 : 1) * (sealed ? SEALED_CELLS : OIL_CELLS) / Math.max(disp * N, 1e-9);
     const phaseCapOn = thin && this.phaseLive && (p.magnetSeconds ?? 1 / 60) > 0;
     stage('phase capillary', (pass) => {
       const smooth = this.scratch();
@@ -786,7 +787,7 @@ export class WebGPUFluid extends FluidCover {
       const hold = Math.max(0, Math.min(1, p.filmHold ?? 0));
       if (hold > 0.001 && oil > 0.001) {
         this.run(pass, 'mixFilm', this.vel.write, [this.vel.read, mix!.read, smooth],
-          this.arg('mix film', [pull * FILM_PUSH * hold, cells, 0, 0]));
+          this.arg('mix film', [pull * FILM_PUSH * hold, cells, cells < 0 ? pull * hold : 0, 0]));
         this.vel.swap();
       }
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));
