@@ -285,6 +285,28 @@ Open, from building 9i:
   domes leave the off-pitch control with a third of their points. The lighting line's
   control wants a ratio over domes of this size (the off-pitch points per dome, not a
   count), read from the optics, before the quarantine ends.
+  **Control rebuilt 2026-11-28** (thread "Fix the ferrofluid spikes lighting check"): the
+  control is each dome's foot, half the domes' own measured spacing off its top, the two
+  ways it falls away fastest (across its crest, from the top's Hessian), and at least half
+  those feet must lie over ferrofluid so it reads something. Measured in the cloud lab at the
+  real onset (12 domes, 0.0297 apart, 0.74 pitch): of the old control's 13 lit places, 2 were
+  the next dome's top and 8 the crest of the ridge joining two domes, which real optics
+  lights along its length (9e-2); the new control reads 2.5 against 11 lit tops (bar 3x).
+  Same bar, same detector. The line comes out of quarantine when the Mac agrees.
+
+- **9e-2. A dome's top light is a light the size of the sky** (S; Medium). The white dot
+  `plate.ts` draws on each dome (the top light, beside the key's glint) is full where the
+  surface's lean is under 0.1 and fades out by 0.35: the reflection of an overhead light
+  about 75° across in the water, at a reflectance of 0.9, where a black gloss under water
+  reflects 0.45% (`ferroDrop.ts`, N_FERRO / N_WATER). At the real onset the domes are flat
+  crests on a heap and the dot covers 27% of the ferrofluid past 1.5 full: the ridges draw
+  silver, not black with a point (`/mnt/project-files/ferro-spikes-9e1/ring-light-before-after.png`).
+  A ring light round a macro lens (12 cm across at 30 cm, 4.2° of normal tilt in the water,
+  lean 0.074) drawn at the same brightness (full under 0.074, out by 0.11) covers 8%, and the
+  ridges go black with white lines along their crests and points on their peaks, as the
+  references. Cloud lab: spikes line 3 reads 11 lit against 2.0 at the feet with it. A look
+  change: film it on the Mac for the owner (Magnet Garden, Ferro Paint) before it ships, and
+  run `ferrodrop`, `domes`, `ferrolook` and `spikes` with it.
 
 - **9ag. The ferrofluid looks lit from the front, in the photos' colours** (S-M). Held
   against the owner's photos (2026-11-12, the looks-against-references read), Ferro Paint

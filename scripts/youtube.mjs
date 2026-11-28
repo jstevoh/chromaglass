@@ -49,6 +49,8 @@ import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { port } from './ports.mjs';
 import { captionRoutes, textScenario } from './youtubeText.mjs';
+import { shortsScenario } from './youtubeShorts.mjs';
+import { ANALYTICS_MUTANTS, analyticsRoutes, analyticsScenario } from './youtubeAnalytics.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const SERVER = resolve(import.meta.dirname, '../mcp/youtube-mcp.js');
@@ -69,7 +71,9 @@ function standIn(gport) {
     codes: new Map(), refresh: new Set(), access: new Set(), refreshes: 0, rejected401: 0,
     sessions: [], videos: new Map(), playlistItems: [], thumbnails: [], updates: 0, wire: 0,
     faults: new Map([[2, 'stall'], [4, 'expire'], [5, 'drop'], [7, '503']]), refreshesAtExpiry: null, stalled: false, secrets: new Set([CLIENT_SECRET]),
-    pkceOk: false, authAsked: null,
+    pkceOk: false, authAsked: null, auths: 0,
+    // Scopes (44i-2d): what each code, refresh key and access key was granted, and the ones a person unticks on the consent page.
+    rtScope: new Map(), scopeOf: new Map(), untick: new Set(),
     requests: 0, limitNext: 0, pageSize: 50, playlistPages: 0, startCalls: 0, holdStart: null, onStartEnter: null,
     playlists: [{ id: 'PL1', snippet: { title: 'Films' }, status: { privacyStatus: 'public' } }],
   };
@@ -77,7 +81,7 @@ function standIn(gport) {
   const err = (res, status, reason, message) => json(res, status, { error: { code: status, message, errors: [{ reason, message }] } });
   const body = (req) => new Promise((r) => { const b = []; req.on('data', (c) => b.push(c)); req.on('end', () => r(Buffer.concat(b))); req.on('error', () => r(Buffer.concat(b))); });
   const authed = (req) => g.access.has((req.headers.authorization ?? '').replace(/^Bearer /, ''));
-  const issue = () => { const a = `at-${randomBytes(8).toString('hex')}`; g.access.add(a); g.secrets.add(a); return a; };
+  const issue = (scope = 'https://www.googleapis.com/auth/youtube') => { const a = `at-${randomBytes(8).toString('hex')}`; g.access.add(a); g.secrets.add(a); g.scopeOf.set(a, scope); return a; };
   const finish = (s) => {
     const id = `vid${g.videos.size + 1}`;
     const v = {
@@ -112,11 +116,11 @@ function standIn(gport) {
     const p = u.pathname; const q = u.searchParams;
     try {
       if (p === '/auth') {
-        g.authAsked = Object.fromEntries(q);
+        g.authAsked = Object.fromEntries(q); g.auths++;
         const ok = q.get('client_id') === 'cid' && /^http:\/\/127\.0\.0\.1:\d+\/$/.test(q.get('redirect_uri') ?? '') && q.get('code_challenge_method') === 'S256' && q.get('access_type') === 'offline' && (q.get('scope') ?? '').includes('youtube');
         if (!ok) return json(res, 400, { error: 'invalid_request' });
         const code = `code-${randomBytes(6).toString('hex')}`;
-        g.codes.set(code, { challenge: q.get('code_challenge'), redirect: q.get('redirect_uri') });
+        g.codes.set(code, { challenge: q.get('code_challenge'), redirect: q.get('redirect_uri'), scope: q.get('scope') });
         res.writeHead(302, { location: `${q.get('redirect_uri')}?code=${code}&state=${encodeURIComponent(q.get('state'))}&scope=youtube` }).end();
         return;
       }
@@ -130,12 +134,15 @@ function standIn(gport) {
           if (createHash('sha256').update(verifier).digest('base64url') !== c.challenge) return json(res, 400, { error: 'invalid_grant', error_description: 'code_verifier' });
           g.codes.delete(f.get('code')); g.pkceOk = true;
           const rt = `rt-${randomBytes(8).toString('hex')}`; g.refresh.add(rt); g.secrets.add(rt);
-          return json(res, 200, { access_token: issue(), expires_in: 3599, refresh_token: rt, scope: 'https://www.googleapis.com/auth/youtube', token_type: 'Bearer' });
+          // What was asked less what the person unticked, as Google's granular consent answers.
+          const scope = c.scope.split(' ').filter((x) => !g.untick.has(x)).join(' ');
+          g.rtScope.set(rt, scope);
+          return json(res, 200, { access_token: issue(scope), expires_in: 3599, refresh_token: rt, scope, token_type: 'Bearer' });
         }
         if (f.get('grant_type') === 'refresh_token') {
           if (!g.refresh.has(f.get('refresh_token'))) return json(res, 400, { error: 'invalid_grant' });
           g.refreshes++;
-          return json(res, 200, { access_token: issue(), expires_in: 3599, token_type: 'Bearer' });
+          return json(res, 200, { access_token: issue(g.rtScope.get(f.get('refresh_token'))), expires_in: 3599, token_type: 'Bearer' });
         }
         return json(res, 400, { error: 'unsupported_grant_type' });
       }
@@ -174,6 +181,7 @@ function standIn(gport) {
       }
       if (!authed(req)) { g.rejected401++; await body(req); return err(res, 401, 'authError', 'Invalid Credentials'); }
       if (await captionRoutes(g, req, res, p, q, { json, err, body })) return;
+      if (analyticsRoutes(g, req, res, p, q, { json, err })) return;
       if (p === '/upload/youtube/v3/videos' && req.method === 'POST' && q.get('uploadType') === 'resumable') {
         g.startCalls++;
         if (g.onStartEnter) g.onStartEnter();
@@ -227,6 +235,8 @@ function standIn(gport) {
       }
       if (p === '/youtube/v3/videos' && req.method === 'GET') {
         const ids = (q.get('id') ?? '').split(',');
+        // YouTube takes at most 50 ids a call (44i-2d's review: the channel report's titles must be asked in fifties).
+        if (ids.length > 50) return err(res, 400, 'badRequest', 'At most 50 ids.');
         // Only the parts named come back, as YouTube's do (44i-2b: a read without localizations has none to keep).
         const named = (q.get('part') ?? '').split(',');
         const only = (v) => Object.fromEntries(Object.entries(resource(v)).filter(([k]) => k === 'id' || named.includes(k)));
@@ -352,7 +362,7 @@ async function scenario(server, gport) {
     const init = await a.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'check', version: '1' } });
     const list = await a.rpc('tools/list', {});
     const names = (list.result?.tools ?? []).map((t) => t.name);
-    line('protocol', `it speaks MCP: initialize with a guide, and its sixteen tools listed (${names.join(', ')})`, init.result?.serverInfo?.name === 'youtube' && /PRIVATE/.test(init.result?.instructions ?? '') && names.length === 16 && names.includes('add_captions') && names.includes('list_captions'));
+    line('protocol', `it speaks MCP: initialize with a guide, and its eighteen tools listed (${names.join(', ')})`, init.result?.serverInfo?.name === 'youtube' && /PRIVATE/.test(init.result?.instructions ?? '') && names.length === 18 && names.includes('analytics') && names.includes('queue_folder') && names.includes('add_captions') && names.includes('list_captions'));
     const before = g.refreshes;
     const ch = await a.tool('channel');
     line('refresh', 'an access key Google refuses is refreshed once and the call goes through', !ch.error && ch.v.title === 'Stand-in Channel' && g.refreshes === before + 1 && g.rejected401 >= 1, ch.text.slice(0, 160));
@@ -770,6 +780,12 @@ async function scenario(server, gport) {
     // (m) the words around a video (44i-2b): credits, chapters, captions, other languages (scripts/youtubeText.mjs)
     await textScenario({ server, start, env, conf, dir, g, line, logs, chunk: CHUNK });
 
+    // (n) Shorts and folders (44i-2c): real MP4 and WebM headers, read by the server's own probe (scripts/youtubeShorts.mjs)
+    await shortsScenario({ server, start, env, conf, dir, g, line, logs });
+
+    // (o) analytics (44i-2d): the opt-in scope, the four reports, Pacific dates (scripts/youtubeAnalytics.mjs)
+    await analyticsScenario({ server, start, env, conf, dir, g, line, logs });
+
     // (i) nothing secret in any reply, the log, the manifest, uploads.json or the plist
     const manifestRaw = readText(join(conf, 'manifest.json'));
     const uploadsRaw = readText(join(conf, 'uploads.json'));
@@ -814,8 +830,11 @@ const MUTANTS = [
   { rule: 'limitFloor', find: 'return Math.max(now + 2 * 3600_000, afterLast);', replace: 'return afterLast || now + 2 * 3600_000;' },
   // The check's old video has no manifest entry yet when its replacement finishes, so
   // the server takes the push branch (the entry made on the spot), and that is the one cut.
-  { rule: 'manifestReplace', find: "status: 'replaced', replacedBy: video.id, updatedAt: finishedAt });", replace: "status: 'replaced', updatedAt: finishedAt });" },
-  { rule: 'leakFiles', find: 'writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos }, null, 2));', replace: 'writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos, t: loadToken()?.refresh_token }, null, 2));' },
+  { rule: 'manifestReplace', in: 'youtube/manifest.js', find: "status: 'replaced', replacedBy: video.id, updatedAt: finishedAt });", replace: "status: 'replaced', updatedAt: finishedAt });" },
+  // The manifest moved to youtube/manifest.js (44i-2c-2), where the server's loadToken is out of
+  // reach, so this leak reads the refresh key from token.json beside the manifest: the same secret
+  // written into the same file, which is what leakFiles must catch.
+  { rule: 'leakFiles', in: 'youtube/manifest.js', find: 'writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos }, null, 2));', replace: "writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos, t: JSON.parse(readFileSync(MANIFEST_FILE.replace(/manifest\\.json$/, 'token.json'), 'utf8')).refresh_token }, null, 2));" },
   { rule: 'progress', find: 'if (moved) { onProgress?.(job.sent, job.size); fails = 0; continue; }', replace: 'if (moved) { fails = 0; continue; }' },
   { rule: 'replaceVideo', find: 'const playlists = Array.isArray(oldEntry?.playlists) ? oldEntry.playlists : await findVideoPlaylists(oldId);', replace: 'const playlists = [];' },
   { rule: 'sidecar', find: 'if (unknown.length) {', replace: 'if (false) {' },
@@ -826,7 +845,7 @@ const MUTANTS = [
   { rule: 'agentLinux', find: "const dryScheduler = () => env('NO_SCHEDULER') === '1' || env('NO_LAUNCHCTL') === '1';", replace: 'const dryScheduler = () => false;' },
   { rule: 'setup', find: 'process.exit(r.ok ? 0 : 1);', replace: 'process.exit(0);' },
   { rule: 'settingsKeys', find: 'try { SETTINGS = readSettings(DIR); } catch (e) { log(e.message); process.exit(2); }', replace: "try { SETTINGS = readSettings(DIR); } catch (e) { SETTINGS = { timeZone: 'UTC', categoryId: '22' }; }" },
-  { rule: 'manifestViews', find: '...(v?.statistics ? { views: Number(v.statistics.viewCount ?? 0), likes: Number(v.statistics.likeCount ?? 0) } : {}),', replace: '' },
+  { rule: 'manifestViews', in: 'youtube/manifest.js', find: '...(v?.statistics ? { views: Number(v.statistics.viewCount ?? 0), likes: Number(v.statistics.likeCount ?? 0) } : {}),', replace: '' },
   // The words around a video (44i-2b): the server's wiring, then the rules in youtube/describe.js and youtube/captions.js.
   { rule: 'credits', find: 'const credits = creditsLine(SETTINGS.credits, a.credits, a.music, a.description);', replace: "const credits = '';" },
   { rule: 'updateChapters', in: 'youtube/describe.js', find: 'if (credits) text = text.split(credits).join', replace: 'if (false) text = text.split(credits).join', as: 'creditsOnce' },
@@ -864,7 +883,48 @@ const MUTANTS = [
   { rule: 'captions', find: "query: { part: 'snippet', uploadType: 'multipart' }", replace: "query: { uploadType: 'multipart' }", as: 'captionsPart' },
   { rule: 'addCaptions', find: 'language: t.snippet?.language,', replace: '', as: 'listLanguage' },
   { rule: 'addCaptions', find: "...(o.draft ? { draft: true } : {})", replace: '', as: 'captionDraft' },
-  { rule: 'releasePlan', find: 'const slotMs = every % 24 === 0\n      ? zoneWall(y, mo, d + i * (every / 24), h, min, 0)\n      : slot0Ms + i * every * 3600_000;', replace: 'const slotMs = slot0Ms + i * every * 3600_000;' },
+  // Shorts and folders (44i-2c): the server's wiring, then youtube/shorts.js, youtube/probe.js and youtube/folder.js.
+  { rule: 'shortLength', find: 'if (a.short) checkShort(shape, basename(file));', replace: '', as: 'shortWired' },
+  { rule: 'shortLength', in: 'youtube/shorts.js', find: 'const over = p.durationSec > SHORT_MAX_SEC', replace: 'const over = false' },
+  { rule: 'shortShape', in: 'youtube/shorts.js', find: 'wide = p.width > p.height', replace: 'wide = false' },
+  { rule: 'shortShape', in: 'youtube/probe.js', find: 'const turned = rotation === 90 || rotation === 270;', replace: 'const turned = false;', as: 'shortTurn' },
+  { rule: 'shortTag', find: "a.short ? tagShort(a.title, a.description) : a.description ?? ''", replace: "a.description ?? ''" },
+  { rule: 'tagOnce', in: 'youtube/shorts.js', find: "if (TAGGED.test(String(title ?? '')) || TAGGED.test(d)) return d;", replace: '' },
+  { rule: 'shortUnknown', in: 'youtube/shorts.js', find: 'if (!p.durationSec) {', replace: 'if (false) {' },
+  { rule: 'webmLength', in: 'youtube/probe.js', find: 'if (f.id === ID.SCALE) scale = uint(buf, f);', replace: 'if (false) scale = uint(buf, f);' },
+  { rule: 'shortsNote', find: '...(a.short ? { short: true } : {}), ...(shorts ? { shorts } : {}),', replace: '...(a.short ? { short: true } : {}),' },
+  { rule: 'shortsNote', in: 'youtube/shorts.js', find: 'return is ? `YouTube will show', replace: 'return false ? `YouTube will show', as: 'notAsked' },
+  { rule: 'shortsNote', in: 'youtube/shorts.js', find: '${p.durationSec > 60 ?', replace: '${false ?', as: 'contentId' },
+  { rule: 'mp4Read', in: 'youtube/probe.js', find: 'size = Number(h.readBigUInt64BE(8)); head = 16; }', replace: '}', as: 'mp4Large' },
+  { rule: 'mp4Read', in: 'youtube/probe.js', find: '(moov[tkhd.start] === 1 ? 32 : 20)', replace: '20', as: 'tkhdVersion' },
+  { rule: 'mp4Read', in: 'youtube/probe.js', find: 'const scale = v === 1 ? moov.readUInt32BE(mvhd.start + 20) : moov.readUInt32BE(mvhd.start + 12);', replace: 'const scale = moov.readUInt32BE(mvhd.start + 12);', as: 'mvhdVersion' },
+  { rule: 'mp4Read', in: 'youtube/probe.js', find: "!== 'vide') continue;", replace: "!== 'vide' && false) continue;", as: 'videoTrack' },
+  { rule: 'uploadChapters', find: 'wordsFor(a, shape?.durationSec)', replace: 'wordsFor(a)', all: true },
+  { rule: 'cardShort', find: 'if (raw.short !== undefined) out.short = raw.short;', replace: '' },
+  { rule: 'cardShort', find: "if (a.short !== undefined && typeof a.short !== 'boolean') throw", replace: 'if (false) throw', as: 'shortType' },
+  { rule: 'shortsNote', in: 'youtube/shorts.js', find: 'return p.durationSec <= SHORT_MAX_SEC && p.height >= p.width;', replace: 'return p.height >= p.width;', as: 'notAskedLen' },
+  { rule: 'shortsNote', in: 'youtube/shorts.js', find: 'return p.durationSec <= SHORT_MAX_SEC && p.height >= p.width;', replace: 'return p.durationSec <= SHORT_MAX_SEC;', as: 'notAskedShape' },
+  { rule: 'mp4Read', in: 'youtube/probe.js', find: 'size = Number(h.readBigUInt64BE(8));', replace: 'size = h.readUInt32BE(12);', as: 'lowWord' },
+  { rule: 'webmLength', in: 'youtube/probe.js', find: 'let value = keepMarker ? first : first & (0xff >> len);', replace: 'let value = keepMarker ? first : first & (0x7f >> len);', as: 'vintMask' },
+  { rule: 'shortTag', find: "composeDescription(a.short ? tagShort(a.title, a.description) : a.description ?? '', chapters, credits)", replace: "(a.short ? (x) => tagShort(a.title, x) : (x) => x)(composeDescription(a.description ?? '', chapters, credits))", as: 'tagAfter' },
+  { rule: 'folderAgain', find: "if (done) return { ...row, title: m.title, state: 'already up'", replace: "if (false) return { ...row, title: m.title, state: 'already up'", as: 'alreadyUp' },
+  { rule: 'probeKinds', in: 'youtube/probe.js', find: 'if (width && height && (rotation === 90 || rotation === 270)) [width, height] = [height, width];', replace: '', as: 'webmRoll' },
+  { rule: 'probeKinds', in: 'youtube/probe.js', find: 'width = get(ID.DW) ?? get(ID.PW); height = get(ID.DH) ?? get(ID.PH);', replace: 'width = get(ID.PW); height = get(ID.PH);', as: 'displaySize' },
+  { rule: 'probeKinds', in: 'youtube/probe.js', find: 'if (mehd) whole =', replace: 'if (false) whole =', as: 'mehd' },
+  { rule: 'probeKinds', in: 'youtube/probe.js', find: 'if (stsd && stsd.start + 8 + 36 <= stsd.end)', replace: 'if (false)', as: 'stsd' },
+  { rule: 'folderWhole', find: 'const go = !a.dry_run && (!refused || a.skip_refused === true);', replace: 'const go = !a.dry_run;' },
+  { rule: 'folderDry', find: 'const go = !a.dry_run && (!refused || a.skip_refused === true);', replace: 'const go = !refused || a.skip_refused === true;' },
+  { rule: 'folderSkip', find: ' || a.skip_refused === true);', replace: ');' },
+  { rule: 'folderCard', find: 'mergeArgsWithCard(readUploadCard(path), shared)', replace: 'mergeArgsWithCard(shared, readUploadCard(path))' },
+  { rule: 'folderAgain', find: "if (pending) return { ...row", replace: "if (false) return { ...row" },
+  { rule: 'folderOrder', in: 'youtube/folder.js', find: "{ numeric: true, sensitivity: 'base' }", replace: "{ sensitivity: 'base' }" },
+  { rule: 'folderOrder', in: 'youtube/folder.js', find: "replace(/[-_.]+/g, ' ')", replace: "replace(/[_.]+/g, ' ')", as: 'titleFromName' },
+  { rule: 'folderFilms', in: 'youtube/folder.js', find: "!n.startsWith('.') && ", replace: '' },
+  { rule: 'folderFilms', in: 'youtube/folder.js', find: 'try { if (!statSync(p).isFile()) continue; } catch { continue; }', replace: '', as: 'folderIsFile' },
+  { rule: 'folderHidden', in: 'youtube/folder.js', find: 'if (/[\\/\\\\]\\.[^\\/\\\\]/.test(under)) throw', replace: 'if (false) throw' },
+  { rule: 'folderMax', in: 'youtube/folder.js', find: 'if (films.length > FOLDER_MAX) throw', replace: 'if (false) throw' },
+  { rule: 'releasePlan', in: 'youtube/release.js', find: 'const slotMs = every % 24 === 0\n      ? zoneWall(y, mo, d + i * (every / 24), h, min, 0)\n      : slot0Ms + i * every * 3600_000;', replace: 'const slotMs = slot0Ms + i * every * 3600_000;' },
+  ...ANALYTICS_MUTANTS,
 ];
 
 function mutant(m) {
@@ -879,7 +939,7 @@ function mutant(m) {
   const src = readFileSync(m.in ? join(MODULES, '..', m.in) : SERVER, 'utf8');
   if (!src.includes(m.find)) return { why: `its text is not in mcp/${m.in ?? 'youtube-mcp.js'}: "${m.find}"` };
   if (m.in) writeFileSync(file, readFileSync(SERVER, 'utf8'));
-  writeFileSync(target, src.replace(m.find, m.replace));
+  writeFileSync(target, m.all ? src.split(m.find).join(m.replace) : src.replace(m.find, m.replace));
   return { file };
 }
 

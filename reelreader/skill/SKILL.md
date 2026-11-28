@@ -1,6 +1,6 @@
 ---
 name: reelreader
-description: Watch a video (a link or a file) as contact sheets, a slit-scan timeline and numbers for motion, colour, light, form and cuts, then judge it honestly for the person asking (an editor, a colourist, a VJ or liquid light artist, or anyone) and say what is in it. Use when someone sends a video or animation, asks what is in it, how it looks, moves, is cut or graded, how two versions differ, or whether a take is good or broken.
+description: Analyse any video link or file (a YouTube or other link, a phone recording, a screen capture, a render) as contact sheets, a slit-scan timeline and numbers for motion, colour, light, form, cuts and sound, then judge it honestly for the person asking (an editor, a colourist, a VJ or liquid light artist, or anyone) and say what is in it. Use when someone sends a video or animation, asks what is in it, how it looks, moves, is cut or graded, how two versions differ, or whether a take is good or broken.
 ---
 
 # reelreader: watch a video, then judge it honestly
@@ -13,8 +13,12 @@ your own eyes on the sheets and stills. This skill says how to run it, in what o
 what it makes, how to judge a clip for the person in front of you, and, first, what you must
 not claim.
 
-Run it however it is installed: `npx reelreader …`, or `node scripts/watch.mjs …` from its
-source. Below, `reelreader` stands for either.
+Run it however it is installed: `npx reelreader …` (or `reelreader …` after
+`npm install -g reelreader`); `node "${CLAUDE_PLUGIN_ROOT}/bin/reelreader.mjs" …` from the
+Claude Code plugin; or `node scripts/watch.mjs …` from its source, or from this skill's own
+folder when the skill came as a zip with its scripts inside. Below, `reelreader` stands for
+any of these. It needs Node 20 or later and `ffmpeg` with `ffprobe`; `yt-dlp` only for links.
+`reelreader --selftest` says at once whether this machine's ffmpeg will do.
 
 ## Honesty rules (read these first)
 
@@ -72,6 +76,9 @@ reelreader clip.mp4 --out <dir> --liquid                # or --general: choose t
 reelreader ours.mp4 --out <dir> --vs <reference dir or kept name>   # gaps, biggest first
 reelreader --before A.mp4 --after B.mp4 --out <dir>     # what changed: diff.md, pairs.png
 reelreader clip.mp4 --out <dir> --keep <name> --note "why"   # into your reference library
+reelreader --batch <folder | playlist | list.txt> --out <dir>   # one ranked table, rate.html
+reelreader --refit ratings.json                         # fit the card to the person's ratings
+reelreader --notes ratings.json                         # what their notes keep saying
 reelreader --refs                                       # the library
 reelreader --selftest                                   # synthetic clips with known answers
 ```
@@ -130,8 +137,10 @@ moment and longest rest fall); the look in one line; one or two things worth cha
 **Editor.** The cut list and cuts a minute; each shot's length and the spread of lengths;
 dissolves and how long each runs; where the pace rises and rests (the swells and rests in
 Overall, hedged as one take's); whether cuts land on motion peaks or loudness (motion vs
-loudness in the header); what each cut joins (the content read). A batch run adds a shot list
-with each shot's length, palette and whether it cut on a beat.
+loudness in the header); what each cut joins (the content read). The shot list (summary,
+report, shots.csv) gives each cut to the frame, each shot's length and palette, and how many
+cuts landed on a beat against what chance gives: quote both, since 3 of 10 on a beat at 120
+bpm is chance (28%), not cutting to the music. A batch run puts every clip's in one table.
 
 **Colourist.** The palette and each colour's share; colourfulness on the Hasler–Süsstrunk
 scale; the two strongest hues' angle (analogous, complementary) and the warm share; luminance

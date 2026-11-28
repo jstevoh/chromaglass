@@ -191,7 +191,8 @@ through cords and preset patches, and the plate shader is untouched.
     unknown key and stops at start.
   - **44i-2b-2.** Chapters at upload cannot be held to the film's length (no probe of the
     file; the server has no packages). An update checks it; reading an MP4's `mvhd`
-    duration in Node would close it.
+    duration in Node would close it. **Closed 2026-11-28 by 44i-2c** (`youtube/probe.js`
+    reads it; `npm run youtube`, line `uploadChapters`).
   - **44i-2b-4.** The check's mutants ran all at once, so lines waiting on a fixed timeout
     failed on unchanged copies and "caught" mutants by load (found by the check's review
     2026-11-28); now eight at a time beside an unchanged copy that must fail nothing. The
@@ -199,10 +200,48 @@ through cords and preset patches, and the plate shader is untouched.
     rather than on an exit.
   - **44i-2b-3.** A film with several pieces credits one `{music}`; an album film needs a
     credits line of its own, or a list form of `music`.
-  - **44i-2c.** A Shorts check (three minutes or less, vertical or square, tagged) and a
-    whole folder queued at once; reelreader's side cuts a 9:16 clip from its best moment.
-  - **44i-2d.** Analytics (YouTube Analytics API, its own read-only scope asked only when
-    wanted): watch time, retention, traffic sources per video.
+  - **44i-2c. Shorts, and a whole folder queued at once.** **Built 2026-11-28**
+    (`npm run youtube`, `scripts/youtubeShorts.mjs`): `short: true` (call or card) is refused
+    unless the file itself reads 3:00 or less and square or vertical as shown (YouTube's rule
+    since 2024-10-15, its help page read 2026-11-28; a phone's quarter turn counted), and
+    `#Shorts` ends the description's own text once; a short tall film not marked says YouTube
+    will make it a Short anyway, and a Short over a minute names YouTube's Content ID block.
+    Length and shape are read by hand from an MP4/MOV/M4V's boxes (moov found box by box, so
+    a camera's moov-last file is read without its media) or a WebM/MKV's EBML; a browser
+    recording, which writes no length, is refused as a Short, not guessed. `queue_folder`
+    queues every film directly in a folder, in name order, each card winning over the shared
+    fields, all or nothing unless `skip_refused`, with `dry_run` and `title_from_name`; asked
+    again it queues only new films. Modules `mcp/youtube/{probe,shorts,folder}.js`.
+  - **44i-2c-1.** reelreader's `best.mp4` is the clip's own shape (landscape for the owner's
+    films), so the Shorts check refuses it; reelreader's side is to cut a 9:16 copy of its
+    best moment (with a `best.youtube.json` card carrying `short: true`), which is also what
+    37c needs. Its own thread, in reelreader's files, after 47p-5.
+  - **44i-2c-2.** **Done 2026-11-28** (a pure move: the server 97,833 bytes before, 85,243
+    after; `mcp/youtube/manifest.js` 8,510 and `release.js` 7,081; `npm run youtube` unchanged).
+    `mcp/youtube-mcp.js` was about 96 KB of the 100 KB ceiling. 44i-2d's analytics
+    cannot land in it: first a pure move (the manifest, or the release plan, into
+    `youtube/`), then 2d beside it.
+  - **44i-2c-3.** AVI and other kinds are not read, so a Short in one is refused ("export it
+    as MP4"), and its chapters are not held to its length.
+  - **44i-2d. Analytics.** **Built 2026-11-28** (`npm run youtube`,
+    `scripts/youtubeAnalytics.mjs`): the `analytics` tool reads the YouTube Analytics API after
+    `login --add analytics`, which asks for `yt-analytics.readonly` on top of the saved sign-in's
+    scopes (a later plain `login` asks for it again, so it is never dropped; unticked on Google's
+    page, the login fails and says so). For one video (`video_id` or manifest `key`, a replaced
+    video's key refused): views, watch minutes, average view, share watched, likes, comments,
+    shares, subscribers; retention at the start and each tenth as clock times with the steepest
+    drop (`detail` for all 100 points; "no curve yet" in words for a thin video); traffic sources
+    in Studio's words with shares; the YouTube search terms that found it. With none: the
+    channel's totals, its videos by watch time (25, at most 200, named by manifest key) and its
+    sources. Dates are YouTube's Pacific days, 28 ending today by default; an end after today or
+    a start after the end refused. Refused before any request when the key lacks the scope; the
+    API turned off names the console page. `setup` says whether it is on. Module
+    `mcp/youtube/analytics.js`.
+  - **44i-2d-1.** Analytics per look: the manifest's keys name films, not looks. A look's name in
+    the card (or the manifest) would let the channel report sum watch time by look, which is
+    the owner's own question; wants the owner's word on where the look name lives.
+  - **44i-2d-2.** Retention by audience (`audienceType` ORGANIC vs ads) and by day (`day`
+    dimension) are supported by the API and not asked for yet.
   - **44i-2e.** Comments: list and reply (its own scope, also asked only when wanted).
   - **44i-2g.** Vimeo: upload (tus, resumable), edit, privacy, showcases, on a personal
     access token (no app review).

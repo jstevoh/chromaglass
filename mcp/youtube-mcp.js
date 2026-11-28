@@ -54,6 +54,7 @@
  *
  *   node mcp/youtube-mcp.js setup             which setup step is done, and the fix for the first that is not
  *   node mcp/youtube-mcp.js login             sign in once (opens the browser)
+ *   node mcp/youtube-mcp.js login --add analytics   also ask for the read-only analytics scope (44i-2d)
  *   node mcp/youtube-mcp.js whoami            which channel the saved sign-in is
  *   node mcp/youtube-mcp.js logout            revoke the sign-in and forget it
  *   node mcp/youtube-mcp.js drain             upload queued jobs whose wait has passed
@@ -71,11 +72,17 @@ import { homedir } from 'node:os';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { ANALYTICS_OFF, ANALYTICS_SCOPE, analyticsFix, channelReport, granted, OPT_IN, parseRange, scopesFor, videoReport } from './youtube/analytics.js';
 import { CAPTION, CAPTION_UNITS, captionRequest, readCaptionFile } from './youtube/captions.js';
 import { checkTitle, composeDescription, composeLocalizations, creditsLine, isoSeconds, parseChapters, validLanguage } from './youtube/describe.js';
+import { filmsIn, titleFromName } from './youtube/folder.js';
 import { notifyCommand, schedulePlan } from './youtube/platform.js';
+import { bindManifest, formatManifestTable, jobPlaylists, MANIFEST_STATUS, markVideo, readManifest, readManifestStrict, recordPlaylistInManifest, recordUploadedManifest, syncManifest, writeManifest } from './youtube/manifest.js';
+import { bindRelease, releasePlan } from './youtube/release.js';
 import { configDir, env, readSettings } from './youtube/settings.js';
 import { formatSetup, runSetup } from './youtube/setup.js';
+import { probeVideo } from './youtube/probe.js';
+import { checkShort, shortsNote, tagShort } from './youtube/shorts.js';
 import { formatZone, nextQuotaResetPlus10m, zoneWallToMs } from './youtube/zone.js';
 
 const DIR = configDir();
@@ -145,11 +152,11 @@ function readKeyFile(file) {
 */
 function endpoints() {
   const o = env('GOOGLE');
-  if (!o) return { auth: 'https://accounts.google.com/o/oauth2/v2/auth', token: 'https://oauth2.googleapis.com/token', revoke: 'https://oauth2.googleapis.com/revoke', api: 'https://www.googleapis.com/youtube/v3', upload: 'https://www.googleapis.com/upload/youtube/v3' };
+  if (!o) return { auth: 'https://accounts.google.com/o/oauth2/v2/auth', token: 'https://oauth2.googleapis.com/token', revoke: 'https://oauth2.googleapis.com/revoke', api: 'https://www.googleapis.com/youtube/v3', upload: 'https://www.googleapis.com/upload/youtube/v3', analytics: 'https://youtubeanalytics.googleapis.com/v2' };
   const u = new URL(o);
   if (u.protocol !== 'http:' || u.hostname !== '127.0.0.1') throw new Error(`The GOOGLE override may only name a stand-in on http://127.0.0.1, not ${u.origin}`);
   const b = o.replace(/\/$/, '');
-  return { auth: `${b}/auth`, token: `${b}/token`, revoke: `${b}/revoke`, api: `${b}/youtube/v3`, upload: `${b}/upload/youtube/v3` };
+  return { auth: `${b}/auth`, token: `${b}/token`, revoke: `${b}/revoke`, api: `${b}/youtube/v3`, upload: `${b}/upload/youtube/v3`, analytics: `${b}/youtubeanalytics/v2` };
 }
 let G;
 try { G = endpoints(); } catch (e) { log(e.message); process.exit(2); }
@@ -210,9 +217,14 @@ async function accessToken(force = false) {
   process holds), and `state` refuses an answer this window did not ask for.
   `access_type=offline` and `prompt=consent` are what make Google hand over a
   refresh key, every time, so a second login always ends with one.
+  `add` names opt-in scopes (44i-2d: `analytics`); the scopes asked for are the
+  server's own, every opt-in the saved key already has, and those, so signing in
+  again never drops one (youtube/analytics.js says why each is asked for apart).
 */
-async function login() {
+async function login(add = []) {
   const c = client();
+  const prev = (() => { try { return loadToken(); } catch { return null; } })();
+  const scopes = scopesFor(SCOPE, prev?.scope, add);
   const verifier = b64url(randomBytes(48));
   const challenge = b64url(createHash('sha256').update(verifier).digest());
   const state = b64url(randomBytes(16));
@@ -220,7 +232,7 @@ async function login() {
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
   const redirect = `http://127.0.0.1:${srv.address().port}/`;
   const url = new URL(G.auth);
-  for (const [k, v] of Object.entries({ client_id: c.id, redirect_uri: redirect, response_type: 'code', scope: SCOPE, access_type: 'offline', prompt: 'consent', code_challenge: challenge, code_challenge_method: 'S256', state })) url.searchParams.set(k, v);
+  for (const [k, v] of Object.entries({ client_id: c.id, redirect_uri: redirect, response_type: 'code', scope: scopes.join(' '), include_granted_scopes: 'true', access_type: 'offline', prompt: 'consent', code_challenge: challenge, code_challenge_method: 'S256', state })) url.searchParams.set(k, v);
   log(`Sign in with the Google account that owns the channel (pick the channel if it asks). The page should open by itself; if not, open:\n${url}`);
   if (!env('NO_BROWSER')) {
     const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
@@ -244,6 +256,13 @@ async function login() {
   writePrivate(TOKEN_FILE, JSON.stringify(token, null, 2));
   const ch = await channel();
   log(`Signed in as the channel "${ch.title}" (${ch.url}). The key is saved in ${TOKEN_FILE}, readable by you alone.`);
+  /* Google's page lets a person untick an opt-in: say which one is off, and end with a failure
+     when it was the one this login was run to add, rather than a quiet "signed in". */
+  const missing = Object.entries(OPT_IN).filter(([, sc]) => scopes.includes(sc) && granted(token, sc) === false).map(([n]) => n);
+  if (missing.length) {
+    log(`Not granted on Google's page: ${missing.join(', ')}. Run login --add ${missing.join(' --add ')} again and tick it, if you want it.`);
+    if (missing.some((n) => add.includes(n))) process.exitCode = 1;
+  }
 }
 
 async function logout() {
@@ -468,7 +487,8 @@ async function listCaptions(videoId) {
 function wordsFor(a, durationSec) {
   const chapters = parseChapters(a.chapters, durationSec);
   const credits = creditsLine(SETTINGS.credits, a.credits, a.music, a.description);
-  const description = composeDescription(a.description ?? '', chapters, credits);
+  /* A Short's #Shorts ends the description's own text, before the chapters and the credits (44i-2c, youtube/shorts.js). */
+  const description = composeDescription(a.short ? tagShort(a.title, a.description) : a.description ?? '', chapters, credits);
   const localizations = composeLocalizations(a.localizations, { language: a.language, chapters, credits, fallbackDescription: description });
   return { description, localizations };
 }
@@ -559,6 +579,7 @@ function jobView(job) {
     ...(job.meta?.status?.publishAt ? { publish_at: job.meta.status.publishAt } : {}),
     ...(job.notBefore ? { not_before: formatLocal(Date.parse(job.notBefore)), not_before_iso: job.notBefore } : {}),
     ...(job.note ? { note: job.note } : {}),
+    ...(job.shorts ? { shorts: job.shorts } : {}),
     ...(job.video_id ? { video_id: job.video_id, url: watchUrl(job.video_id) } : {}),
     ...(job.playlists?.length ? { playlists: job.playlists } : {}),
     ...(job.after?.length ? { then: job.after } : {}), ...(job.error ? { error: job.error } : {}),
@@ -634,170 +655,9 @@ async function push(job, onProgress) {
   } finally { await fh.close(); }
 }
 
-// ── The channel manifest (44i-6) ───────────────────────────────────────
-
-const MANIFEST_STATUS = ['ok', 'rerecord', 'queued', 'replaced', 'removed'];
-function readManifestStrict() {
-  if (!existsSync(MANIFEST_FILE)) return { syncedAt: null, videos: [] };
-  const d = JSON.parse(readFileSync(MANIFEST_FILE, 'utf8'));
-  if (Array.isArray(d)) return { syncedAt: null, videos: d };
-  if (!d || typeof d !== 'object' || !Array.isArray(d.videos)) throw new Error(`${MANIFEST_FILE} is unreadable.`);
-  return { syncedAt: d.syncedAt ?? null, videos: d.videos };
-}
-function readManifest() { try { return readManifestStrict(); } catch { return { syncedAt: null, videos: [] }; } }
-function writeManifest(m) {
-  writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos }, null, 2));
-}
-
-function recordPlaylistInManifest(videoId, pl) {
-  const m = readManifest();
-  const idx = m.videos.findIndex((e) => e.videoId === videoId);
-  if (idx < 0 || !Array.isArray(m.videos[idx].playlists)) return;
-  const list = m.videos[idx].playlists.filter((p) => p.id !== pl.id);
-  list.push(pl);
-  m.videos[idx] = { ...m.videos[idx], playlists: list, updatedAt: new Date(nowMs()).toISOString() };
-  writeManifest(m);
-}
-
-const jobPlaylists = (job) => (Array.isArray(job.playlists) && job.playlists.length ? job.playlists : job.playlist_id ? [{ id: job.playlist_id }] : []);
-
-function recordUploadedManifest(job, video, finishedAt) {
-  if (!job.key && !job.replaces) return;
-  const m = readManifest();
-  const videos = m.videos.slice();
-  const idx = videos.findIndex((e) => e.videoId === video.id);
-  const prev = idx >= 0 ? videos[idx] : {};
-  const pls = jobPlaylists(job);
-  const entry = {
-    ...prev,
-    videoId: video.id,
-    title: video.snippet?.title ?? job.meta.snippet.title,
-    privacy: video.status?.privacyStatus ?? job.meta.status.privacyStatus,
-    publishedAt: video.snippet?.publishedAt ?? finishedAt,
-    ...(job.meta.status.publishAt ? { publishAt: job.meta.status.publishAt } : {}),
-    ...(pls.length ? { playlists: pls } : {}),
-    ...(job.key ? { key: job.key } : {}),
-    source: job.file,
-    status: 'ok',
-    ...(job.replaces ? { replaces: job.replaces } : {}),
-    updatedAt: finishedAt,
-  };
-  if (idx >= 0) videos[idx] = entry; else videos.unshift(entry);
-  if (job.replaces) {
-    const rIdx = videos.findIndex((e) => e.videoId === job.replaces);
-    if (rIdx >= 0) {
-      videos[rIdx] = { ...videos[rIdx], status: 'replaced', replacedBy: video.id, updatedAt: finishedAt };
-    } else {
-      videos.push({ videoId: job.replaces, title: '', privacy: '', publishedAt: '', status: 'replaced', replacedBy: video.id, updatedAt: finishedAt });
-    }
-  }
-  writeManifest({ ...m, videos });
-}
-
-async function syncManifest() {
-  const ch = await channel();
-  const ids = [];
-  const seen = new Set();
-  let pageToken;
-  for (;;) {
-    const { j } = await api('GET', 'playlistItems', {
-      query: { part: 'contentDetails', playlistId: ch.uploads, maxResults: 50, ...(pageToken ? { pageToken } : {}) },
-    });
-    for (const item of j.items ?? []) {
-      const id = item.contentDetails?.videoId;
-      if (id && !seen.has(id)) { seen.add(id); ids.push(id); }
-    }
-    if (!j.nextPageToken || !(j.items ?? []).length) break;
-    pageToken = j.nextPageToken;
-  }
-  const remote = new Map();
-  for (let i = 0; i < ids.length; i += 50) {
-    for (const v of await videos(ids.slice(i, i + 50))) remote.set(v.id, v);
-  }
-  const cur = readManifest();
-  const byId = new Map(cur.videos.map((e) => [e.videoId, e]));
-  const nowIso = new Date(nowMs()).toISOString();
-  const merged = [];
-  for (const id of ids) {
-    const v = remote.get(id);
-    const prev = byId.get(id);
-    const nextEntry = {
-      ...(prev ?? {}),
-      videoId: id,
-      title: v?.snippet?.title ?? prev?.title ?? '',
-      privacy: v?.status?.privacyStatus ?? prev?.privacy ?? '',
-      publishedAt: v?.snippet?.publishedAt ?? prev?.publishedAt ?? '',
-      ...(v?.statistics ? { views: Number(v.statistics.viewCount ?? 0), likes: Number(v.statistics.likeCount ?? 0) } : {}),
-      status: prev?.status ?? 'ok',
-      updatedAt: prev?.updatedAt ?? nowIso,
-    };
-    if (v?.status?.publishAt) nextEntry.publishAt = v.status.publishAt; else if (v) delete nextEntry.publishAt;
-    merged.push(nextEntry);
-  }
-  for (const prev of cur.videos) {
-    if (!seen.has(prev.videoId)) {
-      merged.push({
-        ...prev,
-        status: 'removed',
-        updatedAt: prev.status === 'removed' ? prev.updatedAt : nowIso,
-      });
-    }
-  }
-  const next = { syncedAt: nowIso, videos: merged };
-  writeManifest(next);
-  return next;
-}
-
-function formatManifestTable(list, statusFilter) {
-  const rows = statusFilter ? list.filter((e) => e.status === statusFilter) : list;
-  if (!rows.length) return statusFilter ? `No videos with status "${statusFilter}" in manifest.` : 'Manifest is empty (run manifest with sync: true to populate it).';
-  const cell = (v) => String(v ?? '').replace(/[\r\n]+/g, ' ').replace(/\|/g, '\\|');
-  const lines = ['| key | title | id | privacy | views | likes | status | replacedBy |', '| --- | --- | --- | --- | --- | --- | --- | --- |'];
-  for (const e of rows) {
-    lines.push(`| ${cell(e.key)} | ${cell(e.title)} | ${cell(e.videoId)} | ${cell(e.privacy)} | ${cell(e.views)} | ${cell(e.likes)} | ${cell(e.status)} | ${cell(e.replacedBy)} |`);
-  }
-  return lines.join('\n');
-}
-
-function markVideo(a) {
-  if (a.status !== undefined && !MANIFEST_STATUS.includes(a.status)) {
-    throw new Error(`status is one of ${MANIFEST_STATUS.join(', ')}.`);
-  }
-  const m = readManifest();
-  const videos = m.videos.slice();
-  const nowIso = new Date(nowMs()).toISOString();
-  const targets = [];
-  if (Array.isArray(a.video_ids) && a.video_ids.length) {
-    for (const id of a.video_ids) {
-      const idx = videos.findIndex((e) => e.videoId === String(id));
-      if (idx < 0) throw new Error(`No video ${id} in manifest (run manifest with sync: true first).`);
-      targets.push(idx);
-    }
-  } else if (a.video_id) {
-    const idx = videos.findIndex((e) => e.videoId === String(a.video_id));
-    if (idx < 0) throw new Error(`No video ${a.video_id} in manifest (run manifest with sync: true first).`);
-    targets.push(idx);
-  } else if (a.key) {
-    const idx = videos.findIndex((e) => e.key === String(a.key));
-    if (idx < 0) throw new Error(`No entry with key "${a.key}" in manifest.`);
-    targets.push(idx);
-  } else {
-    throw new Error('Pass video_id, video_ids, or key.');
-  }
-  const updated = [];
-  for (const idx of targets) {
-    const e = { ...videos[idx], updatedAt: nowIso };
-    if (a.video_id && !Array.isArray(a.video_ids) && a.key !== undefined) e.key = a.key;
-    if (a.status !== undefined) e.status = a.status;
-    if (a.reason !== undefined) e.reason = a.reason;
-    if (a.replaced_by !== undefined) e.replacedBy = a.replaced_by;
-    if (a.notes !== undefined) e.notes = a.notes;
-    videos[idx] = e;
-    updated.push(e);
-  }
-  writeManifest({ ...m, videos });
-  return updated.length === 1 ? updated[0] : { updated: updated.length, status: a.status };
-}
+// The channel manifest (44i-6) lives in youtube/manifest.js (moved 44i-2c-2); it is given the
+// server's file, writer, clock and Google calls here, once, before any tool or command runs.
+bindManifest({ MANIFEST_FILE, writePrivate, nowMs, channel, api, videos });
 
 function run(job, onProgress) {
   job.state = 'uploading'; job.pid = process.pid; job.error = undefined; job.limitReason = undefined; saveJob(job);
@@ -839,7 +699,7 @@ function run(job, onProgress) {
 }
 
 const PRIVACY = ['private', 'unlisted', 'public'];
-const SIDECAR_FIELDS = new Set(['title', 'description', 'tags', 'playlist', 'thumbnail', 'key', 'replaces', 'publish_at', 'privacy', 'language', 'chapters', 'music', 'credits', 'captions', 'localizations']);
+const SIDECAR_FIELDS = new Set(['title', 'description', 'tags', 'playlist', 'thumbnail', 'key', 'replaces', 'publish_at', 'privacy', 'language', 'chapters', 'music', 'credits', 'captions', 'localizations', 'short']);
 function readUploadCard(videoPath) {
   const ext = extname(videoPath);
   const cardPath = `${ext ? videoPath.slice(0, -ext.length) : videoPath}.youtube.json`;
@@ -886,6 +746,7 @@ function readUploadCard(videoPath) {
   if (raw.music !== undefined) out.music = String(raw.music);
   if (raw.credits !== undefined) out.credits = raw.credits === false ? false : String(raw.credits);
   if (raw.localizations !== undefined) out.localizations = raw.localizations;
+  if (raw.short !== undefined) out.short = raw.short; // judged with the call's own, in validateUploadArgs
   if (raw.captions !== undefined) {
     const here = (f) => resolve(dir, String(f ?? '').trim().replace(/^~(?=$|\/)/, homedir()));
     out.captions = (Array.isArray(raw.captions) ? raw.captions : [raw.captions]).map((c) => (typeof c === 'string' ? here(c) : c && typeof c === 'object' ? { ...c, file: here(c.file) } : c));
@@ -907,8 +768,13 @@ function validateUploadArgs(a, resolvedFile) {
   if (!a.title) throw new Error('A title is needed.');
   if (String(a.title).length > 100) throw new Error('YouTube takes a title of at most 100 characters.');
   checkTitle(a.title);
+  /* A Short is held to YouTube's rule from the file itself, and the film's own length now holds an
+     upload's chapters to its end as an update's already were (44i-2c, closing 44i-2b-2; youtube/probe.js). */
+  if (a.short !== undefined && typeof a.short !== 'boolean') throw new Error('short is true or false.');
+  const shape = probeVideo(file);
+  if (a.short) checkShort(shape, basename(file));
   /* The words and the captions are judged here, before a job exists, so a bad chapter list or caption file is refused at the call and never fails later in the drain (44i-2b). */
-  wordsFor(a);
+  wordsFor(a, shape?.durationSec);
   captionsFor(a);
   if (a.privacy !== undefined && !PRIVACY.includes(a.privacy)) throw new Error(`privacy is one of ${PRIVACY.join(', ')}.`);
   if (a.publish_at && a.privacy && a.privacy !== 'private') throw new Error('A scheduled video goes up private and turns public at publish_at; leave privacy out or private.');
@@ -919,8 +785,10 @@ function buildJob(a, file, st) {
   const playlists = Array.isArray(a.playlists)
     ? a.playlists.map((p) => (typeof p === 'string' ? { id: p } : { id: String(p.id), ...(Number.isInteger(p.position) ? { position: p.position } : {}) }))
     : a.playlist_id ? [{ id: String(a.playlist_id) }] : undefined;
-  const words = wordsFor(a);
+  const shape = probeVideo(file);
+  const words = wordsFor(a, shape?.durationSec);
   const captions = captionsFor(a);
+  const shorts = shortsNote(shape, a.short);
   return {
     id: b64url(randomBytes(6)), file, size: st.size, mtime: st.mtimeMs, mime: MIME[extname(file).toLowerCase()],
     meta: {
@@ -934,6 +802,7 @@ function buildJob(a, file, st) {
     thumbnail: a.thumbnail ? resolve(a.thumbnail) : undefined,
     ...(a.key ? { key: String(a.key) } : {}),
     ...(a.replaces ? { replaces: String(a.replaces) } : {}),
+    ...(a.short ? { short: true } : {}), ...(shorts ? { shorts } : {}),
     sent: 0, started: new Date(nowMs()).toISOString(),
   };
 }
@@ -988,6 +857,49 @@ function queueUpload(a) {
   const merged = mergeArgsWithCard(a, readUploadCard(resolvedFile));
   const { file, st } = validateUploadArgs(merged, resolvedFile);
   return queueUploadCore(merged, file, st);
+}
+
+/*
+  A whole folder queued at once (44i-2c, youtube/folder.js). Every film is
+  judged as queue_upload would judge it, its card winning over the folder's
+  shared fields (the card was written for that film), and only then is
+  anything queued: one refused film queues nothing unless skip_refused says
+  to queue the rest, so a release is never half in. A film already queued or
+  up under the same title is left alone, so asking again after adding films
+  queues the new ones.
+*/
+const FOLDER_SHARED = ['description', 'tags', 'privacy', 'category_id', 'made_for_kids', 'language', 'playlist_id', 'music', 'credits', 'short'];
+function queueFolder(a) {
+  const { folder, films } = filmsIn(a.folder, { home: homedir(), kinds: MIME, uploadable: (p) => uploadable(p, MIME, 'A video') });
+  if (!films.length) throw new Error(`${folder} holds no film (${Object.keys(MIME).join(' ')}).`);
+  const shared = Object.fromEntries(FOLDER_SHARED.filter((k) => a[k] !== undefined).map((k) => [k, a[k]]));
+  const { jobs } = readStore();
+  const plan = films.map(({ path, refused }) => {
+    const row = { file: basename(path) };
+    if (refused) return { ...row, state: 'refused', reason: refused };
+    try {
+      const m = mergeArgsWithCard(readUploadCard(path), shared);
+      if (!m.title && a.title_from_name) m.title = titleFromName(path);
+      if (!m.title) throw new Error(`no title: give it a card (${basename(path, extname(path))}.youtube.json) or pass title_from_name: true.`);
+      const { file, st } = validateUploadArgs(m, path);
+      const same = (j) => j.file === file && j.size === st.size && j.mtime === st.mtimeMs && j.meta.snippet.title === m.title;
+      const done = jobs.find((j) => same(j) && j.state === 'done');
+      if (done) return { ...row, title: m.title, state: 'already up', url: watchUrl(done.video_id) };
+      const pending = jobs.find((j) => same(j) && (j.state === 'queued' || j.state === 'uploading'));
+      if (pending) return { ...row, title: m.title, state: 'already queued', job: pending.id };
+      const shorts = shortsNote(probeVideo(file), m.short);
+      return { ...row, title: m.title, privacy: m.privacy ?? 'private', state: 'ready', ...(shorts ? { shorts } : {}), go: () => queueUploadCore(m, file, st) };
+    } catch (e) { return { ...row, state: 'refused', reason: e.message }; }
+  });
+  const refused = plan.filter((r) => r.state === 'refused').length;
+  const ready = plan.filter((r) => r.state === 'ready');
+  const go = !a.dry_run && (!refused || a.skip_refused === true);
+  if (go) for (const r of ready) { r.job = r.go().job; r.state = 'queued'; }
+  const files = plan.map(({ go: _, ...r }) => (r.state === 'ready' ? { ...r, state: a.dry_run ? 'would queue' : 'not queued' } : r));
+  const note = a.dry_run ? `Dry run, nothing queued: ${ready.length} would be${refused ? `, ${refused} refused` : ''}.`
+    : !go ? `Nothing queued: ${refused} refused. Fix ${refused > 1 ? 'them' : 'it'}, or pass skip_refused: true to queue the other ${ready.length}.`
+    : `${ready.length} queued${refused ? `, ${refused} refused and left out` : ''}; this computer uploads them on its own passes (100 a day).`;
+  return { folder, note, files };
 }
 
 async function findVideoPlaylists(videoId) {
@@ -1077,148 +989,8 @@ async function replaceVideo(a) {
   };
 }
 
-function parseReleasePlanArgs(a) {
-  const startMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(a.start ?? '').trim());
-  if (!startMatch) throw new Error(`start must be a date in YYYY-MM-DD (${ZONE} time).`);
-  const y = Number(startMatch[1]), mo = Number(startMatch[2]), d = Number(startMatch[3]);
-  const checkDate = new Date(Date.UTC(y, mo - 1, d));
-  if (checkDate.getUTCFullYear() !== y || checkDate.getUTCMonth() !== mo - 1 || checkDate.getUTCDate() !== d) {
-    throw new Error(`Invalid start date: ${a.start}.`);
-  }
-  const atStr = String(a.at ?? '10:00').trim();
-  const atMatch = /^(\d{1,2}):(\d{2})$/.exec(atStr);
-  if (!atMatch) throw new Error(`at must be a 24-hour clock time in ${ZONE} like "10:00".`);
-  const h = Number(atMatch[1]), min = Number(atMatch[2]);
-  if (h < 0 || h > 23 || min < 0 || min > 59) throw new Error(`Invalid clock time: ${atStr}.`);
-  const every = a.every === undefined ? 24 : Number(a.every);
-  if (!Number.isFinite(every) || every <= 0) throw new Error('every must be a positive number of hours.');
-  const privacy = a.privacy ?? 'public';
-  if (!PRIVACY.includes(privacy)) throw new Error(`privacy is one of ${PRIVACY.join(', ')}.`);
-  if (privacy !== 'public') throw new Error('YouTube only schedules a private video to become public at publishAt (privacy must be "public").');
-  return { y, mo, d, h, min, every, privacy, dryRun: Boolean(a.dry_run) };
-}
-
-async function releasePlan(a) {
-  const { y, mo, d, h, min, every, dryRun } = parseReleasePlanArgs(a);
-  const keys = Array.isArray(a.keys) ? a.keys.map(String) : [];
-  const videoIds = Array.isArray(a.video_ids) ? a.video_ids.map(String) : [];
-  if (!keys.length && !videoIds.length) throw new Error('Pass keys or video_ids.');
-
-  const store = readStoreStrict();
-  const manifest = readManifestStrict();
-  const targets = [];
-  for (const key of keys) {
-    const activeJob = store.jobs.find((j) => j.key === key && (j.state === 'queued' || j.state === 'uploading'));
-    if (activeJob) {
-      targets.push({ kind: 'job', key, job: activeJob });
-      continue;
-    }
-    const entry = manifest.videos.find((e) => e.key === key && e.status !== 'replaced' && e.status !== 'removed');
-    if (entry) {
-      targets.push({ kind: 'video', key, videoId: entry.videoId });
-      continue;
-    }
-    const anyEntry = manifest.videos.find((e) => e.key === key);
-    if (anyEntry) throw new Error(`Key "${key}" only matches a ${anyEntry.status} video (${anyEntry.videoId}).`);
-    throw new Error(`No video or queued job with key "${key}".`);
-  }
-  for (const videoId of videoIds) {
-    targets.push({ kind: 'video', videoId });
-  }
-
-  const upIds = [...new Set(targets.filter((t) => t.kind === 'video').map((t) => t.videoId))];
-  const fetched = new Map();
-  for (let i = 0; i < upIds.length; i += 50) {
-    for (const v of await videos(upIds.slice(i, i + 50))) fetched.set(v.id, v);
-  }
-  for (const id of upIds) {
-    if (!fetched.has(id)) throw new Error(`No video ${id} on this channel.`);
-  }
-
-  const slot0Ms = zoneWall(y, mo, d, h, min, 0);
-  const warnings = [];
-  const plan = targets.map((t, i) => {
-    const slotMs = every % 24 === 0
-      ? zoneWall(y, mo, d + i * (every / 24), h, min, 0)
-      : slot0Ms + i * every * 3600_000;
-    const publishAt = new Date(slotMs).toISOString();
-    const when = formatLocal(slotMs);
-    if (t.kind === 'job') {
-      const warn = t.job.state !== 'queued' ? `Job ${t.job.id} is currently ${t.job.state}; cannot change publish_at until queued or uploaded.` : undefined;
-      if (warn) warnings.push(warn);
-      return {
-        kind: 'queued_job',
-        job: t.job.id,
-        ...(t.key ? { key: t.key } : {}),
-        title: t.job.meta?.snippet?.title,
-        publish_at: publishAt,
-        when,
-        quota_units: 0,
-        ...(warn ? { warning: warn } : {}),
-      };
-    }
-    const v = fetched.get(t.videoId);
-    const curPrivacy = v.status?.privacyStatus;
-    const warn = curPrivacy !== 'private' ? `Video ${t.videoId} ("${v.snippet?.title}") is already ${curPrivacy}; YouTube only schedules a private video.` : undefined;
-    if (warn) warnings.push(warn);
-    return {
-      kind: 'video',
-      video_id: t.videoId,
-      ...(t.key ? { key: t.key } : {}),
-      title: v.snippet?.title,
-      current_privacy: curPrivacy,
-      publish_at: publishAt,
-      when,
-      quota_units: 50,
-      ...(warn ? { warning: warn } : {}),
-    };
-  });
-
-  const videoCount = plan.filter((p) => p.kind === 'video').length;
-  const jobCount = plan.length - videoCount;
-  const quotaCost = videoCount * 50;
-  const costNote = `${videoCount} live video update(s) × 50 units = ${quotaCost} quota units (${jobCount} queued job(s) × 0 units).`;
-
-  if (dryRun) {
-    return { dry_run: true, quota_cost: quotaCost, cost_note: costNote, ...(warnings.length ? { warnings } : {}), plan };
-  }
-  if (warnings.length) {
-    throw new Error(`${warnings.join(' ')} No videos or jobs were changed.`);
-  }
-
-  for (const item of plan) {
-    if (item.kind === 'video') {
-      await updateVideo({ video_id: item.video_id, publish_at: item.publish_at });
-    } else {
-      const idx = store.jobs.findIndex((j) => j.id === item.job);
-      if (idx >= 0) {
-        store.jobs[idx] = {
-          ...store.jobs[idx],
-          meta: {
-            ...store.jobs[idx].meta,
-            status: { ...store.jobs[idx].meta.status, privacyStatus: 'private', publishAt: item.publish_at },
-          },
-        };
-      }
-    }
-  }
-  if (jobCount > 0) writeStore(store);
-  if (videoCount > 0) {
-    const curManifest = readManifest();
-    let changed = false;
-    const nowIso = new Date(nowMs()).toISOString();
-    for (const item of plan) {
-      if (item.kind !== 'video') continue;
-      const idx = curManifest.videos.findIndex((e) => e.videoId === item.video_id);
-      if (idx >= 0) {
-        curManifest.videos[idx] = { ...curManifest.videos[idx], privacy: 'private', publishAt: item.publish_at, updatedAt: nowIso };
-        changed = true;
-      }
-    }
-    if (changed) writeManifest(curManifest);
-  }
-  return { dry_run: false, quota_cost: quotaCost, cost_note: costNote, updated_videos: videoCount, updated_jobs: jobCount, plan };
-}
+// The release plan (44i-9) lives in youtube/release.js (moved 44i-2c-2), bound the same way.
+bindRelease({ ZONE, PRIVACY, nowMs, readStoreStrict, writeStore, videos, updateVideo, zoneWall, formatLocal });
 
 function notify(message) {
   // Only a real drain speaks. A run against a stand-in Google (the check, the GOOGLE override
@@ -1312,6 +1084,44 @@ function uninstallAgent() {
 
 // ── The tools ──────────────────────────────────────────────────────────
 
+// ── Analytics (44i-2d) ─────────────────────────────────────────────────
+
+/* Asked for only after `login --add analytics`: a key that lists its scopes and lacks this one is
+   refused here, before any request, with the command that fixes it (youtube/analytics.js). */
+async function analytics(a) {
+  const run = 'node mcp/youtube-mcp.js';
+  if (granted(loadToken(), ANALYTICS_SCOPE) === false) throw new Setup(ANALYTICS_OFF(run));
+  const range = parseRange(a, nowMs());
+  const ask = async (query) => {
+    try { return (await api('GET', 'reports', { query: { ids: 'channel==MINE', ...query }, base: G.analytics })).j; } catch (e) {
+      const fix = analyticsFix(e, run);
+      throw fix ? new Setup(fix) : e;
+    }
+  };
+  let id = a.video_id === undefined ? null : String(a.video_id);
+  const m = readManifest();
+  if (a.key !== undefined) {
+    if (id) throw new Error('Pass video_id or key, not both.');
+    const e = m.videos.find((v) => v.key === String(a.key) && v.status !== 'replaced' && v.status !== 'removed');
+    if (!e) throw new Error(`No live video with key "${a.key}" in the manifest.`);
+    id = e.videoId;
+  }
+  if (id) {
+    const [v] = await videos([id]);
+    // videos.list answers for any public video; the reports cover this channel's alone, so a film of another's is refused here, in words (1 more unit).
+    if (!v || v.snippet?.channelId !== (await channel()).id) throw new Error(`No video ${id} on this channel.`);
+    const key = m.videos.find((e) => e.videoId === id)?.key;
+    return videoReport({ ask, range, detail: Boolean(a.detail), video: { id, key, title: v.snippet?.title ?? '', durationSec: isoSeconds(v.contentDetails?.duration) } });
+  }
+  const lookup = async (ids) => {
+    const names = new Map(m.videos.filter((e) => ids.includes(e.videoId)).map((e) => [e.videoId, { key: e.key, title: e.title }]));
+    const rest = ids.filter((x) => !names.get(x)?.title);
+    for (let i = 0; i < rest.length; i += 50) for (const v of await videos(rest.slice(i, i + 50))) names.set(v.id, { ...names.get(v.id), title: v.snippet?.title ?? '' });
+    return names;
+  };
+  return channelReport({ ask, lookup, range, limit: a.limit });
+}
+
 const GUIDE = `You manage the owner's YouTube channel. Nothing here needs the light show running.
 
 - Uploads go up PRIVATE unless you pass privacy. Make a video unlisted or public, or schedule it (publish_at), or run release_plan, only when the owner said so in this conversation. A scheduled video is private until its time; YouTube only schedules a private video.
@@ -1323,9 +1133,12 @@ const GUIDE = `You manage the owner's YouTube channel. Nothing here needs the li
 - If a file has a sidecar card beside it (<file without extension>.youtube.json), upload_video, queue_upload and replace_video read it for any field the call leaves out (call wins); unknown fields in the card are refused.
 - upload_video answers within about 45 seconds: a short film is done by then; a long one answers "uploading" and carries on. Check it with upload_status. If an upload stops (the computer slept, the app closed), ask upload_video again with the same file and title: it carries on where it stopped and never makes a second copy unless you pass again: true.
 - A job in state "queued" (from queue_upload, replace_video, or from upload_video hitting YouTube's daily upload limit or quota) is NOT a failure: this computer's hourly drain finishes it on its own after not_before (shown in the settings time zone) and shows a notification when done or failed. Do not retry it by hand.
+- Shorts: pass short: true (or "short": true in the card) and the film is held to YouTube's rule, measured from the file: 3:00 or less, square or vertical (a landscape film, such as most best.mp4 clips from reelreader, is refused: cut a 9:16 copy first); #Shorts is added to the description unless the title or description has it. A short, tall film uploaded without short: true is still a Short on YouTube; its job says so under shorts. A Short over a minute with a Content ID claim on its music is blocked everywhere, so say so when the music is not the owner's or CC.
+- queue_folder queues every film directly in a folder (each one's card wins over the call's shared fields; title_from_name makes a title from a file name with no card). Run it with dry_run: true first and show the owner the list. One refused film queues nothing unless skip_refused: true; films already queued or up are left alone. Then release_plan can space them out.
 - Use queue_upload to line up several films without uploading them immediately, and replace_video to queue a re-rendered file carrying the old video's title, description, tags, category and playlists (without deleting or changing the old video; deleting stays in YouTube Studio).
 - Use manifest (with sync: true to pull all pages from the channel, 1 quota unit a page, including views and likes) and mark_video to track which videos are ok, need rerecord, are queued, replaced or removed.
 - YouTube processes a video for a few minutes after the upload; its upload_status in list_videos says when it is "processed".
+- analytics: watch time, average view, retention (who is still watching at each tenth of the film and the steepest drop) and traffic sources for one video (video_id or key, plus the search terms that found it), or the channel's videos by watch time. Dates are YouTube's, in Pacific time, the last 28 days by default; numbers arrive a day or three late. It needs the owner to have run login --add analytics once; if it says so, pass that on, do not retry.
 - Deleting is not here on purpose: tell the owner to delete in YouTube Studio.
 - Quota: 100 uploads a day; an update, thumbnail or playlist change costs 50 of 10,000 a day (release_plan costs 50 per live video updated, 0 per queued job — state the cost first); reading (and each manifest sync page or playlist scan) costs 1.`;
 
@@ -1352,10 +1165,25 @@ const uploadProps = {
   key: { ...str, description: 'Optional short film id (e.g. "hymn-to-the-dawn") recorded in the channel manifest.' },
   replaces: { ...str, description: 'Optional existing video id this upload replaces in the manifest.' },
   again: { type: 'boolean', description: 'Upload a second copy of a file already up with this title.' },
+  short: { type: 'boolean', description: 'A YouTube Short: refused unless the file is 3:00 or less and square or vertical (measured from it); #Shorts added to the description.' },
   ...wordProps,
   captions: { type: 'array', description: 'Caption files to add once it is up (400 quota units each): a path, or { file, language, name, draft }. language defaults to the upload\'s.', items: { anyOf: [str, { type: 'object', required: ['file'], properties: { file: str, language: str, name: str, draft: { type: 'boolean' } } }] } },
 };
 const TOOLS = [
+  {
+    name: 'analytics',
+    description: "How videos are watched (YouTube Analytics, after login --add analytics): for one video (video_id or the manifest's key) its views, watch minutes, average view, share watched, retention at each tenth of the film with the steepest drop, traffic sources and the search terms that found it; with no video, the channel's totals, its videos by watch time and its traffic sources. Dates in Pacific time, as YouTube counts them: the last 28 days unless days or start/end say otherwise. Read-only; costs 1 Data API unit for a named video's title and length.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        video_id: str, key: { type: 'string', description: "A manifest key in place of video_id." },
+        days: { type: 'integer', minimum: 1, description: 'Days ending today (or end), 28 by default.' },
+        start: { type: 'string', description: 'First day, YYYY-MM-DD (Pacific).' }, end: { type: 'string', description: 'Last day, YYYY-MM-DD (Pacific), today by default.' },
+        limit: { type: 'integer', minimum: 1, maximum: 200, description: "The channel's top videos by watch time, 25 by default." },
+        detail: { type: 'boolean', description: 'All 100 retention points, not eleven.' },
+      },
+    },
+  },
   { name: 'channel', description: 'The signed-in channel: its name, link, subscribers, views and video count.', inputSchema: { type: 'object', properties: {} } },
   { name: 'list_videos', description: "The channel's latest uploads, newest first: id, link, title, privacy, schedule, processing state, views.", inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 50, description: 'How many (default 10).' } } } },
   {
@@ -1367,6 +1195,20 @@ const TOOLS = [
     name: 'queue_upload',
     description: 'Save a video upload job in state "queued" without uploading yet (reads <file>.youtube.json sidecar for omitted fields; call wins); this computer drains the queue on its own. Refuses if the same file and title is already queued or up.',
     inputSchema: { type: 'object', required: ['file'], properties: uploadProps },
+  },
+  {
+    name: 'queue_folder',
+    description: 'Queue every film directly in a folder (MP4, MOV, WebM...; not its subfolders), in name order, each judged as queue_upload would. Each film\'s <file>.youtube.json card wins over the shared fields given here. If any film is refused nothing is queued, unless skip_refused. Films already queued or up with the same title are left alone. Run with dry_run first.',
+    inputSchema: {
+      type: 'object', required: ['folder'],
+      properties: {
+        folder: { ...str, description: 'Full path to the folder on this computer.' },
+        dry_run: { type: 'boolean', description: 'List what would be queued and what is refused, queue nothing.' },
+        skip_refused: { type: 'boolean', description: 'Queue the films that pass even when others are refused.' },
+        title_from_name: { type: 'boolean', description: 'A film with no title in its card is titled from its file name ("hymn-to-the-dawn.mp4" -> "Hymn to the dawn").' },
+        ...Object.fromEntries(FOLDER_SHARED.map((k) => [k, uploadProps[k]])),
+      },
+    },
   },
   {
     name: 'replace_video',
@@ -1441,10 +1283,12 @@ const fail = (m) => ({ content: [{ type: 'text', text: m }], isError: true });
 
 async function call(name, a = {}, onProgress = null) {
   switch (name) {
+    case 'analytics': return text(await analytics(a));
     case 'channel': { const { uploads, ...c } = await channel(); return text(c); }
     case 'list_videos': return text(await listVideos(Number(a.limit ?? 10)));
     case 'upload_video': return text(await uploadVideo(a, onProgress));
     case 'queue_upload': return text(queueUpload(a));
+    case 'queue_folder': return text(queueFolder(a));
     case 'replace_video': return text(await replaceVideo(a));
     case 'upload_status': {
       const { jobs } = readStore();
@@ -1528,7 +1372,16 @@ if (command === 'setup') {
   process.exit(r.ok ? 0 : 1);
 } else if (command === 'login' || command === 'logout' || command === 'whoami' || command === 'drain' || command === 'install-agent' || command === 'uninstall-agent' || command === 'manifest') {
   try {
-    if (command === 'login') await login();
+    if (command === 'login') {
+      // `login --add analytics` (44i-2d): an opt-in scope on top of what the saved sign-in has.
+      const args = process.argv.slice(3);
+      const add = [];
+      for (let i = 0; i < args.length; i++) {
+        if (args[i] !== '--add' || !args[i + 1]) throw new Error(`login takes --add ${Object.keys(OPT_IN).join('|')}, not ${JSON.stringify(args.slice(i).join(' '))}.`);
+        add.push(args[++i]);
+      }
+      await login(add);
+    }
     else if (command === 'logout') await logout();
     else if (command === 'whoami') { const { uploads, ...c } = await channel(); log(JSON.stringify(c)); }
     else if (command === 'drain') await drain();
@@ -1545,7 +1398,7 @@ if (command === 'setup') {
       if (mdFile) { writeFileSync(mdFile, `${table}\n`); log(`wrote ${mdFile}`); }
       else process.stdout.write(`${table}\n`);
     }
-    process.exit(0);
+    process.exit(process.exitCode ?? 0); // a login whose opt-in was unticked has set 1 (44i-2d)
   } catch (e) { log(e instanceof Setup ? e.message : `failed: ${e?.message ?? e}`); process.exit(1); }
 } else {
   const lines = createInterface({ input: process.stdin });

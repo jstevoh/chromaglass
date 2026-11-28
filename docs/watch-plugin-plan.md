@@ -1,6 +1,8 @@
 # Sharing the watch tool as a Claude Code plugin (PLAN 47x-4)
 
-A plan, not built. The owner decides on packaging after the test on real films (47x-3).
+Built as reelreader (PLAN 47p-6, 2026-11-28): one repository that is the npm package, the plugin
+and its own marketplace, built from this one by `scripts/reelreaderpack.mjs`. What follows is the
+plan as it was written; check-skeptic and the second wave were not shipped with it.
 
 Since 47p-5b (2026-11-28) the skill's public half is built: `reelreader/skill/` holds the
 skill, the words guide, the helper, a worked example, the eval-set guide and the test set,

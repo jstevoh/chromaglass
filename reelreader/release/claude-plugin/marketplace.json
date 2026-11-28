@@ -1,0 +1,19 @@
+{
+  "name": "reelreader",
+  "owner": { "name": "OmniBrains", "url": "https://omnibrains.org" },
+  "metadata": {
+    "description": "reelreader: analyse any video link or file, and judge it honestly.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "reelreader",
+      "source": "./",
+      "description": "Analyse any video link or file: contact sheets, a slit-scan timeline and numbers for motion, colour, light, form, cuts and sound, with a judging skill, a helper agent and a /reelreader command.",
+      "version": "0.1.0",
+      "category": "media",
+      "homepage": "https://github.com/jstevoh/reelreader",
+      "license": "MIT"
+    }
+  ]
+}

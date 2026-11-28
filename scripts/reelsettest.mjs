@@ -141,10 +141,16 @@ check('(c) no page of the skill names the project, its places, its plan, its scr
 const PLANTED = ["ChromaGlass's plate", "/mnt/project-files/x and /home/user/y", "on the owner's Mac", 'PLAN 47p-5b', '.claude/skills/watch', 'npm run watch', 'Opus5 wrote it'];
 const plantedMissed = PLANTED.filter((line, i) => !scanText('planted', line).some(h => h.endsWith(BANNED[i][1])));
 check('(c) the scan catches each of its patterns in a planted line', !plantedMissed.length, plantedMissed.join(' | '));
+// The project's own layer lives only in this repository. The packaged copy
+// (reelreader's own repository, built by scripts/reelreaderpack.mjs) is known by
+// a positive sign, its plugin file, never by something missing: anywhere else
+// the layer is read, and a missing one throws.
 const layer = path.join(ROOT, '.claude', 'skills', 'watch', 'SKILL.md');
-const layerHits = scanText('layer', fs.readFileSync(layer, 'utf8'));
-const kinds = new Set(layerHits.map(h => h.split(' ').slice(1).join(' ')));
-check("(c) the scan catches the project's own layer on top (so it can see what it scans for)", kinds.has('the project') && kinds.has('a run script of this repository'), [...kinds].join(', '));
+if (!fs.existsSync(path.join(ROOT, '.claude-plugin', 'plugin.json'))) {
+  const layerHits = scanText('layer', fs.readFileSync(layer, 'utf8'));
+  const kinds = new Set(layerHits.map(h => h.split(' ').slice(1).join(' ')));
+  check("(c) the scan catches the project's own layer on top (so it can see what it scans for)", kinds.has('the project') && kinds.has('a run script of this repository'), [...kinds].join(', '));
+} else note('a packaged copy: no project layer to scan');
 
 // (d) the clips and the key.
 const key = JSON.parse(fs.readFileSync(path.join(SET, 'answers.json'), 'utf8'));
