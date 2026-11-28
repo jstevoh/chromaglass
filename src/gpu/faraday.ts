@@ -27,25 +27,20 @@ import { FARADAY_KERNELS, FARADAY_N, type FaradayKernel } from './wgsl/faraday';
 import { PLATE_METRES, VEL } from './fluid/constants';
 import {
   FARADAY_DEPTH, FARADAY_G, FARADAY_HZ_MAX, FARADAY_HZ_MIN, FARADAY_NU, FARADAY_RHO, FARADAY_ROCK_MAX, FARADAY_SHAKE_MAX, FARADAY_SIGMA,
-  faradayCapillaryShare, faradayK, faradayOmega,
+  faradayCapillaryShare, faradayCubicScale, faradayDetuneNL, faradayFloorFriction, faradayGrowth, faradayK, faradayMeniscus, faradayStreamingGamma,
 } from '../lib/faraday';
 import type { Opening } from './opening';
 
 export { FARADAY_N };
 
-/*
-  S0, the saturation's scale (wgsl/faraday.ts, N(u)): the steepness k u a
-  pattern settles at is S0 √(4(ε − ε_c)/3), so at the Shake dial's top over
-  a 40 Hz drive (ε − ε_c 0.6 of the restoring force) 0.5, a steep but
-  unbroken wave, and at twice the threshold about 0.1.
-*/
-export const FARADAY_S0 = 0.6;
 /** The dish's own disturbances, m/√s: what a pattern grows from (wgsl/faraday.ts). */
 export const FARADAY_NOISE = 1e-7;
 /** The longest substep, seconds: two a frame at 60. */
 export const FARADAY_SUBSTEP = 1 / 120;
 /** At most this many a step: a slow frame steps longer substeps, not more of them. */
 export const FARADAY_SUBSTEPS = 4;
+
+let nextPlateId = 1;
 
 /** What a step needs of the settings: the front plate's only (one dish on the speaker). */
 export interface FaradayStepParams {
@@ -87,31 +82,21 @@ export interface FaradayField {
 }
 
 /*
-  The waves' own mean flow (wgsl/faraday.ts, faradayForce, faradayStream):
-  the push is Γ ∇²u ∇u, and the flow it makes in a layer h deep over a floor
-  is held by the floor's friction r = ν (π/2h)², the first shear mode of a
-  layer that cannot slip at its floor and is free at its top. Γ is set so
-  that, at the pattern's own wavelength, the flow a defect makes is the
-  waves' streaming scale ω k u², the speed of the drift a standing wave's
-  particles make (Longuet-Higgins 1953; the Stokes drift of each of its two
-  travelling halves): Γ k_c² u² k_c / (r + ν k_c²) = ω k_c u², so
-  Γ = ω (r + ν k_c²) / k_c². At a 40 Hz drive and k u 0.3 that is about
-  2 cm/s near a defect, a cell's width in a second or two, which is the
-  pace Kudrolli and Gollub (1996) filmed defects moving at in shaken dishes.
-  It is a scale and not a derivation (PLAN 48f-8): the Faraday mean flow
-  proper (Vega, Knobloch and Martel 2001) has terms this leaves out.
+  The waves' own VKM (2001) mean flow and rim damping (wgsl/faraday.ts).
 */
-function floorFriction(): number {
-  return FARADAY_NU * (Math.PI / (2 * FARADAY_DEPTH)) ** 2;
-}
+const FARADAY_PROG_MUL = 1.0;
+const FARADAY_WALL_DAMP = 6;
 
 /* Where the cubic sits in a slot's pass list (the constructor's order). */
-const CUBIC_PASS = 9;
+const CUBIC_PASS = 14;
 
 export class FaradayPlate {
+  readonly id = nextPlateId++;
   private readonly disposer = new Disposer();
   private readonly spec: GPUBuffer;
   private readonly z: GPUBuffer;
+  private readonly uv: GPUBuffer;
+  private readonly zq: GPUBuffer;
   /* The waves' push on the liquid, packed (Fx + i Fy), and the flow it makes (Ux + i Uy), m/s. */
   private readonly zf: GPUBuffer;
   private readonly zu: GPUBuffer;
@@ -120,18 +105,22 @@ export class FaradayPlate {
   /* The flow the cubic's groups were built over: rebuilt when the plate hands it another (fields.ts ride). */
   private vel: GPUTexture | null = null;
   private readonly cubicPipe: GPUComputePipeline;
-  /** The cubic's stiffness gauge: the largest u² and |∇u|² of the substep, as float bits (wgsl/faraday.ts). */
+  /** The cubic's stiffness gauge: largest |Z|², |∇Z|², and triad field of the substep, as float bits. */
   private readonly stiff: GPUBuffer;
   readonly field: FaradayField;
+  readonly meanFlow: { readonly zu: GPUBuffer; readonly n: number; readonly id: number };
   /** One uniform buffer a substep slot, so each substep's seed is its own (writes land before the encoder runs). */
   private readonly uni: GPUBuffer[] = [];
-  /* Each substep slot's thirteen passes, their bind groups built once (one uniform buffer a slot); the cubic's are rebuilt on a new plate flow. */
+  /* Each substep slot's eighteen passes, their bind groups built once (one uniform buffer a slot); the cubic's are rebuilt on a new plate flow. */
   private readonly passes: { pipe: GPUComputePipeline; group: GPUBindGroup; x: number; y: number }[][] = [];
-  private readonly args = new Float32Array(20);
+  private readonly args = new Float32Array(28);
   /* The strobe's slip, radians, carried across steps so a rock never jumps (wrapped at a turn). */
   private phase = 0;
   /* What the drive's frequency sets, worked out again only when it changes (faradayK is a bisection). */
   private hz = -1;
+  private kc = 0;
+  private kM = 0;
+  private decM = 0;
   private seed = 1;
 
   /** The kernels, for the show to build before it opens (gpu/prepare.ts): ahead when the look opens with the shaker on. */
@@ -145,6 +134,8 @@ export class FaradayPlate {
     const store = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
     this.spec = this.disposer.track(device.createBuffer({ label: 'faraday spectrum', size: n * n * 8, usage: store }));
     this.z = this.disposer.track(device.createBuffer({ label: 'faraday work', size: n * n * 8, usage: store }));
+    this.uv = this.disposer.track(device.createBuffer({ label: 'faraday complex envelope', size: n * n * 8, usage: store }));
+    this.zq = this.disposer.track(device.createBuffer({ label: 'faraday triad', size: n * n * 8, usage: store }));
     this.zf = this.disposer.track(device.createBuffer({ label: 'faraday push', size: n * n * 8, usage: store }));
     this.zu = this.disposer.track(device.createBuffer({ label: 'faraday mean flow', size: n * n * 8, usage: store }));
     const h = this.disposer.track(device.createBuffer({ label: 'faraday height', size: n * n * 4, usage: store }));
@@ -152,8 +143,9 @@ export class FaradayPlate {
     this.stiff = this.disposer.track(device.createBuffer({ label: 'faraday stiffness', size: 16, usage: store }));
     this.still = this.disposer.track(device.createTexture({ label: 'faraday still', size: [1, 1], format: VEL, usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST }));
     this.field = { h, eta, n };
+    this.meanFlow = { zu: this.zu, n, id: this.id };
     for (let s = 0; s < FARADAY_SUBSTEPS; s++) {
-      this.uni.push(this.disposer.track(device.createBuffer({ label: `faraday args ${s}`, size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })));
+      this.uni.push(this.disposer.track(device.createBuffer({ label: `faraday args ${s}`, size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })));
     }
     const cfg = (label: string, axis: number, sign: number) => {
       const b = this.disposer.track(device.createBuffer({ label: `faraday fft ${label}`, size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
@@ -167,23 +159,23 @@ export class FaradayPlate {
       if (!p) throw new Error(`faraday pipeline ${k} failed to build`);
       return p;
     };
-    const fft = pipe('faradayFft'), height = pipe('faradayHeight'), force = pipe('faradayForce'), stream = pipe('faradayStream');
+    const fft = pipe('faradayFft'), height = pipe('faradayHeight'), triad = pipe('faradayTriad'), force = pipe('faradayForce'), stream = pipe('faradayStream');
     const advance = pipe('faradayAdvance');
     this.cubicPipe = pipe('faradayCubic');
     const flat = Math.ceil((n * n) / 64);
     const at = (p: GPUComputePipeline, res: (GPUBuffer | GPUTexture)[], x: number, y = 1) => ({ pipe: p, group: bindGroup(device, p, res), x, y });
     for (const uni of this.uni) {
       this.passes.push([
-        // Back to real space: the amplitude, the surface the strobe catches.
         at(fft, [uni, rowB, this.z], n), at(fft, [uni, colB, this.z], n),
-        at(height, [uni, this.z, h, this.stiff, eta], flat),
-        // The waves' push, and the mean flow it makes (Fourier space and back).
-        at(force, [uni, h, this.zf], n / 8, n / 8),
+        at(height, [uni, this.z, h, this.stiff, eta, this.uv, this.zq], flat),
+        at(force, [uni, this.uv, this.zf], n / 8, n / 8),
         at(fft, [uni, rowF, this.zf], n), at(fft, [uni, colF, this.zf], n),
         at(stream, [uni, this.zf, this.zu], flat),
         at(fft, [uni, rowB, this.zu], n), at(fft, [uni, colB, this.zu], n),
-        // What the linear step leaves out: the saturation, the carry by both flows, the noise.
-        at(this.cubicPipe, [uni, h, this.z, this.stiff, this.zu, this.still], n / 8, n / 8),
+        at(fft, [uni, rowF, this.zq], n), at(fft, [uni, colF, this.zq], n),
+        at(triad, [uni, this.zq], flat),
+        at(fft, [uni, rowB, this.zq], n), at(fft, [uni, colB, this.zq], n),
+        at(this.cubicPipe, [uni, this.uv, this.z, this.stiff, this.zu, this.still, this.zq], n / 8, n / 8),
         at(fft, [uni, rowF, this.z], n), at(fft, [uni, colF, this.z], n),
         at(advance, [uni, this.z, this.spec, this.stiff], flat),
       ]);
@@ -199,7 +191,7 @@ export class FaradayPlate {
       const list = this.passes[s];
       list[CUBIC_PASS] = {
         pipe: this.cubicPipe,
-        group: bindGroup(this.device, this.cubicPipe, [this.uni[s], this.field.h, this.z, this.stiff, this.zu, vel ?? this.still]),
+        group: bindGroup(this.device, this.cubicPipe, [this.uni[s], this.uv, this.z, this.stiff, this.zu, vel ?? this.still, this.zq]),
         x: n / 8, y: n / 8,
       };
     }
@@ -211,9 +203,10 @@ export class FaradayPlate {
    * strobe slipped `rock` Hz (the Rock setting), and the pattern carried by
    * the plate's flow `vel` (the solver's velocity texture, none for a dish
    * on its own), whose unit moves the dye `travel` of the plate's width a
-   * step of `seconds` (lib/detailFlow.ts stepDisplacement).
+   * step of `seconds` (lib/detailFlow.ts stepDisplacement). `coupled` tells
+   * the cubic when the plate flow already includes this dish's `zu`.
    */
-  step(enc: GPUCommandEncoder, seconds: number, shakeG: number, hz: number, rock = 0, vel: GPUTexture | null = null, travel = 0): void {
+  step(enc: GPUCommandEncoder, seconds: number, shakeG: number, hz: number, rock = 0, vel: GPUTexture | null = null, travel = 0, coupled = false): void {
     const total = Math.max(0, Math.min(0.1, Number.isFinite(seconds) ? seconds : 0));
     if (!(total > 0)) return;
     this.bindFlow(vel);
@@ -221,40 +214,43 @@ export class FaradayPlate {
     const dt = total / subs;
     const a = this.args;
     const f = faradayHzOf(hz);
+    const accel = FARADAY_G * Math.max(0, Math.min(FARADAY_SHAKE_MAX, Number.isFinite(shakeG) ? shakeG : 0));
     if (f !== this.hz) {
       this.hz = f;
       const kc = faradayK(f);
-      a[10] = (faradayOmega(kc) / 4) * (kc / FARADAY_S0) ** 2;
+      this.kc = kc;
+      a[10] = faradayCubicScale(kc);
       a[11] = faradayCapillaryShare(kc);
       a[12] = kc;
-      const r = floorFriction();
-      a[17] = (Math.PI * f) * (r + FARADAY_NU * kc * kc) / (kc * kc);
-      a[18] = r;
+      a[17] = faradayStreamingGamma(kc);
+      a[18] = faradayFloorFriction();
+      a[23] = faradayDetuneNL(kc);
+      const men = faradayMeniscus(accel, f);
+      this.kM = men.k;
+      this.decM = men.decay;
+      a[20] = men.k;
+      a[22] = men.decay;
     }
+    const menAmp = faradayMeniscus(accel, f).amp;
     const n = FARADAY_N;
     a[0] = n; a[1] = PLATE_METRES; a[2] = dt; a[3] = Math.log2(n);
-    a[4] = FARADAY_G * Math.max(0, Math.min(FARADAY_SHAKE_MAX, Number.isFinite(shakeG) ? shakeG : 0));
+    a[4] = accel;
     a[5] = f; a[6] = FARADAY_DEPTH; a[7] = FARADAY_NU; a[8] = FARADAY_G; a[9] = FARADAY_SIGMA / FARADAY_RHO;
-    a[13] = FARADAY_NOISE; a[15] = 0;
+    a[12] = this.kc; a[13] = FARADAY_NOISE; a[15] = coupled && vel ? 1 : 0;
     // The plate's flow in m/s a unit: what it moves the dye a step, over the step's seconds.
     a[16] = vel && Number.isFinite(travel) && travel > 0 ? (travel * PLATE_METRES) / total : 0;
+    a[20] = this.kM; a[21] = menAmp; a[22] = this.decM;
+    const wallExt = Math.min(24, Math.max(0, 2.2 * faradayGrowth(this.kc, accel, f)));
+    a[24] = FARADAY_PROG_MUL; a[25] = FARADAY_WALL_DAMP; a[27] = wallExt;
     const slip = 2 * Math.PI * Math.max(-FARADAY_ROCK_MAX, Math.min(FARADAY_ROCK_MAX, Number.isFinite(rock) ? rock : 0));
     const pass = enc.beginComputePass({ label: 'faraday' });
     for (let s = 0; s < subs; s++) {
       // A 24-bit linear congruence in 32-bit integers: in doubles its product passes 2^53 and the sequence falls into a short cycle.
       this.seed = (Math.imul(this.seed, 1103515245) + 12345) & 0xffffff;
       a[14] = this.seed;
-      /*
-        The strobe. A standing wave's surface swings u cos(ωt/2) at half the
-        drive; a light flashed once a swing at the crest sees it still, and
-        one flashed a little slower than the swing catches it a little later
-        each flash, so the crests sink and the troughs rise, and they trade
-        places at the slip's rate (a stroboscope's beat). The liquid is the
-        same; only the light's timing differs, so φ only scales what is
-        drawn (faradayHeight's eta), never what is stepped.
-      */
       this.phase = (this.phase + slip * dt) % (2 * Math.PI);
       a[19] = Math.cos(this.phase);
+      a[26] = Math.sin(this.phase);
       this.device.queue.writeBuffer(this.uni[s], 0, a);
       const list = this.passes[s];
       for (let i = 0; i < list.length; i++) {
@@ -270,7 +266,8 @@ export class FaradayPlate {
   /** Still water again (the plate's wipe). */
   reset(enc?: GPUCommandEncoder): void {
     const e = enc ?? this.device.createCommandEncoder({ label: 'faraday reset' });
-    e.clearBuffer(this.spec); e.clearBuffer(this.z); e.clearBuffer(this.field.h); e.clearBuffer(this.field.eta); e.clearBuffer(this.stiff);
+    e.clearBuffer(this.spec); e.clearBuffer(this.z); e.clearBuffer(this.uv); e.clearBuffer(this.zq);
+    e.clearBuffer(this.field.h); e.clearBuffer(this.field.eta); e.clearBuffer(this.stiff);
     e.clearBuffer(this.zf); e.clearBuffer(this.zu);
     this.phase = 0;
     if (!enc) this.device.queue.submit([e.finish()]);

@@ -47,7 +47,6 @@ import { splatKernel } from './wgsl/splat';
 import { STATS_KERNELS } from './wgsl/stats';
 import type { GpuStepParams } from './solverTypes';
 import { stepDisplacement } from '../lib/detailFlow';
-import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
 import { holdApartPull, HOLD_APART_CELLS, AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, THIN_GAP_LATER_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, oilTensionOf, OIL_CELLS, SEALED_TENSION, SEALED_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, NU_REF, dripOf, dripWeightOf, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, LIQUID_DENSITY, thinGapViscosity, oilBodyLn, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
@@ -123,6 +122,8 @@ export class WebGPUFluid extends FluidCover {
       ['scaleDye', [dye], open.oilBodies],
       // The slosh's flow over the dye's (18a-13): waited for when the look tips its dish.
       ['addSlosh', [VEL], open.slosh],
+      // The shaken dish's wave streaming onto the plate flow (48f-10).
+      ['addFaraday', [VEL], open.faraday],
       // Viscosity diffuses velocity only; no caller diffuses dye via jacobi.
       ['jacobi', [VEL], true],
       ['dyeDisperse', [dye], true],
@@ -936,19 +937,12 @@ export class WebGPUFluid extends FluidCover {
       stage('forces', (pass) => {
         this.run2(pass, 'forcesB', this.vel.write, this.velForced, [this.vel.read, this.dye.read, this.cur.read, this.squeeze.read, this.swirl.read, this.holdSoftStep(pass, p)], this.arg('current grid thin', [this.boilLive ? 2 : 1, this.M, 0, swirlScale]));
         this.vel.swap();
+        this.applyFaradayForce(pass, p, perSecond, true);
       });
       stage('thin gap', (pass) => {
         this.thinProject(pass, p, disp, hands);
         // What the dye rides is the flow itself: the current is in it now.
-        if (this.sloshTex && this.pipeline('addSlosh', VEL)) {
-          // And the dish's own flow over it, when the dial is up (setSlosh): the unit is the swirl's, plate widths a second to this solver's.
-          const sloshScale = perSecond;
-          // Each layer's own: the oil's share of the cell (the mix's red) rides the oil's flow, the rest the water's (lib/slosh.ts).
-          const sloshOil = !!this.mix && (p.oilTension ?? 0) > 0;
-          this.run(pass, 'addSlosh', this.velForced, [this.vel.read, this.sloshTex, sloshOil ? this.mix!.read : this.sloshTex], this.arg('add slosh', [0, sloshOil ? 1 : 0, SLOSH_N, sloshScale]));
-        } else {
-          this.run(pass, 'scaleDye', this.velForced, [this.vel.read], this.arg('scale one', [1, 0, 0, 0]));
-        }
+        this.applySurfaceFlow(pass, p, perSecond);
         // Less the glass's drift for the carries, when it has one (driftCells).
         const [wx, wy, fx, fy] = this.driftCells;
         this.riding = (wx !== 0 || wy !== 0 || fx !== 0 || fy !== 0) && this.driftIsReady();
@@ -979,6 +973,7 @@ export class WebGPUFluid extends FluidCover {
         this.run2(pass, 'forcesB', this.vel.write, this.velForced, [this.vel.read, this.dye.read, this.cur.read, this.squeeze.read, this.swirl.read, this.holdSoftStep(pass, p)],
           this.arg('add current', [0, this.M, p.depthDrag, swirlScale]));
         this.vel.swap();
+        this.applyFaradayForce(pass, p, perSecond, false);
       });
     }
 

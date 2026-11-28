@@ -10,6 +10,7 @@ import { kernel } from '../wgsl/fluid';
 import type { GpuStepParams } from '../solverTypes';
 import { stepDisplacement } from '../../lib/detailFlow';
 import { WebGPUSlosh } from '../slosh';
+import { SLOSH_N } from '../../lib/slosh';
 import { OPEN_RIM } from '../../lib/turntable';
 import { DYE_FLOOR } from '../../lib/dye';
 import { WebGPUParticles } from '../particles';
@@ -360,7 +361,49 @@ export class FluidPasses extends FluidFields {
     if (!this.faradayPlate) this.faradayPlate = new FaradayPlate(this.device);
     // The pattern rides the plate's own flow: the uv a unit of velocity moves the dye this step (lib/detailFlow.ts stepDisplacement).
     const travel = p.dt * p.advection * ((this.N - 2) / this.N);
-    this.faradayPlate.step(enc, p.magnetSeconds ?? 1 / 60, p.faraday ?? 0, p.faradayHz ?? 0, p.faradayRock ?? 0, this.ride(), travel);
+    this.faradayPlate.step(enc, p.magnetSeconds ?? 1 / 60, p.faraday ?? 0, p.faradayHz ?? 0, p.faradayRock ?? 0, this.ride(), travel, !!this.pipeline('addFaraday', VEL));
+  }
+
+  /** Add the Faraday dish's VKM streaming mean flow (`zu`, m/s) onto `src -> dst` as a force in solver units. */
+  protected dispatchFaradayForce(pass: GPUComputePassEncoder, src: GPUTexture, dst: GPUTexture, p: GpuStepParams, perSecond: number): boolean {
+    if (!this.faradayPlate || !((p.faradayHz ?? 0) > 0)) return false;
+    const pipe = this.pipeline('addFaraday', VEL);
+    if (!pipe) return false;
+    const { zu, n, id } = this.faradayPlate.meanFlow;
+    const args = this.arg('add faraday', [n, 0, 0, perSecond / PLATE_METRES]);
+    const key = `addFaraday:${src.label}:${dst.label}:${id}`;
+    let group = this.groups.get(key);
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, args, src, dst, zu]);
+      this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(this.N / 8);
+    pass.dispatchWorkgroups(w, w);
+    return true;
+  }
+
+  /** Add Faraday streaming as a force on the thin gap before projection, or over the open plate's forced velocity. */
+  protected applyFaradayForce(pass: GPUComputePassEncoder, p: GpuStepParams, perSecond: number, thin: boolean): void {
+    if (thin) {
+      if (this.dispatchFaradayForce(pass, this.vel.read, this.vel.write, p, perSecond)) this.vel.swap();
+      return;
+    }
+    if (!this.faradayPlate || !((p.faradayHz ?? 0) > 0) || !this.pipeline('addFaraday', VEL)) return;
+    this.run(pass, 'scaleDye', this.vel.write, [this.velForced], this.arg('scale one', [1, 0, 0, 0]));
+    this.dispatchFaradayForce(pass, this.vel.write, this.velForced, p, perSecond);
+  }
+
+  /** Copy projected thin-gap flow into `velForced`, laying `slosh` over it when driven. */
+  protected applySurfaceFlow(pass: GPUComputePassEncoder, p: GpuStepParams, perSecond: number): void {
+    if (this.sloshTex && this.pipeline('addSlosh', VEL)) {
+      const sloshOil = !!this.mix && (p.oilTension ?? 0) > 0;
+      this.run(pass, 'addSlosh', this.velForced, [this.vel.read, this.sloshTex, sloshOil ? this.mix!.read : this.sloshTex],
+        this.arg('add slosh', [0, sloshOil ? 1 : 0, SLOSH_N, perSecond]));
+      return;
+    }
+    this.run(pass, 'scaleDye', this.velForced, [this.vel.read], this.arg('scale one', [1, 0, 0, 0]));
   }
 
   /**

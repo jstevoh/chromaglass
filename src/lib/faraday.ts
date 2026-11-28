@@ -124,3 +124,81 @@ export function faradayCapillaryShare(k: number): number {
   const c = (FARADAY_SIGMA / FARADAY_RHO) * k * k;
   return c / (FARADAY_G + c);
 }
+
+/**
+ * Vega, Knobloch & Martel (2001) Poiseuille floor friction 1/s for a fluid
+ * layer of depth `h` with a no-slip floor and stress-free free surface:
+ * r = 3 ν / h².
+ */
+export function faradayFloorFriction(h = FARADAY_DEPTH, nu = FARADAY_NU): number {
+  return (3 * nu) / (h * h);
+}
+
+/**
+ * Vega, Knobloch & Martel (2001) Eulerian mean-flow coupling Γ (m²/s²) in the
+ * streaming force F = −Γ ∇²u ∇u: bottom Stokes boundary-layer slip plus
+ * free-surface tangential boundary-layer stress over the subharmonic period.
+ */
+export function faradayStreamingGamma(kc: number, h = FARADAY_DEPTH, nu = FARADAY_NU): number {
+  const w = faradayOmega(kc, h);
+  const r = faradayFloorFriction(h, nu);
+  const kh = kc * h;
+  // Time-average over the subharmonic period contributes 1/2: ζ = u cos(ωt) + v sin(ωt).
+  const bot = (r * w) / (4 * kc * kc * Math.sinh(Math.min(40, kh)) ** 2);
+  const surf = (r * h * w) / (4 * kc * Math.tanh(kh));
+  return bot + surf;
+}
+
+/**
+ * Zhang & Viñals (1997) finite-depth diagonal cubic saturation scale g3
+ * (1/(s·m²)) from wave breaking steepness limit, finite-depth hyperbolic
+ * factor tanh(k_c h), and viscous damping, replacing the heuristic S0.
+ */
+export function faradayCubicScale(kc: number, h = FARADAY_DEPTH, nu = FARADAY_NU): number {
+  const w = faradayOmega(kc, h);
+  const damp = faradayDamping(kc, h, nu);
+  const beta = faradayCapillaryShare(kc);
+  const t1 = Math.tanh(kc * h);
+  const finite = (1 - beta) / (8 * t1 * t1);
+  return w * kc * kc * (0.5 + (2 * damp) / w + finite);
+}
+
+/**
+ * Nonlinear frequency shift coefficient α_NL (1/(s·m²)) from Tadjbakhsh &
+ * Keller (1960) for finite-depth gravity waves and Concus (1962) / Crapper
+ * for capillary ripples, blended by capillary share `faradayCapillaryShare`.
+ */
+export function faradayDetuneNL(kc: number, h = FARADAY_DEPTH): number {
+  const w = faradayOmega(kc, h);
+  const beta = faradayCapillaryShare(kc);
+  const t1 = Math.tanh(kc * h);
+  const t2 = t1 * t1;
+  const grav = (9 - 12 * t2 - 3 * t2 * t2 - 2 * t2 * t2 * t1) / (64 * t2 * t2);
+  const cap = -3 / 32;
+  return w * kc * kc * ((1 - beta) * grav + beta * cap);
+}
+
+/**
+ * Harmonic meniscus ripples launched inward from the circular rim at the
+ * drive frequency Ω = 2π `hz` (m): wavenumber `k`, spatial decay rate `decay`
+ * (1/m, γ_Ω / c_g), and contact-line stroke amplitude `amp` (m).
+ */
+export function faradayMeniscus(accel: number, hz: number, h = FARADAY_DEPTH, nu = FARADAY_NU): { k: number; decay: number; amp: number } {
+  const k = faradayK(2 * hz, h);
+  const w = faradayOmega(k, h);
+  const damp = faradayDamping(k, h, nu);
+  const sigma = FARADAY_SIGMA / FARADAY_RHO;
+  const kh = k * h;
+  const th = Math.tanh(kh);
+  const sech2 = 1 - th * th;
+  const gk3 = FARADAY_G * k + sigma * k * k * k;
+  const dGk3 = FARADAY_G + 3 * sigma * k * k;
+  const dWk = (dGk3 * th + gk3 * h * sech2) / (2 * w);
+  // Meniscus rim ripples decay by both fluid damping (γ/c_g) and geometric contact-line loss (~2 wavelengths).
+  const decay = Math.max(damp / Math.max(dWk, 1e-4), k / (4 * Math.PI));
+  const lc2 = (FARADAY_SIGMA / FARADAY_RHO) / FARADAY_G;
+  const k2lc2 = k * k * lc2;
+  const stroke = (Math.max(0, accel) / (w * w)) * (k2lc2 / (1 + k2lc2));
+  const amp = 0.08 * stroke;
+  return { k, decay, amp };
+}
