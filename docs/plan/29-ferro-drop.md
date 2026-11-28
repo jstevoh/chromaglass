@@ -76,6 +76,15 @@ the code's entry points, the checks to add and the scenes to match, in
     The drop's reflection is worked in light and encoded as a camera records it, so a dome's
     steep sides show the lit liquid round them as a dark gloss. Story in
     `docs/plan-shipped.md` §29a-13.
+  - **29a-13b. The Magnet's domes sometimes do not stand in ferrodrop's closeup scene on the
+    Mac** (S, nil; found landing 29a-13 in the physics batch, 2026-11-28). Of thirteen runs of
+    `npm run ferrodrop` section 7 on the owner's Mac, eleven read 19446 px of dome (the pool's
+    fullest 3.00) and two read 0 px, on the same commit as passing runs, each straight after a
+    heavier lab run (nolight, filmlook, lavacycle); six back-to-back runs alone all passed, and
+    the cloud lab stands them every time (20231 px). The line fails rather than passing on
+    nothing (it needs over 2000 px). If it reads 0 again, the detail's "the plate's fullest"
+    says whether the pool never domed (a GPU state left by the run before: look at what
+    `lab.create` resets) or the frame missed them.
   - **29a-14. The domes' ridges and their star, in the closeup** (M, nil; found doing
     29a-13). The references (Colored I) show each dome's sides ridged from the point down,
     the finer spikes a big one carries, and the reflection broken into a star round its top.
