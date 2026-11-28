@@ -330,8 +330,8 @@ export class FluidCore {
   protected oilDye: PingPong | null = null;
   /** The water's share of the dye between its carry's substeps (ensureWaterShare). */
   protected waterShare: PingPong | null = null;
-  /** The slump's K Δt/Δx² a cell, once a step (PLAN 18m, wgsl/slump.ts); made on the first step that slumps. */
-  protected slumpK: GPUTexture | null = null;
+  /** The slump's solve (PLAN 18m-1a, wgsl/slump.ts): the amount the sweeps reach and each cell's east and north face rates, rewritten every substep; made on the first step that slumps (fields.ts ensureSlump). */
+  protected slumpBufs: { x: GPUBuffer; faces: GPUBuffer } | null = null;
   /** The oil blurred wide, for colour astray from its liquid to find the way back (bodyPartition). */
   protected oilReach: PingPong | null = null;
   /** Whether the last step asked for Oil Bodies (the setting, and oil's tension to have oil at all). */

@@ -311,15 +311,17 @@ export class FluidFields extends FluidCore {
     return this.oilReach;
   }
 
-  /** The slump's per-cell rate, made once (PLAN 18m). */
-  protected ensureSlump(): GPUTexture {
-    if (!this.slumpK) {
-      this.slumpK = this.disposer.track(this.device.createTexture({
-        label: 'slump rate', size: [this.N, this.N], format: R32,
-        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
-      }));
+  /**
+   * The slump's solve (PLAN 18m-1a), made once: `x` the amount the sweeps
+   * reach, a float a cell, and `faces` each cell's east then north face rate,
+   * two floats a cell. Row-major, as the thin gap's buffers are.
+   */
+  protected ensureSlump(): { x: GPUBuffer; faces: GPUBuffer } {
+    if (!this.slumpBufs) {
+      const make = (label: string, floats: number) => this.disposer.track(this.device.createBuffer({ label, size: floats * 4, usage: GPUBufferUsage.STORAGE }));
+      this.slumpBufs = { x: make('slump amount', this.N * this.N), faces: make('slump faces', 2 * this.N * this.N) };
     }
-    return this.slumpK;
+    return this.slumpBufs;
   }
 
   protected ensureOilDye(): PingPong {
