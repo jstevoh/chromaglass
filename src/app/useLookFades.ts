@@ -168,7 +168,8 @@ export function useLookFades({
       sequencerRef.current?.startAt(next.sequence, 0);
       return;
     }
-    previousLook.current = { id: pinnedPresetId, settings: settingsRef.current };
+    const from = settingsRef.current;
+    previousLook.current = { id: pinnedPresetId, settings: from };
     setCued(null);
     // Pressing Go is a decision: the whole look, structure and all — and its
     // colours with it, handed over across the fade rather than left to
@@ -260,7 +261,7 @@ export function useLookFades({
     }
     if (next.sequence) return;
     const up = isUserPresetId(next.id) ? userPresetsRef.current.find(p => p.id === next.id) : null;
-    dissolve(backWait, seconds, true, next.settings, (fade) => visualizerRef.current?.sendBack(next.id, targetLook(settingsRef.current, next.settings), fade, next.name, up
+    dissolve(backWait, seconds, true, next.settings, (seconds) => visualizerRef.current?.sendBack(next.id, targetLook(settingsRef.current, next.settings), seconds, next.name, up
       ? { contract: up.contract ?? null, injectStyles: up.injectStyles ?? null, liquids: up.liquids ?? null }
       : undefined));
     setBackLook({ id: next.id, name: next.name });
