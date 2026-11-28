@@ -100,6 +100,8 @@ It prints a summary (also `summary.md`) and writes:
 | `still-*.png` | Full-resolution frames at the `--at` times, for the close look once the sheets say where. |
 | `stats.tsv` | Per sample: brightness, near-black fraction, blown fraction, saturation, motion, loudness. |
 | `palette.png` | The clip's six main colours, each as wide as its share. |
+| `report.html` | All of the above on one self-contained page for a person (best moment, timeline, read, words, numbers, sheets). **Attach it when showing the owner a watch**: it opens on a phone. `--no-report` skips it. |
+| `best.mp4`, `best.png` | The strongest 12 s and frame (most motion, colour, lit area and loudness by rank, no title card, one shot when it can be; `scripts/watchreport.mjs`). The moment to show, or to drop into a judging page. |
 | `design.json` | The design, physics, and `footage` reads (autocrop, overlays, title spans, camera share, blockiness, cutoff, `reliable` flags), plus `shape`, `overall`, `card` for `--vs`. |
 | `diff.md`, `diff-timeline.png`, `pairs.png` | Written by `--before A --after B`: `# What changed` (ranked steps, what held, near an edge, how it felt, both "In words" reads), stacked timelines, and matched-time frame pairs beside `before/` and `after/`. |
 
