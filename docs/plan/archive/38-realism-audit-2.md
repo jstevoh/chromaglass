@@ -144,3 +144,13 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   run once on the joined dye: 0.27% of the largest cell apart under a bubble, its floor is
   per share. The species no longer rides the dye's carry with Oil Bodies on (the one pass
   has no third field): it takes its own stage, as many face passes as before; 38w-34.
+- ~~**38w-35. The glass kick pumped the oil to the rim**~~ (S; High, found by 38w-28's probe).
+  *Shipped 2026-11-28.* A kick that pressed the glass across the dish (Bass Drop's, Frame Sway)
+  stamped three discs, each cell closed by Stefan's film on its own, and KickRelease opened them
+  linearly: the gap went down through one sequence of shapes and up another, and a Stokes flow
+  driven round a loop of shapes moves the liquid by the loop's area (the scallop theorem read the
+  other way). Lava Pop under it at full: the oil in the middle third 61.5 → 38.5% in five
+  seconds, the gap at rest between kicks. Now one rigid shape, depth eased down over KICK_HOLD
+  and up over KICK_RELEASE along one cosine, laid through the sheet's channel with the spring
+  tracked (lib/glassPress.ts, sim/kickLay.ts): 65.6 → 63.9%, the gap 0.03000 after every kick.
+  On the old plate the discs and KickRelease still press (no film there).

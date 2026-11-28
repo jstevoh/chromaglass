@@ -219,6 +219,7 @@
     "clockglass": "node scripts/clockglass.mjs",
     "classicdish": "node scripts/classicdish.mjs",
     "oilride": "node scripts/oilride.mjs",
+    "classichand": "node scripts/classichand.mjs",
     "splitcarry": "node scripts/splitcarry.mjs",
     "beads": "node scripts/beads.mjs",
     "filmhold": "node scripts/filmhold.mjs",
