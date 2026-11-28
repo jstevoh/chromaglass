@@ -287,12 +287,6 @@ const api = {
     if (cells > 0) l.sheetGap = out;
     return cells;
   },
-  layGap(data: number[] | Float32Array) {
-    const l = lab!;
-    const out = l.sheetGap ?? new Float32Array(l.L * l.L);
-    for (let q = 0; q < out.length; q++) out[q] += data[q];
-    l.sheetGap = out;
-  },
   /** What the glass has pressed and laid: for the checks. */
   glassState() { const g = lab!.glass; return g ? { live: g.live, kicks: g.kicksPressed, steps: g.steps, laid: g.laid, closed: g.closed, opened: g.opened, deepest: g.deepest } : null; },
   /** The sheet's change laid this step moved to the press's channel (the gap column of the velocity deltas), for the check that the press's ceiling cuts its ring. */
