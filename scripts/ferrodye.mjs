@@ -85,6 +85,15 @@ try {
   });
   const lay = (N) => page.evaluate(async (N) => {
     await lab.create(N);
+    /*
+      The standing film built before the first step (PLAN 38k). The walking
+      magnet, 0.5 at 0.3, is past the liquid's own onset (4 mT), so the film
+      runs from the step its kernels are in; built behind, that step was the
+      machine's timing, a different one in each arm, and line 5's "at 0 the
+      plate is the plate it was" read two runs of the same plate as unequal
+      on the Mac. Waited for, every arm runs the film from its first step.
+    */
+    await lab.prepareFilm();
     lab.dye(0.5, 0.5, 3, [0.3, 0.5, 0.7], 1);
     lab.flush();
     for (let k = 0; k < 18; k++) { const a = k * 2.399963229728653, rad = 0.16 + 0.3 * ((k * 0.6180339887) % 1);

@@ -17,12 +17,15 @@
  * and fails on its own: a Google outage never touches the show's link and a
  * closed show never stops an upload. Two small servers in one folder, each
  * with one job, also keep the assistant's tool list honest about which is which.
- * It imports nothing from the repo, so it can be lifted into a repository of
- * its own if the owner ever decides to publish it (44i-2).
+ * It imports nothing from the repo but its own folder (`youtube/`), so the two
+ * lift into a repository of their own: the owner decided 2026-11-28 to
+ * publish them as `sendreel` (44i-2), and 44i-2a took out what only held on
+ * the owner's Mac (the scheduler, the notifier, the folder, Pacific time).
  *
- * The YouTube Data API v3, signed in with OAuth as a desktop app: the owner
- * makes a Google Cloud project once and saves its client file in
- * `~/.chromaglass/youtube/` (`CHROMAGLASS_YOUTUBE_DIR`), and `login` below
+ * The YouTube Data API v3, signed in with OAuth as a desktop app: the user
+ * makes a Google Cloud project once and saves its client file in the folder
+ * `youtube/settings.js` names (`~/.config/sendreel/youtube`, the owner's old
+ * `~/.chromaglass/youtube/`, or `SENDREEL_DIR`), and `login` below
  * opens Google's consent page and keeps the refresh key there, readable by the
  * owner alone. Nothing secret is ever in the repository, in a reply to the
  * assistant, or in the log: the assistant drives the channel without ever
@@ -49,12 +52,13 @@
  * stdout, Node's own fetch and http. Nothing but protocol goes to stdout; the
  * log goes to stderr.
  *
+ *   node mcp/youtube-mcp.js setup             which setup step is done, and the fix for the first that is not
  *   node mcp/youtube-mcp.js login             sign in once (opens the browser)
  *   node mcp/youtube-mcp.js whoami            which channel the saved sign-in is
  *   node mcp/youtube-mcp.js logout            revoke the sign-in and forget it
  *   node mcp/youtube-mcp.js drain             upload queued jobs whose wait has passed
- *   node mcp/youtube-mcp.js install-agent     install the hourly LaunchAgent for drain
- *   node mcp/youtube-mcp.js uninstall-agent   remove the LaunchAgent
+ *   node mcp/youtube-mcp.js install-agent     install the hourly drain (LaunchAgent, systemd timer or Task Scheduler)
+ *   node mcp/youtube-mcp.js uninstall-agent   remove it
  *   node mcp/youtube-mcp.js manifest [--sync] [--md <file>]  show or export the channel manifest
  *   node mcp/youtube-mcp.js                   the MCP server (what the assistant runs)
  */
@@ -67,13 +71,22 @@ import { homedir } from 'node:os';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { CAPTION, CAPTION_UNITS, captionRequest, readCaptionFile } from './youtube/captions.js';
+import { checkTitle, composeDescription, composeLocalizations, creditsLine, isoSeconds, parseChapters, validLanguage } from './youtube/describe.js';
+import { notifyCommand, schedulePlan } from './youtube/platform.js';
+import { configDir, env, readSettings } from './youtube/settings.js';
+import { formatSetup, runSetup } from './youtube/setup.js';
+import { formatZone, nextQuotaResetPlus10m, zoneWallToMs } from './youtube/zone.js';
 
-const DIR = process.env.CHROMAGLASS_YOUTUBE_DIR ?? join(homedir(), '.chromaglass', 'youtube');
+const DIR = configDir();
 const SECRET_FILE = join(DIR, 'client_secret.json');
 const TOKEN_FILE = join(DIR, 'token.json');
 const JOBS_FILE = join(DIR, 'uploads.json');
 const MANIFEST_FILE = join(DIR, 'manifest.json');
 const AGENT_LABEL = 'art.chromaglass.youtube-drain';
+/* The host system, which picks the scheduler and the notifier. The check overrides it to read
+   every system's plan on one machine; nothing else should. */
+const PLATFORM = env('PLATFORM') ?? process.platform;
 /* One scope: `youtube` covers upload, update, thumbnails and playlists. The
    narrower `youtube.upload` cannot change a video once it is up, which is
    half of what was asked. */
@@ -82,16 +95,16 @@ const VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 /* Google takes a chunk in multiples of 256 KiB. 8 MiB is its own suggestion
    for a steady connection: big enough that the per-request cost is nothing,
    small enough that a dropped one loses seconds. The check sets it small. */
-const CHUNK = Number(process.env.CHROMAGLASS_YOUTUBE_CHUNK ?? 8 * 1024 * 1024);
+const CHUNK = Number(env('CHUNK') ?? 8 * 1024 * 1024);
 /* How long upload_video waits before answering "still going": a short film
    finishes inside one call, a long one answers and carries on in the
    background, read with upload_status. Under a client's tool timeout. */
-const WAIT_MS = Number(process.env.CHROMAGLASS_YOUTUBE_WAIT_MS ?? 45_000);
-const BACKOFF_MS = Number(process.env.CHROMAGLASS_YOUTUBE_BACKOFF_MS ?? 1_000);
+const WAIT_MS = Number(env('WAIT_MS') ?? 45_000);
+const BACKOFF_MS = Number(env('BACKOFF_MS') ?? 1_000);
 const TRIES = 8;
 /* A chunk that neither lands nor fails (a half-dead connection after the Mac
    slept) is given up after this and treated as a drop. */
-const PUT_MS = Number(process.env.CHROMAGLASS_YOUTUBE_PUT_MS ?? 120_000);
+const PUT_MS = Number(env('PUT_MS') ?? 120_000);
 /* The files this server writes hold keys: the owner's alone. */
 const PRIVATE = 0o600;
 
@@ -102,39 +115,21 @@ const b64url = (b) => Buffer.from(b).toString('base64url');
    `notBefore` can run immediately without sleeping 24 hours; OAuth expiry and
    the live-process `beat` keep real wall-clock time (`Date.now()`). */
 function nowMs() {
-  const raw = process.env.CHROMAGLASS_YOUTUBE_NOW;
+  const raw = env('NOW');
   if (!raw) return Date.now();
   const n = Number(raw);
   return Number.isFinite(n) ? n : Date.parse(raw);
 }
-function pacificParts(ms) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
-  }).formatToParts(new Date(ms));
-  const get = (t) => Number(parts.find((p) => p.type === t).value);
-  return { y: get('year'), m: get('month'), d: get('day'), h: get('hour') % 24, min: get('minute'), s: get('second') };
-}
-function pacificWallToMs(y, m, d, h, min, s = 0) {
-  const targetWall = Date.UTC(y, m - 1, d, h, min, s);
-  let t = targetWall + 8 * 3600_000;
-  for (let i = 0; i < 3; i++) {
-    const g = pacificParts(t);
-    t += targetWall - Date.UTC(g.y, g.m - 1, g.d, g.h, g.min, g.s);
-  }
-  return t;
-}
-function nextMidnightPacificPlus10m(now) {
-  const p = pacificParts(now);
-  return pacificWallToMs(p.y, p.m, p.d + 1, 0, 10, 0);
-}
-function formatPacific(ms) {
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
-    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
-  }).format(new Date(ms));
-}
+/*
+  The person's choices (settings.json beside the keys: the time zone release
+  times are read in, the category a new upload gets). Read once at start; a
+  bad file stops the server with the line to fix, before it sends anything.
+*/
+let SETTINGS;
+try { SETTINGS = readSettings(DIR); } catch (e) { log(e.message); process.exit(2); }
+const ZONE = SETTINGS.timeZone;
+const zoneWall = (y, m, d, h, min, s = 0) => zoneWallToMs(y, m, d, h, min, s, ZONE);
+const formatLocal = (ms) => formatZone(ms, ZONE);
 /* A key file read without quoting it: Node's JSON error carries about ten
    characters of the text, which in these files can be part of a secret. */
 function readKeyFile(file) {
@@ -149,10 +144,10 @@ function readKeyFile(file) {
   another host.
 */
 function endpoints() {
-  const o = process.env.CHROMAGLASS_YOUTUBE_GOOGLE;
+  const o = env('GOOGLE');
   if (!o) return { auth: 'https://accounts.google.com/o/oauth2/v2/auth', token: 'https://oauth2.googleapis.com/token', revoke: 'https://oauth2.googleapis.com/revoke', api: 'https://www.googleapis.com/youtube/v3', upload: 'https://www.googleapis.com/upload/youtube/v3' };
   const u = new URL(o);
-  if (u.protocol !== 'http:' || u.hostname !== '127.0.0.1') throw new Error(`CHROMAGLASS_YOUTUBE_GOOGLE may only name a stand-in on http://127.0.0.1, not ${u.origin}`);
+  if (u.protocol !== 'http:' || u.hostname !== '127.0.0.1') throw new Error(`The GOOGLE override may only name a stand-in on http://127.0.0.1, not ${u.origin}`);
   const b = o.replace(/\/$/, '');
   return { auth: `${b}/auth`, token: `${b}/token`, revoke: `${b}/revoke`, api: `${b}/youtube/v3`, upload: `${b}/upload/youtube/v3` };
 }
@@ -227,7 +222,7 @@ async function login() {
   const url = new URL(G.auth);
   for (const [k, v] of Object.entries({ client_id: c.id, redirect_uri: redirect, response_type: 'code', scope: SCOPE, access_type: 'offline', prompt: 'consent', code_challenge: challenge, code_challenge_method: 'S256', state })) url.searchParams.set(k, v);
   log(`Sign in with the Google account that owns the channel (pick the channel if it asks). The page should open by itself; if not, open:\n${url}`);
-  if (!process.env.CHROMAGLASS_YOUTUBE_NO_BROWSER) {
+  if (!env('NO_BROWSER')) {
     const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
     spawn(cmd, [String(url)], { stdio: 'ignore', detached: true }).on('error', () => {}).unref();
   }
@@ -323,11 +318,13 @@ const describe = (v) => ({
   likes: v.statistics ? Number(v.statistics.likeCount ?? 0) : undefined,
   description: v.snippet?.description, tags: v.snippet?.tags ?? [], category_id: v.snippet?.categoryId,
   made_for_kids: v.status?.selfDeclaredMadeForKids ?? v.status?.madeForKids,
+  ...(v.snippet?.defaultLanguage ? { language: v.snippet.defaultLanguage } : {}),
+  ...(v.localizations && Object.keys(v.localizations).length ? { localizations: v.localizations } : {}),
 });
 
 async function videos(ids) {
   if (!ids.length) return [];
-  const { j } = await api('GET', 'videos', { query: { part: 'snippet,status,statistics,contentDetails', id: ids.join(','), maxResults: 50 } });
+  const { j } = await api('GET', 'videos', { query: { part: 'snippet,status,statistics,contentDetails,localizations', id: ids.join(','), maxResults: 50 } });
   return j.items ?? [];
 }
 
@@ -349,11 +346,32 @@ async function updateVideo(a) {
   if (!cur) throw new Error(`No video ${a.video_id} on this channel.`);
   const snippet = { ...cur.snippet };
   for (const k of ['thumbnails', 'localized', 'publishedAt', 'channelId', 'channelTitle', 'liveBroadcastContent']) delete snippet[k];
-  if (a.title !== undefined) snippet.title = a.title;
-  if (a.description !== undefined) snippet.description = a.description;
+  if (a.title !== undefined) snippet.title = checkTitle(a.title);
   if (a.tags !== undefined) snippet.tags = a.tags;
   if (a.category_id !== undefined) snippet.categoryId = String(a.category_id);
   if (a.language !== undefined) snippet.defaultLanguage = snippet.defaultAudioLanguage = a.language;
+  /* The words (44i-2b). The description is put together again only when one
+     of its parts is named: new text keeps its chapters and gets the credits
+     line, new chapters replace the old ones, checked against the video's own
+     length. A title-only update leaves the description exactly as it was. */
+  let localizations;
+  if (['description', 'chapters', 'credits', 'music', 'localizations'].some((k) => a[k] !== undefined)) {
+    /* Other languages added alone to a video whose description has no credits line (one from
+       before 44i-2b, or uploaded with credits: false) take its description as it is: adding a
+       Spanish title is not the moment to demand the music's name. */
+    const wordsNamed = ['description', 'chapters', 'credits', 'music'].some((k) => a[k] !== undefined);
+    const body = a.description ?? cur.snippet?.description ?? '';
+    let lenient = {};
+    if (!wordsNamed) { try { creditsLine(SETTINGS.credits, undefined, undefined, body); } catch { lenient = { credits: false }; } }
+    const w = wordsFor({ ...a, ...lenient, description: body, language: snippet.defaultLanguage }, isoSeconds(cur.contentDetails?.duration));
+    if (wordsNamed) snippet.description = w.description;
+    /* The localizations part is whole as well: languages not named are kept,
+       one set to null is taken off. */
+    if (w.localizations) {
+      localizations = { ...(cur.localizations ?? {}) };
+      for (const [lang, v] of Object.entries(w.localizations)) { if (v === null) delete localizations[lang]; else localizations[lang] = v; }
+    }
+  }
   /* The status part is whole too: a field left out is reset (a Studio
      "altered or synthetic" mark, embedding, the licence). So it starts from
      all of the video's status and drops only what YouTube sets itself;
@@ -363,7 +381,7 @@ async function updateVideo(a) {
   if (a.privacy !== undefined) { status.privacyStatus = a.privacy; if (a.privacy !== 'private') delete status.publishAt; }
   if (a.publish_at !== undefined) { status.publishAt = a.publish_at || undefined; if (a.publish_at) status.privacyStatus = 'private'; }
   if (a.made_for_kids !== undefined) status.selfDeclaredMadeForKids = Boolean(a.made_for_kids);
-  const { j } = await api('PUT', 'videos', { query: { part: 'snippet,status' }, body: { id: cur.id, snippet, status } });
+  const { j } = await api('PUT', 'videos', { query: { part: localizations ? 'snippet,status,localizations' : 'snippet,status' }, body: { id: cur.id, snippet, status, ...(localizations ? { localizations } : {}) } });
   return describe({ ...cur, ...j });
 }
 
@@ -393,7 +411,7 @@ const IMAGE = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png'
 const PRIVATE_PLACE = /(\.photoslibrary|Photo Booth Library|\.imovielibrary|\.tvlibrary|\.musiclibrary)(\/|$)/i;
 function uploadable(raw, kinds, what, home = homedir()) {
   const asked = String(raw ?? '').trim().replace(/^~(?=$|\/)/, home);
-  if (!asked) throw new Error(`${what}: a full path to the file on this Mac.`);
+  if (!asked) throw new Error(`${what}: a full path to the file on this computer.`);
   let real;
   try { real = realpathSync(resolve(asked)); } catch { throw new Error(`No file at ${resolve(asked)}.`); }
   if (!statSync(real).isFile()) throw new Error(`${real} is not a file.`);
@@ -414,6 +432,45 @@ async function setThumbnail(videoId, file) {
   if (statSync(path).size > 2 * 1024 * 1024) throw new Error('A thumbnail must be 2 MB or less.');
   await api('POST', 'thumbnails/set', { base: G.upload, query: { videoId, uploadType: 'media' }, raw: readFileSync(path), type });
   return 'thumbnail set';
+}
+
+/*
+  Captions (44i-2b, youtube/captions.js). Every caption an upload names is
+  looked at when the job is made (its file, its kind, its cues, its language),
+  so the drain hours later sends only what passed. `captions.insert` is 400
+  units, so a film with three languages is 1,200 of the day's 10,000.
+*/
+function captionsFor(a) {
+  if (a.captions === undefined || a.captions === null) return [];
+  const list = Array.isArray(a.captions) ? a.captions : [a.captions];
+  return list.map((c) => {
+    const o = typeof c === 'string' ? { file: c } : c;
+    if (!o || typeof o !== 'object') throw new Error('captions is a list of caption files, each a path or { file, language, name }.');
+    const { path } = uploadable(o.file, CAPTION, 'A caption file');
+    readCaptionFile(path);
+    const language = String(o.language ?? a.language ?? '');
+    if (!validLanguage(language)) throw new Error(`The caption file ${basename(path)} needs its language (e.g. "en"): on the caption, or the upload's language.`);
+    return { file: path, language, ...(o.name ? { name: String(o.name) } : {}), ...(o.draft ? { draft: true } : {}) };
+  });
+}
+async function addCaptions(videoId, c) {
+  const { path } = uploadable(c.file, CAPTION, 'A caption file');
+  const { raw, type } = captionRequest({ videoId, language: c.language, name: c.name ?? '', draft: c.draft }, readCaptionFile(path));
+  const { j } = await api('POST', 'captions', { base: G.upload, query: { part: 'snippet', uploadType: 'multipart' }, raw, type });
+  return `captions ${c.language}${c.name ? ` (${c.name})` : ''} added (${j.id})`;
+}
+async function listCaptions(videoId) {
+  const { j } = await api('GET', 'captions', { query: { part: 'snippet', videoId } });
+  return (j.items ?? []).map((t) => ({ id: t.id, language: t.snippet?.language, name: t.snippet?.name, kind: t.snippet?.trackKind, draft: t.snippet?.isDraft, status: t.snippet?.status }));
+}
+
+/* The description and the other languages' words for an upload or an update (youtube/describe.js). */
+function wordsFor(a, durationSec) {
+  const chapters = parseChapters(a.chapters, durationSec);
+  const credits = creditsLine(SETTINGS.credits, a.credits, a.music, a.description);
+  const description = composeDescription(a.description ?? '', chapters, credits);
+  const localizations = composeLocalizations(a.localizations, { language: a.language, chapters, credits, fallbackDescription: description });
+  return { description, localizations };
 }
 
 async function addToPlaylist(videoId, playlistId, position) {
@@ -482,14 +539,14 @@ const pidAlive = (pid) => { try { process.kill(pid, 0); return true; } catch { r
 const busyElsewhere = (j) => Boolean(j.pid) && j.pid !== process.pid && pidAlive(j.pid) && Date.now() - (j.beat ?? 0) < 5 * 60_000;
 
 function computeNotBefore(reason, now, lastUploadAt) {
-  if (reason === 'quotaExceeded') return nextMidnightPacificPlus10m(now);
+  if (reason === 'quotaExceeded') return nextQuotaResetPlus10m(now);
   const last = lastUploadAt ? Date.parse(lastUploadAt) : 0;
   const afterLast = Number.isFinite(last) && last > 0 ? last + 24 * 3600_000 + 10 * 60_000 : 0;
   return Math.max(now + 2 * 3600_000, afterLast);
 }
 function limitNote(reason, nbMs) {
   const prefix = reason === 'quotaExceeded' ? "YouTube's daily quota is spent" : "YouTube's daily upload limit";
-  return `${prefix}; queued, the Mac retries after ${formatPacific(nbMs)}`;
+  return `${prefix}; queued, this computer retries after ${formatLocal(nbMs)}`;
 }
 
 function jobView(job) {
@@ -500,7 +557,7 @@ function jobView(job) {
     ...(job.key ? { key: job.key } : {}),
     ...(job.replaces ? { replaces: job.replaces } : {}),
     ...(job.meta?.status?.publishAt ? { publish_at: job.meta.status.publishAt } : {}),
-    ...(job.notBefore ? { not_before: formatPacific(Date.parse(job.notBefore)), not_before_iso: job.notBefore } : {}),
+    ...(job.notBefore ? { not_before: formatLocal(Date.parse(job.notBefore)), not_before_iso: job.notBefore } : {}),
     ...(job.note ? { note: job.note } : {}),
     ...(job.video_id ? { video_id: job.video_id, url: watchUrl(job.video_id) } : {}),
     ...(job.playlists?.length ? { playlists: job.playlists } : {}),
@@ -522,7 +579,7 @@ async function askOffset(job, retried = false) {
 }
 
 async function startSession(job) {
-  const { r } = await api('POST', 'videos', { base: G.upload, query: { uploadType: 'resumable', part: 'snippet,status' }, body: job.meta, headers: { 'x-upload-content-length': String(job.size), 'x-upload-content-type': job.mime } });
+  const { r } = await api('POST', 'videos', { base: G.upload, query: { uploadType: 'resumable', part: job.meta.localizations ? 'snippet,status,localizations' : 'snippet,status' }, body: job.meta, headers: { 'x-upload-content-length': String(job.size), 'x-upload-content-type': job.mime } });
   const at = r.headers.get('location');
   if (!at) throw new Error('YouTube gave no upload address.');
   return at;
@@ -755,6 +812,7 @@ function run(job, onProgress) {
         job.after.push(await addToPlaylist(video.id, pl.id, pl.position).catch((e) => `playlist ${pl.id} not added: ${e.message}`));
       }
       if (job.thumbnail) job.after.push(await setThumbnail(video.id, job.thumbnail).catch((e) => `thumbnail not set: ${e.message}`));
+      for (const c of job.captions ?? []) job.after.push(await addCaptions(video.id, c).catch((e) => `captions ${c.language} not added: ${e.message}`));
       recordUploadedManifest(job, video, finishedAt);
       log(`uploaded ${job.file} as ${watchUrl(video.id)}`);
       job.pid = undefined; saveJob(job, { lastUploadAt: finishedAt });
@@ -781,7 +839,7 @@ function run(job, onProgress) {
 }
 
 const PRIVACY = ['private', 'unlisted', 'public'];
-const SIDECAR_FIELDS = new Set(['title', 'description', 'tags', 'playlist', 'thumbnail', 'key', 'replaces', 'publish_at', 'privacy']);
+const SIDECAR_FIELDS = new Set(['title', 'description', 'tags', 'playlist', 'thumbnail', 'key', 'replaces', 'publish_at', 'privacy', 'language', 'chapters', 'music', 'credits', 'captions', 'localizations']);
 function readUploadCard(videoPath) {
   const ext = extname(videoPath);
   const cardPath = `${ext ? videoPath.slice(0, -ext.length) : videoPath}.youtube.json`;
@@ -822,6 +880,16 @@ function readUploadCard(videoPath) {
   if (raw.replaces !== undefined) out.replaces = String(raw.replaces);
   if (raw.publish_at !== undefined) out.publish_at = String(raw.publish_at);
   if (raw.privacy !== undefined) out.privacy = String(raw.privacy);
+  /* 44i-2b. A caption file named in the card is found beside the card, like its thumbnail. */
+  if (raw.language !== undefined) out.language = String(raw.language);
+  if (raw.chapters !== undefined) out.chapters = raw.chapters;
+  if (raw.music !== undefined) out.music = String(raw.music);
+  if (raw.credits !== undefined) out.credits = raw.credits === false ? false : String(raw.credits);
+  if (raw.localizations !== undefined) out.localizations = raw.localizations;
+  if (raw.captions !== undefined) {
+    const here = (f) => resolve(dir, String(f ?? '').trim().replace(/^~(?=$|\/)/, homedir()));
+    out.captions = (Array.isArray(raw.captions) ? raw.captions : [raw.captions]).map((c) => (typeof c === 'string' ? here(c) : c && typeof c === 'object' ? { ...c, file: here(c.file) } : c));
+  }
   return out;
 }
 function mergeArgsWithCard(a, card) {
@@ -838,6 +906,10 @@ function validateUploadArgs(a, resolvedFile) {
   const st = statSync(file);
   if (!a.title) throw new Error('A title is needed.');
   if (String(a.title).length > 100) throw new Error('YouTube takes a title of at most 100 characters.');
+  checkTitle(a.title);
+  /* The words and the captions are judged here, before a job exists, so a bad chapter list or caption file is refused at the call and never fails later in the drain (44i-2b). */
+  wordsFor(a);
+  captionsFor(a);
   if (a.privacy !== undefined && !PRIVACY.includes(a.privacy)) throw new Error(`privacy is one of ${PRIVACY.join(', ')}.`);
   if (a.publish_at && a.privacy && a.privacy !== 'private') throw new Error('A scheduled video goes up private and turns public at publish_at; leave privacy out or private.');
   if (a.thumbnail) uploadable(a.thumbnail, IMAGE, 'A thumbnail');
@@ -847,12 +919,16 @@ function buildJob(a, file, st) {
   const playlists = Array.isArray(a.playlists)
     ? a.playlists.map((p) => (typeof p === 'string' ? { id: p } : { id: String(p.id), ...(Number.isInteger(p.position) ? { position: p.position } : {}) }))
     : a.playlist_id ? [{ id: String(a.playlist_id) }] : undefined;
+  const words = wordsFor(a);
+  const captions = captionsFor(a);
   return {
     id: b64url(randomBytes(6)), file, size: st.size, mtime: st.mtimeMs, mime: MIME[extname(file).toLowerCase()],
     meta: {
-      snippet: { title: a.title, description: a.description ?? '', tags: a.tags ?? [], categoryId: String(a.category_id ?? 10), ...(a.language ? { defaultLanguage: a.language, defaultAudioLanguage: a.language } : {}) },
+      snippet: { title: a.title, description: words.description, tags: a.tags ?? [], categoryId: String(a.category_id ?? SETTINGS.categoryId), ...(a.language ? { defaultLanguage: a.language, defaultAudioLanguage: a.language } : {}) },
       status: { privacyStatus: a.privacy ?? 'private', selfDeclaredMadeForKids: Boolean(a.made_for_kids ?? false), ...(a.publish_at ? { publishAt: a.publish_at } : {}) },
+      ...(words.localizations ? { localizations: words.localizations } : {}),
     },
+    ...(captions.length ? { captions } : {}),
     playlist_id: a.playlist_id ?? playlists?.[0]?.id,
     ...(playlists?.length ? { playlists } : {}),
     thumbnail: a.thumbnail ? resolve(a.thumbnail) : undefined,
@@ -873,7 +949,7 @@ async function uploadVideo(rawArgs, onProgress) {
   if (done && !a.again) throw new Error(`This file is already up with this title: ${watchUrl(done.video_id)}. Pass again: true to upload a second copy.`);
   let job = a.again ? null : jobs.find((j) => same(j) && j.state !== 'done');
   if (job && running.has(job.id)) return { ...jobView(job), note: 'already uploading in this window' };
-  if (job && busyElsewhere(job)) return { ...jobView(job), note: 'already uploading from another app on this Mac' };
+  if (job && busyElsewhere(job)) return { ...jobView(job), note: 'already uploading from another app on this computer' };
   if (job && job.state === 'queued' && job.notBefore && Date.parse(job.notBefore) > nowMs()) return jobView(job);
   if (!job) job = buildJob(a, file, st);
   else {
@@ -894,7 +970,7 @@ function queueUploadCore(a, file, st) {
   if (done && !a.again) throw new Error(`This file is already up with this title: ${watchUrl(done.video_id)}. Pass again: true to upload a second copy.`);
   const existing = a.again ? null : jobs.find((j) => same(j) && (j.state === 'queued' || j.state === 'uploading'));
   if (existing) throw new Error(`This file is already queued with this title (job ${existing.id}). Pass again: true to queue a second copy.`);
-  const job = { ...buildJob(a, file, st), state: 'queued', note: 'Queued; the Mac uploads it on the next pass.' };
+  const job = { ...buildJob(a, file, st), state: 'queued', note: 'Queued; this computer uploads it on the next pass.' };
   saveJob(job);
   if (job.replaces) {
     const m = readManifest();
@@ -973,8 +1049,9 @@ async function replaceVideo(a) {
     title: old.snippet?.title,
     description: old.snippet?.description ?? '',
     tags: old.snippet?.tags ?? [],
-    category_id: old.snippet?.categoryId ? String(old.snippet.categoryId) : '10',
+    category_id: old.snippet?.categoryId ? String(old.snippet.categoryId) : SETTINGS.categoryId,
     ...(old.snippet?.defaultLanguage ? { language: old.snippet.defaultLanguage } : {}),
+    ...(old.localizations && Object.keys(old.localizations).length ? { localizations: old.localizations } : {}),
     made_for_kids: Boolean(old.status?.selfDeclaredMadeForKids ?? false),
     ...(playlists.length ? { playlists } : {}),
     ...(oldEntry?.key ? { key: oldEntry.key } : {}),
@@ -1002,7 +1079,7 @@ async function replaceVideo(a) {
 
 function parseReleasePlanArgs(a) {
   const startMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(a.start ?? '').trim());
-  if (!startMatch) throw new Error('start must be a date in YYYY-MM-DD (Pacific time).');
+  if (!startMatch) throw new Error(`start must be a date in YYYY-MM-DD (${ZONE} time).`);
   const y = Number(startMatch[1]), mo = Number(startMatch[2]), d = Number(startMatch[3]);
   const checkDate = new Date(Date.UTC(y, mo - 1, d));
   if (checkDate.getUTCFullYear() !== y || checkDate.getUTCMonth() !== mo - 1 || checkDate.getUTCDate() !== d) {
@@ -1010,7 +1087,7 @@ function parseReleasePlanArgs(a) {
   }
   const atStr = String(a.at ?? '10:00').trim();
   const atMatch = /^(\d{1,2}):(\d{2})$/.exec(atStr);
-  if (!atMatch) throw new Error('at must be a 24-hour Pacific clock time like "10:00".');
+  if (!atMatch) throw new Error(`at must be a 24-hour clock time in ${ZONE} like "10:00".`);
   const h = Number(atMatch[1]), min = Number(atMatch[2]);
   if (h < 0 || h > 23 || min < 0 || min > 59) throw new Error(`Invalid clock time: ${atStr}.`);
   const every = a.every === undefined ? 24 : Number(a.every);
@@ -1058,14 +1135,14 @@ async function releasePlan(a) {
     if (!fetched.has(id)) throw new Error(`No video ${id} on this channel.`);
   }
 
-  const slot0Ms = pacificWallToMs(y, mo, d, h, min, 0);
+  const slot0Ms = zoneWall(y, mo, d, h, min, 0);
   const warnings = [];
   const plan = targets.map((t, i) => {
     const slotMs = every % 24 === 0
-      ? pacificWallToMs(y, mo, d + i * (every / 24), h, min, 0)
+      ? zoneWall(y, mo, d + i * (every / 24), h, min, 0)
       : slot0Ms + i * every * 3600_000;
     const publishAt = new Date(slotMs).toISOString();
-    const pacific = formatPacific(slotMs);
+    const when = formatLocal(slotMs);
     if (t.kind === 'job') {
       const warn = t.job.state !== 'queued' ? `Job ${t.job.id} is currently ${t.job.state}; cannot change publish_at until queued or uploaded.` : undefined;
       if (warn) warnings.push(warn);
@@ -1075,7 +1152,7 @@ async function releasePlan(a) {
         ...(t.key ? { key: t.key } : {}),
         title: t.job.meta?.snippet?.title,
         publish_at: publishAt,
-        pacific,
+        when,
         quota_units: 0,
         ...(warn ? { warning: warn } : {}),
       };
@@ -1091,7 +1168,7 @@ async function releasePlan(a) {
       title: v.snippet?.title,
       current_privacy: curPrivacy,
       publish_at: publishAt,
-      pacific,
+      when,
       quota_units: 50,
       ...(warn ? { warning: warn } : {}),
     };
@@ -1144,15 +1221,18 @@ async function releasePlan(a) {
 }
 
 function notify(message) {
-  // Only the real drain on the owner's Mac speaks. A run against a stand-in Google (the check,
-  // CHROMAGLASS_YOUTUBE_GOOGLE set) never does: on 2026-11-22 the check's early drain lines ran
-  // without NO_NOTIFY while the check and its mutants ran again and again, and every pass put a
-  // real "YouTube" notification on the owner's screen. A notification the check did not ask
-  // for is a bug in the check's reach, so the server refuses it here, not only the check's env.
-  if (process.platform !== 'darwin' || process.env.CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL === '1' || process.env.CHROMAGLASS_YOUTUBE_NO_NOTIFY === '1' || process.env.CHROMAGLASS_YOUTUBE_GOOGLE) return;
-  const clean = String(message).replace(/[\r\n]+/g, ' ').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  // Only a real drain speaks. A run against a stand-in Google (the check, the GOOGLE override
+  // set) never does: on 2026-11-22 the check's early drain lines ran without NO_NOTIFY while the
+  // check and its mutants ran again and again, and every pass put a real "YouTube" notification
+  // on the owner's screen. A notification the check did not ask for is a bug in the check's
+  // reach, so the server refuses it here, not only the check's env. Which notifier runs is the
+  // host's own (platform.js): osascript on macOS, notify-send on Linux, a PowerShell balloon on
+  // Windows; a system with none just stays quiet, since the queue's state is the real record.
+  if (env('NO_SCHEDULER') === '1' || env('NO_LAUNCHCTL') === '1' || env('NO_NOTIFY') === '1' || env('GOOGLE')) return;
+  const n = notifyCommand(PLATFORM, 'YouTube', message);
+  if (!n) return;
   try {
-    execFileSync('osascript', ['-e', `display notification "${clean}" with title "YouTube"`], { stdio: 'ignore' });
+    execFileSync(n.cmd, n.args, { stdio: 'ignore', timeout: 15_000, env: { ...process.env, ...(n.env ?? {}) } });
   } catch { /* notification is best-effort */ }
 }
 
@@ -1195,53 +1275,39 @@ async function drain() {
   }
 }
 
-const xmlEscape = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-function buildPlist() {
-  const script = realpathSync(fileURLToPath(import.meta.url));
-  const logFile = join(DIR, 'drain.log');
-  return [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
-    '<plist version="1.0">',
-    '<dict>',
-    `  <key>Label</key><string>${AGENT_LABEL}</string>`,
-    '  <key>ProgramArguments</key>',
-    '  <array>',
-    `    <string>${xmlEscape(process.execPath)}</string>`,
-    `    <string>${xmlEscape(script)}</string>`,
-    '    <string>drain</string>',
-    '  </array>',
-    '  <key>StartInterval</key><integer>3600</integer>',
-    '  <key>RunAtLoad</key><true/>',
-    `  <key>StandardOutPath</key><string>${xmlEscape(logFile)}</string>`,
-    `  <key>StandardErrorPath</key><string>${xmlEscape(logFile)}</string>`,
-    '</dict>',
-    '</plist>',
-    '',
-  ].join('\n');
+/*
+  The hourly drain, in the host system's own scheduler (platform.js: a
+  LaunchAgent, a systemd user timer, or a Task Scheduler task). The plan is
+  computed, written and run here; with NO_SCHEDULER (or the old NO_LAUNCHCTL)
+  the files are written and the commands printed but not run, which is how the
+  check reads every system's plan on one machine (PLATFORM picks which).
+*/
+function agentPlan() {
+  const plan = schedulePlan({ platform: PLATFORM, home: homedir(), node: process.execPath, script: realpathSync(fileURLToPath(import.meta.url)), log: join(DIR, 'drain.log'), label: AGENT_LABEL });
+  if (!plan) throw new Setup(`No scheduler this server knows on ${PLATFORM}. Run \`node ${fileURLToPath(import.meta.url)} drain\` every hour with the system's own scheduler.`);
+  return plan;
 }
-function plistPath() { return join(homedir(), 'Library', 'LaunchAgents', `${AGENT_LABEL}.plist`); }
+const dryScheduler = () => env('NO_SCHEDULER') === '1' || env('NO_LAUNCHCTL') === '1';
+function runSteps(steps) {
+  for (const st of steps) {
+    if (dryScheduler()) { log(`would run: ${st.cmd} ${st.args.map((x) => JSON.stringify(x)).join(' ')}`); continue; }
+    try { execFileSync(st.cmd, st.args, { stdio: st.mayFail ? 'ignore' : 'inherit' }); } catch (e) { if (!st.mayFail) throw e; }
+  }
+}
 function installAgent() {
   mkdirSync(DIR, { recursive: true, mode: 0o700 });
-  chmodSync(DIR, 0o700);
-  const dest = plistPath();
-  mkdirSync(join(homedir(), 'Library', 'LaunchAgents'), { recursive: true });
-  writeFileSync(dest, buildPlist(), { mode: 0o644 });
-  if (process.env.CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL !== '1') {
-    const target = `gui/${process.getuid()}`;
-    try { execFileSync('launchctl', ['bootout', target, dest], { stdio: 'ignore' }); } catch { /* not loaded */ }
-    execFileSync('launchctl', ['bootstrap', target, dest], { stdio: 'inherit' });
-  }
-  log(`installed ${dest}`);
+  if (PLATFORM !== 'win32') chmodSync(DIR, 0o700);
+  const plan = agentPlan();
+  for (const d of plan.dirs) mkdirSync(d, { recursive: true });
+  for (const f of plan.files) writeFileSync(f.path, f.text, { mode: 0o644 });
+  runSteps(plan.install);
+  log(`installed the hourly drain as a ${plan.kind}${plan.files.length ? `: ${plan.files.map((f) => f.path).join(', ')}` : ` named ${AGENT_LABEL}`}`);
 }
 function uninstallAgent() {
-  const dest = plistPath();
-  if (process.env.CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL !== '1') {
-    const target = `gui/${process.getuid()}`;
-    try { execFileSync('launchctl', ['bootout', target, dest], { stdio: 'ignore' }); } catch { /* not loaded */ }
-  }
-  if (existsSync(dest)) unlinkSync(dest);
-  log(`uninstalled ${dest}`);
+  const plan = agentPlan();
+  runSteps(plan.uninstall);
+  for (const f of plan.files) if (existsSync(f.path)) unlinkSync(f.path);
+  log(`uninstalled the hourly drain (${plan.kind})`);
 }
 
 // ── The tools ──────────────────────────────────────────────────────────
@@ -1250,9 +1316,13 @@ const GUIDE = `You manage the owner's YouTube channel. Nothing here needs the li
 
 - Uploads go up PRIVATE unless you pass privacy. Make a video unlisted or public, or schedule it (publish_at), or run release_plan, only when the owner said so in this conversation. A scheduled video is private until its time; YouTube only schedules a private video.
 - Before uploading, say what you will upload: the file, the title, the privacy. Credit the music's source in the description when the owner has one (where a recording came from and its date).
+- Credits: when settings.json has a credits line, every new upload's description ends with it (and each other language's). If the line holds {music}, pass music (the title of the piece); for a film with other music pass a credits line of its own, or credits: false only when the owner said the film needs none.
+- Chapters: pass chapters (lines like "0:00 Intro", or { at, title }) and they go into the description as YouTube reads them: first at 0:00, three or more, each ten seconds or longer. update_video with chapters replaces the old list.
+- Captions: an upload's captions (.srt or .vtt, with a language) are added once it is up; add_captions adds one to a video already up. Each costs 400 quota units, so say so first.
+- Other languages: localizations ({"es": {"title", "description"}}) need the video's own language (language).
 - If a file has a sidecar card beside it (<file without extension>.youtube.json), upload_video, queue_upload and replace_video read it for any field the call leaves out (call wins); unknown fields in the card are refused.
-- upload_video answers within about 45 seconds: a short film is done by then; a long one answers "uploading" and carries on. Check it with upload_status. If an upload stops (the Mac slept, the app closed), ask upload_video again with the same file and title: it carries on where it stopped and never makes a second copy unless you pass again: true.
-- A job in state "queued" (from queue_upload, replace_video, or from upload_video hitting YouTube's daily upload limit or quota) is NOT a failure: the Mac's background agent finishes it on its own after not_before (shown in Pacific time) and posts a macOS notification when done or failed. Do not retry it by hand.
+- upload_video answers within about 45 seconds: a short film is done by then; a long one answers "uploading" and carries on. Check it with upload_status. If an upload stops (the computer slept, the app closed), ask upload_video again with the same file and title: it carries on where it stopped and never makes a second copy unless you pass again: true.
+- A job in state "queued" (from queue_upload, replace_video, or from upload_video hitting YouTube's daily upload limit or quota) is NOT a failure: this computer's hourly drain finishes it on its own after not_before (shown in the settings time zone) and shows a notification when done or failed. Do not retry it by hand.
 - Use queue_upload to line up several films without uploading them immediately, and replace_video to queue a re-rendered file carrying the old video's title, description, tags, category and playlists (without deleting or changing the old video; deleting stays in YouTube Studio).
 - Use manifest (with sync: true to pull all pages from the channel, 1 quota unit a page, including views and likes) and mark_video to track which videos are ok, need rerecord, are queued, replaced or removed.
 - YouTube processes a video for a few minutes after the upload; its upload_status in list_videos says when it is "processed".
@@ -1260,14 +1330,21 @@ const GUIDE = `You manage the owner's YouTube channel. Nothing here needs the li
 - Quota: 100 uploads a day; an update, thumbnail or playlist change costs 50 of 10,000 a day (release_plan costs 50 per live video updated, 0 per queued job — state the cost first); reading (and each manifest sync page or playlist scan) costs 1.`;
 
 const str = { type: 'string' };
+/* The parts of the description and the other languages (44i-2b), shared by uploads and update_video. */
+const wordProps = {
+  chapters: { description: 'Chapters written into the description: lines like "0:00 Intro" (one string or a list), or [{ at: "1:30" or seconds, title }]. First at 0:00, three or more, each ten seconds or longer.', anyOf: [str, { type: 'array', items: { anyOf: [str, { type: 'object', properties: { at: { anyOf: [str, { type: 'number' }] }, title: str } }] } }] },
+  music: { ...str, description: 'The title of the piece of music, for a credits line in settings.json that holds {music}.' },
+  credits: { description: 'This upload\'s own credits line instead of the one in settings.json, or false for none.', anyOf: [str, { type: 'boolean' }] },
+  localizations: { type: 'object', description: 'Title and description in other languages: {"es": {"title": "...", "description": "..."}}; needs language. A language without a description gets the default one. On update_video, null for a language removes it.', additionalProperties: { anyOf: [{ type: 'object', properties: { title: str, description: str } }, { type: 'null' }] } },
+};
 const uploadProps = {
-  file: { ...str, description: 'Full path to the video file on this Mac.' },
+  file: { ...str, description: 'Full path to the video file on this computer.' },
   title: { ...str, description: 'At most 100 characters (may come from <file>.youtube.json).' },
   description: str,
   tags: { type: 'array', items: str },
   privacy: { type: 'string', enum: PRIVACY, description: 'Default private. Only another value when the owner asked for it.' },
   publish_at: { ...str, description: 'Schedule: an ISO 8601 time in the future; the video stays private until then.' },
-  category_id: { ...str, description: 'YouTube category id; default 10 (Music). 24 is Entertainment, 1 Film & Animation.' },
+  category_id: { ...str, description: 'YouTube category id; default from settings.json (categoryId, else 22 People & Blogs). 10 is Music, 24 Entertainment, 1 Film & Animation.' },
   made_for_kids: { type: 'boolean', description: 'Default false.' },
   language: { ...str, description: 'e.g. en' },
   playlist_id: { ...str, description: 'Add it to this playlist once it is up.' },
@@ -1275,18 +1352,20 @@ const uploadProps = {
   key: { ...str, description: 'Optional short film id (e.g. "hymn-to-the-dawn") recorded in the channel manifest.' },
   replaces: { ...str, description: 'Optional existing video id this upload replaces in the manifest.' },
   again: { type: 'boolean', description: 'Upload a second copy of a file already up with this title.' },
+  ...wordProps,
+  captions: { type: 'array', description: 'Caption files to add once it is up (400 quota units each): a path, or { file, language, name, draft }. language defaults to the upload\'s.', items: { anyOf: [str, { type: 'object', required: ['file'], properties: { file: str, language: str, name: str, draft: { type: 'boolean' } } }] } },
 };
 const TOOLS = [
   { name: 'channel', description: 'The signed-in channel: its name, link, subscribers, views and video count.', inputSchema: { type: 'object', properties: {} } },
   { name: 'list_videos', description: "The channel's latest uploads, newest first: id, link, title, privacy, schedule, processing state, views.", inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 50, description: 'How many (default 10).' } } } },
   {
     name: 'upload_video',
-    description: 'Upload a video file from this Mac (reads <file>.youtube.json sidecar for omitted fields; call wins). Private unless privacy says otherwise. Resumes an interrupted upload of the same file and title. If YouTube answers with the daily upload limit or quota, queues the job for automatic retry on the Mac instead of failing.',
+    description: 'Upload a video file from this computer (reads <file>.youtube.json sidecar for omitted fields; call wins). Private unless privacy says otherwise. Resumes an interrupted upload of the same file and title. If YouTube answers with the daily upload limit or quota, queues the job for automatic retry on the Mac instead of failing.',
     inputSchema: { type: 'object', required: ['file'], properties: uploadProps },
   },
   {
     name: 'queue_upload',
-    description: 'Save a video upload job in state "queued" without uploading yet (reads <file>.youtube.json sidecar for omitted fields; call wins); the Mac drains the queue on its own. Refuses if the same file and title is already queued or up.',
+    description: 'Save a video upload job in state "queued" without uploading yet (reads <file>.youtube.json sidecar for omitted fields; call wins); this computer drains the queue on its own. Refuses if the same file and title is already queued or up.',
     inputSchema: { type: 'object', required: ['file'], properties: uploadProps },
   },
   {
@@ -1301,30 +1380,36 @@ const TOOLS = [
       },
     },
   },
-  { name: 'upload_status', description: 'How the uploads are going (or one, by its job id): MB sent, queued jobs with not_before in Pacific time (not a failure; the Mac finishes them on its own — do not retry by hand), done, failed and why, the link once up.', inputSchema: { type: 'object', properties: { job: str } } },
+  { name: 'upload_status', description: 'How the uploads are going (or one, by its job id): MB sent, queued jobs with not_before in the settings time zone (not a failure; this computer finishes them on its own — do not retry by hand), done, failed and why, the link once up.', inputSchema: { type: 'object', properties: { job: str } } },
   {
     name: 'update_video',
-    description: "Change a video's title, description, tags, category, privacy or schedule. Only the fields you pass change.",
-    inputSchema: { type: 'object', required: ['video_id'], properties: { video_id: str, title: str, description: str, tags: { type: 'array', items: str }, category_id: str, language: str, privacy: { type: 'string', enum: PRIVACY }, publish_at: { ...str, description: 'ISO time to go public; empty string to unschedule.' }, made_for_kids: { type: 'boolean' } } },
+    description: "Change a video's title, description, chapters, credits, other languages, tags, category, privacy or schedule. Only the fields you pass change; new chapters replace the old list.",
+    inputSchema: { type: 'object', required: ['video_id'], properties: { video_id: str, title: str, description: str, tags: { type: 'array', items: str }, category_id: str, language: str, privacy: { type: 'string', enum: PRIVACY }, publish_at: { ...str, description: 'ISO time to go public; empty string to unschedule.' }, made_for_kids: { type: 'boolean' }, ...wordProps } },
   },
   {
+    name: 'add_captions',
+    description: `Add a caption track to a video already up, from an .srt or .vtt file on this computer (${CAPTION_UNITS} quota units).`,
+    inputSchema: { type: 'object', required: ['video_id', 'file', 'language'], properties: { video_id: str, file: str, language: { ...str, description: 'e.g. en, es, pt-BR' }, name: { ...str, description: 'The track\'s name as viewers see it (optional).' }, draft: { type: 'boolean', description: 'Keep it hidden from viewers until published in Studio.' } } },
+  },
+  { name: 'list_captions', description: "A video's caption tracks: id, language, name, draft (50 quota units).", inputSchema: { type: 'object', required: ['video_id'], properties: { video_id: str } } },
+  {
     name: 'release_plan',
-    description: 'Schedule a release across private live videos and queued upload jobs, one slot apart at a Pacific clock time. Only run this without dry_run when the owner asked for that release in this conversation. Live video updates cost 50 quota units each (queued jobs cost 0); YouTube only schedules a private video.',
+    description: 'Schedule a release across private live videos and queued upload jobs, one slot apart at a clock time in the settings time zone (the computer\'s own unless settings.json names one). Only run this without dry_run when the owner asked for that release in this conversation. Live video updates cost 50 quota units each (queued jobs cost 0); YouTube only schedules a private video.',
     inputSchema: {
       type: 'object',
       required: ['start'],
       properties: {
         keys: { type: 'array', items: str, description: 'Manifest keys of videos or queued jobs to schedule in order.' },
         video_ids: { type: 'array', items: str, description: 'YouTube video ids to schedule in order.' },
-        start: { ...str, description: 'First release date (YYYY-MM-DD, Pacific time).' },
+        start: { ...str, description: 'First release date (YYYY-MM-DD, in the settings time zone).' },
         every: { type: 'number', description: 'Hours between slots (default 24).' },
-        at: { ...str, description: 'Pacific clock time HH:MM (default "10:00").' },
+        at: { ...str, description: 'Clock time HH:MM in the settings time zone (default "10:00").' },
         privacy: { type: 'string', enum: PRIVACY, description: 'Target release privacy (default "public"; YouTube schedules private videos to become public).' },
         dry_run: { type: 'boolean', description: 'Return the computed plan and quota cost without changing anything.' },
       },
     },
   },
-  { name: 'set_thumbnail', description: "Set a video's thumbnail from a .jpg or .png on this Mac (needs the channel phone-verified).", inputSchema: { type: 'object', required: ['video_id', 'file'], properties: { video_id: str, file: str } } },
+  { name: 'set_thumbnail', description: "Set a video's thumbnail from a .jpg or .png on this computer (needs the channel phone-verified).", inputSchema: { type: 'object', required: ['video_id', 'file'], properties: { video_id: str, file: str } } },
   { name: 'list_playlists', description: "The channel's playlists: id, title, privacy, how many videos.", inputSchema: { type: 'object', properties: {} } },
   { name: 'create_playlist', description: 'Make a playlist (private unless privacy says otherwise).', inputSchema: { type: 'object', required: ['title'], properties: { title: str, description: str, privacy: { type: 'string', enum: PRIVACY } } } },
   { name: 'add_to_playlist', description: 'Add a video to a playlist.', inputSchema: { type: 'object', required: ['video_id', 'playlist_id'], properties: { video_id: str, playlist_id: str } } },
@@ -1373,6 +1458,11 @@ async function call(name, a = {}, onProgress = null) {
       return text(await updateVideo(a));
     }
     case 'release_plan': return text(await releasePlan(a));
+    case 'add_captions': {
+      const [c] = captionsFor({ captions: [{ file: a.file, language: a.language, name: a.name, draft: a.draft }] });
+      return text(await addCaptions(String(a.video_id), c));
+    }
+    case 'list_captions': return text(await listCaptions(String(a.video_id)));
     case 'set_thumbnail': return text(await setThumbnail(String(a.video_id), String(a.file)));
     case 'list_playlists': {
       const { j } = await api('GET', 'playlists', { query: { part: 'snippet,status,contentDetails', mine: true, maxResults: 50 } });
@@ -1428,7 +1518,15 @@ async function onRequest(m) {
 }
 
 const command = process.argv[2];
-if (command === 'login' || command === 'logout' || command === 'whoami' || command === 'drain' || command === 'install-agent' || command === 'uninstall-agent' || command === 'manifest') {
+if (command === 'setup') {
+  const r = await runSetup({
+    dir: DIR, secretFile: SECRET_FILE, tokenFile: TOKEN_FILE, script: realpathSync(fileURLToPath(import.meta.url)), platform: PLATFORM, settings: SETTINGS,
+    client, loadToken, accessToken, channel,
+    agentFiles: () => { try { return agentPlan().files.map((f) => f.path); } catch { return null; } },
+  });
+  process.stdout.write(`${formatSetup(r)}\n`);
+  process.exit(r.ok ? 0 : 1);
+} else if (command === 'login' || command === 'logout' || command === 'whoami' || command === 'drain' || command === 'install-agent' || command === 'uninstall-agent' || command === 'manifest') {
   try {
     if (command === 'login') await login();
     else if (command === 'logout') await logout();

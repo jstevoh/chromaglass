@@ -1,9 +1,9 @@
 # Watching in words: the vocabulary
 
-The watch tool (`npm run watch`, `.claude/skills/watch/`) reads a film as numbers: motion,
+reelreader (the watch tool, `scripts/watch.mjs`; its skill is [SKILL.md](SKILL.md)) reads a film as numbers: motion,
 colour, form, flow. Those numbers are right and hard to read. A person judging a light show
 says "slow and heavy", "two warm colours on black", "the edges went soft". This page is the
-vocabulary the tool uses to say that (PLAN 47x): the words, where each comes from, which
+vocabulary the tool uses to say that: the words, where each comes from, which
 measure decides it, and how sure the tool can be.
 
 Three rules hold for every word:
@@ -65,7 +65,7 @@ Three rules hold for every word:
 The measures are the ones the tool already reads (`scripts/watch.mjs` shape(),
 `scripts/watchdesign.mjs`, `scripts/watchphysics.mjs`; the skill lists each). A band below
 is where a word starts; the code's table holds the exact edges, each with a comment on what
-set it (a synthetic clip, a real show in `REAL_SHOWS`, a film of the app).
+set it (a synthetic clip, a real show in `REAL_SHOWS`, a film of a liquid light show rendered in software).
 
 ### Motion: Laban's Effort
 
@@ -131,6 +131,21 @@ From the physics and techniques reads: a **bloom** (spreading outwards: divergen
 **turned dish** (the whole picture rotating: curl of the whole), a **pour** (a new colour
 arriving in one place), **marbling** (sheared lines), **cells** breaking or joining.
 
+### General footage
+
+Footage that is not a liquid light show (`scripts/watchmode.mjs`: a film with
+cuts, a camera that pans, daylight) is read in general words, because the wet show's name
+what a liquid does and are wrong said of a cartoon or a street. The same measure and edge
+then says: **low-key** for dark-ground and **high-key** for washed (film and photography
+lighting: a frame mostly in shadow, or lit bright all over); **luminous** as Arnheim's
+luminosity (colour that seems to glow because it is brighter than all around it); **linear**
+for threads and marbling, and **clustered** for beads (Ching's linear and clustered forms);
+a **colour field** for a wash (Greenberg's broad, even areas); **fine** form scale as it is.
+Lobes, cells and the show's own moves (bloom, turned dish, pour) have no general word that
+says the same thing, so they are not said; nor, in the before/after read, are the fluid's
+flow speed, turnover, form lifetime, whole-field share and spreading. Sources for the
+lighting words: Wikipedia, "Low-key lighting" and "High-key lighting".
+
 ## What changed: the before/after read
 
 Two films of the same look, before and after a change, are told apart in the same words.
@@ -188,12 +203,15 @@ same look; the paragraph says so.
 
 ## From a gap to a setting
 
-`scripts/watchsettings.mjs` (`MEASURE_SETTINGS`, `gapSettings`) connects every ranked comparison gap (`compareDesign`, `comparePhysics`, and `reportCard`) to keys of `DEFAULT_SETTINGS` (`src/types.ts`). Every entry states which way to turn the control to raise the measure (and `gapSettings` flips it when a gap asks to lower the measure).
+A comparison (`--vs`) ranks its gaps in just-noticeable steps. When the config names a
+settings map (`settingsMap` in `reelreader.config.json`, a module beside the scripts; see
+`scripts/watchconfig.mjs`), every gap of 1.0 step or more is turned into one to three of
+your own app's controls under `## Settings to try`, each with the way to turn it, and the
+setting's current value when `--settings file.json` is given. With no map there is no such
+section: the gaps are still ranked, in the measures' own terms.
 
-Following the real-physics rule, physical controls always come first and are labeled apart from post grades:
-
-- **Colour & intensity**: adjust `dyeBudget`, `transmission` (Beer–Lambert optical depth), `hueJourney`, `polarity`, `dimmer`, `lampWarmth`, `lampHotspot`, `lampGround`, and `boundaryContrast` before post grades (`saturationBoost`, `exposure`, `ledContrast`, `ledHue`).
-- **Edges, scale & flow**: adjust `diffusionRate`, `polarity`, `focus`, `turbulenceScale`, `turbulenceDetail`, `oilTension`, `beads`, `oilBodies`, `filmHold`, `blobSurfaceTension`, `advection`, `globalSpeed`, `damping`, `gapThickness`, `rotationSpeed`, `plateTiltX` before `postBlurRadius`.
-- **Arc, surprise, restraint & sync**: adjust `surge`, `pacing`, `automateRate`, `damping`, `audioImpact`, `soundImpact`, `sensitivity`, `beatPrediction`, `beatLead`, and `kickBloom`.
-
-Under `--vs`, any gap of 1.0 just-noticeable step or larger appears under `## Settings to try` with 1 to 3 settings; if `--settings file.json` (or a take's own `settings` metadata) is supplied, each suggestion includes the setting's current value.
+A map lists, for each measure, the controls that move it and which way. Put the controls
+that change what is filmed (the light, the material, the motion) ahead of the ones that
+grade the picture afterwards, and label the two apart: a gap closed by a grade is a gap
+hidden, not closed. What the module must export (`gapSettings`) is at the top of
+`scripts/watchconfig.mjs`.

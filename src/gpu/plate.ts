@@ -36,7 +36,7 @@ import { FOCUS_SCENE_FORMAT, FOCUS_SHARE_FORMAT, PlateFocus } from './focus';
 import { drawTank, prepareTankDraw } from './tankDraw';
 import type { TankPlateField } from './tankPlate';
 import type { FaradayField } from './faraday';
-import { PACK_SURFACE_KERNEL } from './wgsl/plateSurface';
+import { PlateCaustics, causticDz } from './caustic';
 
 /** What a layer needs on the way from the solver to the screen. */
 interface LayerTargets {
@@ -81,11 +81,13 @@ export function pictureSize(image: CanvasImageSource): [number, number] {
   liquids' species (PLAN 18d-9). layoutFromWgsl takes every f32 texture a
   fragment shader names to be sampled, and the species is rgba32float, which
   is not filterable without a feature the plate does not ask for: the derive
-  pass reads it with textureLoad, and the layout has to say so.
+  pass reads it with textureLoad, and the layout has to say so. Binding 6,
+  the surface's height (r32float, PLAN 31s-1, read for the traced path's
+  oil, 31s-2), the same.
 */
 function deriveLayout(device: GPUDevice): GPUBindGroupLayout {
   const entries = layoutEntries(DERIVE_WGSL, GPUShaderStage.FRAGMENT)
-    .map((e) => (e.binding === 4 ? { ...e, texture: { sampleType: 'unfilterable-float' as GPUTextureSampleType } } : e));
+    .map((e) => (e.binding === 4 || e.binding === 6 ? { ...e, texture: { sampleType: 'unfilterable-float' as GPUTextureSampleType } } : e));
   return device.createBindGroupLayout({ label: 'derive', entries });
 }
 
@@ -226,9 +228,9 @@ export class WebGPUPlate {
   private readonly blankBeads: GPUBuffer;
   /** The same, for the species field (rgba32float). */
   private readonly blankSpecies: GPUTexture;
-  private surfaceBuf: GPUBuffer | null = null;
-  private surfaceN = 0;
-  private surfaceReady = false;
+  /** The lamp's light traced through the liquid to the wall (PLAN 31s-2), or null when this frame traced none. */
+  private readonly caustics: PlateCaustics;
+  private causticLight: GPUBuffer | null = null;
 
   /**
    * Everything a frame of the plate draws with, built before the show opens
@@ -262,7 +264,7 @@ export class WebGPUPlate {
         ]),
       cache.computePrep('packVel', PACK_KERNELS.packVel),
       cache.computePrep('packDyeBodies', PACK_KERNELS.packDyeBodies, !open.oilBodies),
-      cache.computePrep('packSurface', PACK_SURFACE_KERNEL, true),
+      ...PlateCaustics.prepare(cache, device),
       cache.renderPrep('derive', deriveRecipe(device)),
       ...BeadMask.prepare(cache),
       // The lens pass (glitter, the side lamp; PLAN 47e): behind the show, as no look opens with it.
@@ -294,6 +296,7 @@ export class WebGPUPlate {
     this.beads = new BeadMask(device, this.pipelines, this.disposer);
     this.glint = new PlateGlint(device, this.pipelines, this.disposer);
     this.focus = new PlateFocus(device, this.pipelines, this.disposer);
+    this.caustics = new PlateCaustics(device, this.pipelines, this.disposer);
     this.sampler = device.createSampler({
       magFilter: 'linear', minFilter: 'linear',
       addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge',
@@ -550,40 +553,6 @@ export class WebGPUPlate {
       }
       packPass.end();
     }
-    /*
-      The surface height's pack (PLAN 31s-1). It sat inside the pack pass
-      every frame; main's 19ak-24a skips that pass when no layer has new
-      solver writes, so a frame that repeats the last step would have left
-      surfaceReady false and the height unbound. The height only changes
-      when the solver steps, so it is packed when layer 0 is (packLayer[0]),
-      when it was never packed, or when its grid changed, in a pass of its
-      own; otherwise last frame's pack stands.
-    */
-    const shTex = fields[0].surfaceHeight ?? null;
-    if (!shTex) this.surfaceReady = false;
-    else if (packLayer[0] || !this.surfaceReady || this.surfaceN !== shTex.width) {
-      const shN = shTex.width;
-      if (!this.surfaceBuf || this.surfaceN !== shN) {
-        if (this.surfaceBuf) this.disposer.release(this.surfaceBuf);
-        this.surfaceBuf = this.disposer.track(this.device.createBuffer({
-          label: 'surface height store', size: Math.max(16, shN * shN * 4),
-          usage: GPUBufferUsage.STORAGE,
-        }));
-        this.surfaceN = shN;
-      }
-      this.surfaceReady = false;
-      const pipeSurf = this.pipelines.computePipeline('packSurface', PACK_SURFACE_KERNEL);
-      if (pipeSurf) {
-        const surfPass = encoder.beginComputePass({ label: 'pack surface' });
-        const gSurf = Math.ceil(shN / 8);
-        surfPass.setPipeline(pipeSurf);
-        surfPass.setBindGroup(0, groupOf(this.device, pipeSurf, [shTex, this.surfaceBuf]));
-        surfPass.dispatchWorkgroups(gSurf, gSurf);
-        surfPass.end();
-        this.surfaceReady = true;
-      }
-    }
-
     // ── Derive ──────────────────────────────────────────────────────
     const derive = this.pipelines.renderPipeline('derive', deriveRecipe(this.device));
     if (derive) {
@@ -594,11 +563,25 @@ export class WebGPUPlate {
         });
         pass.setPipeline(derive);
         const viewTex = fields[i]?.view ?? this.blankU;
-        pass.setBindGroup(0, groupOf(this.device, derive, [this.uniformBuffer, this.sampler, this.layers[i].dye, viewTex, fields[i]?.species ?? this.blankSpecies, fields[i]?.air ?? this.blank]));
+        // The surface's height (31s-1) gives the traced path its oil (caustic.ts SURFACE_PATH_WGSL); 1x1 with none.
+        pass.setBindGroup(0, groupOf(this.device, derive, [this.uniformBuffer, this.sampler, this.layers[i].dye, viewTex, fields[i]?.species ?? this.blankSpecies, fields[i]?.air ?? this.blank, fields[i]?.surfaceHeight ?? this.blankSpecies]));
         pass.draw(6);
         pass.end();
       }
     }
+
+    /*
+      The light traced from the derived path to the wall (PLAN 31s-2,
+      caustic.ts), when Focus is off the liquid and no camera draws. It
+      replaced 31s-1's whole-grid pack of the surface height into binding
+      27, which nothing drew (31s-1a): a pack a frame for no picture.
+    */
+    this.causticLight = derive ? this.caustics.trace(encoder, this.layers.slice(0, fields.length).map((l) => l.derived), causticDz({
+      projectorFocus: this.pack.get('projectorFocus')[0],
+      boundaryContrast: this.pack.get('boundaryContrast')[0],
+      camera: this.pack.get('photo')[0] > 0.5 || this.pack.get('macroOn')[0] > 0.001,
+      derived: this.pack.get('derivedOn')[0] > 0.5,
+    })) : null;
 
     // ── Display ─────────────────────────────────────────────────────
 
@@ -767,8 +750,8 @@ export class WebGPUPlate {
       fields[0].faraday?.eta ?? this.blankStore,
       // The water's glow (48c), the lead plate's alone; a 4-float stand-in while it is off.
       fields[0].glow?.light ?? this.blankStore,
-      // Free-surface and oil-layer height h (PLAN 31s-1), read-only for 31s-2 caustics.
-      this.surfaceReady && this.surfaceBuf ? this.surfaceBuf : this.blankStore,
+      // The lamp's light traced to the wall (PLAN 31s-2), a 4-float stand-in while none is.
+      this.causticLight ?? this.blankStore,
     ]));
     pass.draw(6);
     pass.end();

@@ -1,6 +1,6 @@
 ---
 name: watch
-description: Watch a video (a YouTube or other link, a phone recording of a real show, or a take from the app's Record button) as contact sheets, a slit-scan timeline, motion/colour/sound numbers, a design read (palette, colourfulness, edges, form scale, flow lines, symmetry, composition), a physics read (flow speed, turning, spreading, carried vs fading in place, lifetime, detail spectrum) and the techniques used. Use when the user sends any video or animation link or file as a reference, asks what we can learn from one, asks how the app's output moves or looks, or wants our visuals judged against a reference.
+description: Watch a video (a YouTube or other link, a phone recording of a real show, or a take from the app's Record button) as contact sheets, a slit-scan timeline, motion/colour/sound numbers, a design read (palette, colourfulness, edges, form scale, flow lines, symmetry, composition), a physics read (flow speed, turning, spreading, carried vs fading in place, lifetime, detail spectrum) and the techniques used. Use when the user sends any video or animation link or file as a reference, asks what we can learn from one, asks how the app's output moves or looks, or wants our visuals judged against a reference. ChromaGlass's layer on reelreader's public judging skill (reelreader/skill/SKILL.md), which it reads first.
 ---
 
 # Watch: a video as pictures and numbers
@@ -13,6 +13,25 @@ it was made. The owner asked (2026-11-12) to be able to point Claude at any
 video or animation and get meaningful feedback, with a physics read and the
 techniques used, and to judge our own visuals the same way.
 
+## Read the public skill first
+
+The tool ships to anyone as **reelreader** (PLAN 47p), with a judging skill of its own:
+[`reelreader/skill/SKILL.md`](../../../reelreader/skill/SKILL.md). Read it before this page,
+every time. It holds what any judge needs and this page no longer repeats: the **honesty
+rules** (evidence on every claim, Footage and Read as first, one take is one take, the
+numbers miss faults, the card is not a score, the image budget, the content read's limits,
+liquid or general is a measurement, rights), the **reading order**, the **content read**
+(shots, subjects, setting), the **lenses** (anyone, editor, colourist, VJ or liquid artist:
+for our plate, always the VJ lens with the liquid read), comparing two films, the helper
+agent and the words guide (`reelreader/skill/watch-words.md`), the **test set** with known
+answers (`reelreader/skill/testset/`, held by `npm run reelset`) and how to build an **eval
+set** from ratings (`reelreader/skill/evals.md`).
+
+This page is ChromaGlass's layer on top: the owner's links and the Mac route, our takes and
+the app's own output, the solver's terms and PLAN items in an account, the real shows and the
+reference library, our faults, the checks that film the app, and the settings map. Nothing
+here goes into the public folder (`npm run reelset` fails if a ChromaGlass word reaches it).
+
 ```sh
 npm run watch -- <file or URL> --out <scratchpad>/<name>
 npm run watch -- clip.webm --out … --from 30 --to 90 --frames 36 --at 41.5,62
@@ -24,6 +43,7 @@ npm run watch -- --before A --after B --out <scratchpad>/<name>       # what cha
 npm run watch -- film.mkv --out … --keep <name> --note "why"   # into the reference library
 npm run watch -- our-take.webm --out … --vs <name>   # against a kept reference, no fetch
 npm run watch -- --refs         # the library, with each reference's numbers
+npm run watch -- our-take.webm --out … --liquid   # the liquid read whatever the footage shows (a drained, frozen or cut take of the app)
 npm run watch -- --selftest     # synthetic clips, frames and flows with known answers
 npm run watchwords              # vocabulary and before/after diff contract check
 npm run watchcard               # footage robustness, report card & gap settings check
@@ -47,7 +67,14 @@ npm run watchcard               # footage robustness, report card & gap settings
    sheet and run again with `--crop x,y,w,h` (fractions), or the design read
    measures the room. A circular projection inside a square crop reads some
    symmetry from the mask; say so.
-3. **Read** the timeline, the sheets, then the summary's **Footage** section (cropped
+3. **Check the Read as line first.** The physics read, Techniques, the Report card,
+   the wet show's words and Settings to try come only with a liquid read (PLAN 47p-3,
+   `scripts/watchmode.mjs`): one take, its own motion, coloured light on a dark ground.
+   A real show or an app take reads liquid by itself; an app take that is drained,
+   frozen or cut reads general, so pass `--liquid` for any take of the app and any
+   liquid reference that reads general (and say so). Anything else reads general, with a
+   Motion section in place of Physics.
+4. **Read** the timeline, the sheets, then the summary's **Footage** section (cropped
    letterbox/pillarbox bars, masked still sharp overlays, excluded title-card spans,
    global camera pan share, and compression softness flags — or `clean`), **Overall** section (the whole
    film's arc and feel in one paragraph: whether it builds, settles, swells or holds, its
@@ -56,7 +83,7 @@ npm run watchcard               # footage robustness, report card & gap settings
    section (the seven canons calibrated against real shows — Unity, Complexity, Intensity, Arc,
    Surprise, Music fit, Restraint — plus verdict and Spearman ratings agreement when `ratings.json`
    is present), then its **In words** section
-   (every word with the number that chose it, its source in `docs/watch-words.md`,
+   (every word with the number that chose it, its source in `reelreader/skill/watch-words.md`,
    and `(may vary from take to take)` on unsteady measures), followed by the Design,
    Physics and Techniques sections. Take `--at` stills of what matters.
    With `--vs`, a **Reference in words** section, **Report card (side by side)** table,
@@ -67,15 +94,15 @@ npm run watchcard               # footage robustness, report card & gap settings
    edge** note for words that differ while their measure moved under a step, a **How
    it felt** section with both Overall paragraphs and how the arc changed, plus both
    "In words" reads), `diff-timeline.png` and `pairs.png`.
-4. **Scan the pages.** Open the links the Techniques section lists
+5. **Scan the pages.** Open the links the Techniques section lists
    (WebFetch), the maker's site and gear lists, for what they say they used.
    Where nothing says, the "Guessed from the footage" lines are a start: check
    each against the stills, keep what holds.
-5. **Compare with ours.** Film or find the closest look of ours (the owner's
+6. **Compare with ours.** Film or find the closest look of ours (the owner's
    Mac has takes under `~/chromaglass-films/presets-*/clips/`, `npm run film`
    makes more, the Record button makes one) and watch it with `--vs` pointing
    at the reference's out folder. The gaps come ranked, biggest first.
-6. **Write the account**: what happens; the design critique (palette and
+7. **Write the account**: what happens; the design critique (palette and
    harmony, light, edges, scale and form, composition); the physics (what
    phenomenon makes each thing seen: immiscible drops and surface tension,
    diffusion, shear, buoyancy, refraction at a meniscus); the techniques;
@@ -92,6 +119,8 @@ It prints a summary (also `summary.md`) and writes:
 | `still-*.png` | Full-resolution frames at the `--at` times, for the close look once the sheets say where. |
 | `stats.tsv` | Per sample: brightness, near-black fraction, blown fraction, saturation, motion, loudness. |
 | `palette.png` | The clip's six main colours, each as wide as its share. |
+| `report.html` | All of the above on one self-contained page for a person (best moment, timeline, read, words, numbers, sheets). **Attach it when showing the owner a watch**: it opens on a phone. `--no-report` skips it. |
+| `best.mp4`, `best.png` | The strongest 12 s and frame (most motion, colour, lit area and loudness by rank, no title card, one shot when it can be; `scripts/watchreport.mjs`). The moment to show, or to drop into a judging page. |
 | `design.json` | The design, physics, and `footage` reads (autocrop, overlays, title spans, camera share, blockiness, cutoff, `reliable` flags), plus `shape`, `overall`, `card` for `--vs`. |
 | `diff.md`, `diff-timeline.png`, `pairs.png` | Written by `--before A --after B`: `# What changed` (ranked steps, what held, near an edge, how it felt, both "In words" reads), stacked timelines, and matched-time frame pairs beside `before/` and `after/`. |
 
@@ -215,19 +244,60 @@ owner's login.
 
 ## Doing it properly
 
-1. **Timeline, then sheets, then stills.** The timeline says where the clip
-   changes; the sheets show what it looks like there; `--at` gets the detail.
-   Do not describe a clip from one sheet of a long video.
-2. **Say what you measured.** "Near black 48% of the frame, motion median 0.9"
-   beats "mostly dark and calm". For a reference, write down the numbers you
-   are aiming at; for the app, the same numbers on its recording are the
-   before and after.
-3. **Compare like with like.** Reference against app: same `--frames`, and
-   `--from/--to` windows of the same length around the part that matters.
-   Put the two timelines one above the other when showing the owner.
-4. **Big clips.** The `video-watcher` agent reads the sheets in its own context
-   and returns prose and numbers; use it when there are several videos, or a
-   long one, so the main thread does not fill with images.
+The general rules (timeline, then sheets, then stills; say what you measured; compare like
+with like; the helper for big clips) are the public skill's honesty rules and its comparing
+section. What this project adds:
+
+1. **Like with like, for us.** Reference against app: same `--frames`, and `--from/--to`
+   windows of the same length around the part that matters. Put the two timelines one above
+   the other when showing the owner.
+2. **For a reference, write down the numbers you are aiming at**; for the app, the same
+   numbers on its recording are the before and after.
+3. **Big clips.** This repo's `video-watcher` agent (`.claude/agents/video-watcher.md`, the
+   public helper plus this layer) reads the sheets in its own context and returns prose and
+   numbers; use it when there are several videos, or a long one.
+
+## Our faults, and what the numbers say about them today
+
+Our plate's own failures, as an audience sees them. The public skill's rule 4 says check for
+them by eye; here is what each looks like on the plate and what the read says now. Named
+detectors for all of them are the fault-read follow-up (handoff section 7a; PLAN 47p-5c to
+47p-5e are the misreads the test set found).
+
+- **Frozen** (the plate stops; the recorder repeats the last frame): the timeline's motion
+  strip goes flat. `freezes()` in `scripts/watch.mjs` finds it (`npm run moving` and `gig`
+  use it), but the summary does not print it, and the Footage read files a long freeze as a
+  "title span" and leaves it out, so Overall says "one steady pace" (the test set's
+  `frozen-take.mp4`, 47p-5c).
+- **Whole-plate turn** (rotation from sound or a turned dish turning the whole picture): the
+  same shapes at a new angle frame to frame. The flow read takes it for the liquid's own flow
+  ("fast, churning", 17%/s, over every real show) and reads its period as 22 s when it is 8 s
+  (`turned-take.mp4`, 47p-5d). The owner's rule: no whole-frame motion from sound.
+- **Drained** (the dye leaves the dish; an empty or lamp-lit plate): near black or a flat
+  field climbing, colourfulness falling; a drained app take fails the light cue and reads
+  general, so pass `--liquid` (47p-3b). The test set has none yet: the Mac's fault films are
+  where a real one comes from.
+- **Flower halo** (a bright ring round every form, the 33 videos made private): no measure
+  sees it; only the eye on a still. The flower gate (`npm run flower`, 31s-14) holds the
+  shader, not the film.
+- **Seam** (a hard line across the plate): edges and the timeline show a fixed line; no named
+  read.
+
+Our takes always run with `--liquid` (they are liquid by construction, 47p-3b), and the
+Footage read can misfire on a slow dark take (four "still overlays" and three "title spans"
+on the test set's good take, 47p-5e): read the sheets before trusting a mask.
+
+## From a gap to a setting: our settings map
+
+Moved here from the words guide when it went public (47p-5b): the public guide says only how a map works. `scripts/watchsettings.mjs` (`MEASURE_SETTINGS`, `gapSettings`) connects every ranked comparison gap (`compareDesign`, `comparePhysics`, and `reportCard`) to keys of `DEFAULT_SETTINGS` (`src/types.ts`). Every entry states which way to turn the control to raise the measure (and `gapSettings` flips it when a gap asks to lower the measure).
+
+Following the real-physics rule, physical controls always come first and are labeled apart from post grades:
+
+- **Colour & intensity**: adjust `dyeBudget`, `transmission` (Beer–Lambert optical depth), `hueJourney`, `polarity`, `dimmer`, `lampWarmth`, `lampHotspot`, `lampGround`, and `boundaryContrast` before post grades (`saturationBoost`, `exposure`, `ledContrast`, `ledHue`).
+- **Edges, scale & flow**: adjust `diffusionRate`, `polarity`, `focus`, `turbulenceScale`, `turbulenceDetail`, `oilTension`, `beads`, `oilBodies`, `filmHold`, `blobSurfaceTension`, `advection`, `globalSpeed`, `damping`, `gapThickness`, `rotationSpeed`, `plateTiltX` before `postBlurRadius`.
+- **Arc, surprise, restraint & sync**: adjust `surge`, `pacing`, `automateRate`, `damping`, `audioImpact`, `soundImpact`, `sensitivity`, `beatPrediction`, `beatLead`, and `kickBloom`.
+
+Under `--vs`, any gap of 1.0 just-noticeable step or larger appears under `## Settings to try` with 1 to 3 settings; if `--settings file.json` (or a take's own `settings` metadata) is supplied, each suggestion includes the setting's current value.
 
 ## In the QA checks
 

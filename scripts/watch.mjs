@@ -4,7 +4,7 @@
  *
  *   npm run watch -- <file or URL> [--out DIR] [--frames 24] [--from S] [--to S]
  *                                  [--at 3.5,12] [--rate 10] [--per-sheet 12] [--vs REF_OUT]
- *                                  [--crop x,y,w,h] [--keep NAME [--note TEXT]]
+ *                                  [--crop x,y,w,h] [--keep NAME [--note TEXT]] [--liquid | --general] [--no-report]
  *   npm run watch -- --before A --after B [--out DIR]  |  --refs  |  --selftest
  *
  * Asked for: "a skill or agent that is able to better watch video … it will make
@@ -31,6 +31,8 @@
  *                  forty rows and names the dominant hues.
  *   still-*.png    full-resolution frames at the times given with --at, for the
  *                  close look after the sheets say where to look.
+ *   report.html    one page a person reads, with best.mp4 and best.png, the
+ *   best.mp4/png   strongest 10-15 s and frame (`watchreport.mjs`, 47p-4).
  *   design.json    the design read (`watchdesign.mjs`): palette, colourfulness,
  *   palette.png    hue harmony, contrast, edge width, form scale, flow lines,
  *                  forms, symmetry and composition, in the summary's "Design"
@@ -81,10 +83,12 @@ import { describe } from './watchwords.mjs';
 import { detectAutocrop, analyseFootage, footageLines, footageOut } from './watchfootage.mjs';
 import { reportCard, loadRatings, formatSideBySideCards } from './watchcard.mjs';
 import { loadConfig, useConfig, settingsMapFor, macFetch, fetchElsewhere } from './watchconfig.mjs';
+import { readMode, cueNumbers, generalMotionLines } from './watchmode.mjs';
+import { bestMoment, exportBest, writeReport } from './watchreport.mjs';
 
 // ─── arguments ───────────────────────────────────────────────────────────────
 
-const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', before: '', after: '', selftest: false, quiet: false, crop: null, noAutocrop: false, vs: '', keep: '', note: '', refs: false, settings: null, config: '' };
+const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', before: '', after: '', selftest: false, quiet: false, crop: null, noAutocrop: false, vs: '', keep: '', note: '', refs: false, settings: null, config: '', liquid: null, report: true };
 const opt = { ...DEFAULTS };
 
 /** A failure the caller can report: a harness catches it, the command line prints it and exits with `code`. */
@@ -116,9 +120,16 @@ function parseArgs(argv) {
     else if (a === '--crop') { const [x, y, w, h] = v().split(',').map(Number); if ([x, y, w, h].every(Number.isFinite) && w > 0 && h > 0) opt.crop = { x, y, w, h }; else fail('--crop wants x,y,w,h as fractions, e.g. 0.5,0,0.25,0.35', 2); }
     else if (a === '--no-autocrop') opt.noAutocrop = true;
     else if (a === '--settings') opt.settings = v();
+    // The liquid read (physics, report card, techniques, the wet show's words,
+    // Settings to try) or the general one, whatever the footage looks like
+    // (scripts/watchmode.mjs, PLAN 47p-3); by default the footage decides.
+    else if (a === '--liquid') opt.liquid = true;
+    else if (a === '--general') opt.liquid = false;
     // Where the reference library, the fetch folder and the settings map are
     // (scripts/watchconfig.mjs, PLAN 47p-1); by default reelreader.config.json.
     else if (a === '--config') { opt.config = v(); try { useConfig(opt.config); } catch (e) { fail(e.message, 2); } }
+    // report.html, best.mp4 and best.png (scripts/watchreport.mjs, 47p-4).
+    else if (a === '--no-report') opt.report = false;
     else if (a === '--selftest') opt.selftest = true;
     else if (a === '--help' || a === '-h') { printHelp(); process.exit(0); }
     else if (!opt.input) opt.input = a;
@@ -503,7 +514,7 @@ async function watch() {
   const out = path.resolve(opt.out || path.join(os.tmpdir(), loadConfig().scratch,
     (/^https?:/.test(opt.input) ? opt.input.replace(/^https?:\/\//, '') : path.basename(opt.input)).replace(/[^\w.-]+/g, '_').slice(0, 60)));
   fs.mkdirSync(out, { recursive: true });
-  for (const f of fs.readdirSync(out)) if (/^(sheet-\d+|timeline|palette|still-.*)\.png$|^(stats\.tsv|summary\.md|design\.json)$/.test(f)) fs.rmSync(path.join(out, f));
+  for (const f of fs.readdirSync(out)) if (/^(sheet-\d+|timeline|palette|still-.*|best)\.png$|^(stats\.tsv|summary\.md|design\.json|report\.html|best\.mp4)$/.test(f)) fs.rmSync(path.join(out, f));
 
   let info = null;
   if (/^https?:\/\//.test(opt.input)) ({ file: opt.file, info } = download(opt.input, out));
@@ -823,7 +834,15 @@ async function watch() {
     ps.spectrum = ps.spectrum ? { ...ps.spectrum, reliable: false } : { med: null, p10: null, p90: null, reliable: false };
   }
   ds.physics = ps;
-  const designOut = [...designLines(ds), '', ...physicsLines(ps), '', ...techniqueLines(info, ds, ps, activeCuts.length / Math.max(1 / 60, activeSpan / 60))];
+  // Liquid or general (scripts/watchmode.mjs, PLAN 47p-3): the physics read's
+  // words, the techniques, the report card, the wet show's words and Settings
+  // to try are a liquid light show's, so only liquid footage gets them.
+  const cfgMode = loadConfig().mode;
+  const [forced, how] = opt.liquid === true || opt.liquid === false ? [opt.liquid, opt.liquid ? '--liquid' : '--general']
+    : cfgMode !== 'auto' ? [cfgMode === 'liquid', `the config's mode, ${cfgMode}`] : [null, null];
+  const mode = readMode({ forced, how, info, m: cueNumbers({ rows: useRows, cuts: activeCuts, span: activeSpan, shape: sh, design: ds, physics: ps }) });
+  const liquid = mode.liquid;
+  const designOut = [...designLines(ds, { liquid }), '', ...(liquid ? [...physicsLines(ps), '', ...techniqueLines(info, ds, ps, activeCuts.length / Math.max(1 / 60, activeSpan / 60))] : generalMotionLines(ps))];
   let refWords = null, refTitle = null, refDoc = null;
   let takeSettings = null;
   if (opt.settings) {
@@ -842,13 +861,14 @@ async function watch() {
     try { ref = JSON.parse(fs.readFileSync(vf, 'utf8')); } catch { fail(`--vs: no design.json at ${opt.vs}, and no reference of that name (npm run watch -- --refs lists them; watch the reference first, with this version of the tool)`, 2); }
     refDoc = ref;
     refTitle = ref.title ?? vf;
-    refWords = ref.words?.lines?.length ? ref.words : describe({ design: ref });
+    refWords = ref.words?.lines?.length && (ref.mode?.liquid ?? true) === liquid ? ref.words : describe({ design: ref }, { liquid });
     designOut.push('', ...compareDesign(ref, ds, `the reference (${refTitle})`, 'this'));
-    if (ref.physics) designOut.push('', ...comparePhysics(ref.physics, ps, 'the reference', 'this'));
+    if (liquid && ref.physics) designOut.push('', ...comparePhysics(ref.physics, ps, 'the reference', 'this'));
     const allGaps = [...designGaps(ref, ds).rows, ...(ref.physics ? physicsGaps(ref.physics, ps).rows : [])];
     // "Settings to try" only for an app the config names a settings map for
     // (PLAN 47p-1): a gap in edge width is a dial only in an app that has one.
-    const gapSettings = await settingsMapFor(loadConfig()).catch(e => fail(e.message, 2));
+    // And only for liquid footage: the map's dials are a liquid show's.
+    const gapSettings = liquid ? await settingsMapFor(loadConfig()).catch(e => fail(e.message, 2)) : null;
     if (gapSettings) designOut.push('', ...gapSettings(allGaps, takeSettings));
   }
 
@@ -863,24 +883,25 @@ async function watch() {
 
   const ftOut = footageOut(footage);
   const readForText = { out, rows: useRows, cuts: activeCuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, sheets, tiles, picks, timeline, span: activeSpan, pr, w, h, rate };
-  const words = describe(readForText);
+  const words = describe(readForText, { liquid });
   const ov = overall({ ...readForText, words });   // the whole film's arc and feel, before the words one measure at a time (47x-8)
   const { ratings, libDirs } = loadRatings();
-  const card = reportCard({ ...readForText, overall: ov }, { ratings, libDirs });
-  if (refDoc) {
+  const card = liquid ? reportCard({ ...readForText, overall: ov }, { ratings, libDirs }) : null;
+  if (card && refDoc) {
     const refCard = refDoc.card?.canons?.length ? refDoc.card : reportCard(refDoc);
     designOut.push('', ...formatSideBySideCards(card, refCard, refTitle));
   }
-  const cardOut = { canons: card.canons, verdict: card.verdict, agreement: card.agreement, lines: card.lines };
-  const result = { out, rows, cuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, words, overall: ov, card: cardOut, sheets, tiles, picks, timeline, span, pr, w, h, rate };
-  fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds, shape: sh, overall: ov, card: cardOut, sync, footage: ftOut, words }, null, 1) + '\n');
+  const cardOut = card ? { canons: card.canons, verdict: card.verdict, agreement: card.agreement, lines: card.lines } : null;
+  // The strongest 10-15 s and frame, saved beside the report (47p-4).
+  const moment = opt.report ? bestMoment(rows, { rate }) : null;
+  const bestFiles = moment ? exportBest({ ff: ff(), file: opt.file, out, best: moment, crop: c, hasAudio: !!pr.audio }) : {};
+  const result = { out, rows, cuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, mode, words, overall: ov, card: cardOut, best: moment, bestFiles, sheets, tiles, picks, timeline, span, pr, w, h, rate };
+  const bestOut = moment && { from: moment.from, to: moment.to, at: moment.at, cuts: moment.cuts, why: moment.why };
+  fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds, shape: sh, overall: ov, card: cardOut, sync, footage: ftOut, mode, words, best: bestOut }, null, 1) + '\n');
   const palettePng = path.join(out, 'palette.png');
   if (ds.palette.length) writePng(palettePng, 960, 96, paletteStrip(ds.palette));
 
-  const lines = [
-    `# ${info?.title ?? path.basename(opt.file)}`,
-    '',
-    ...(info ? [`${info.uploader ?? ''} · ${info.url}`, info.description ? `> ${info.description}` : '', ''] : []),
+  const numbers = [
     `- file: ${opt.file}`,
     `- ${w}x${h} as decoded (stored ${pr.stored}), ${pr.fps ?? '?'} fps, ${pr.duration != null ? `${pr.duration.toFixed(1)} s` : 'no duration in the header'}; watched ${stamp(opt.from)} to ${stamp(opt.from + span)} at ${rate} samples/s (${n} samples)`,
     `- brightness ${mean(r => r.lum).toFixed(2)}; near black ${pct(mean(r => r.dark))} of the frame; blown ${pct(mean(r => r.bright))}; saturation ${mean(r => r.sat).toFixed(2)}`,
@@ -889,17 +910,25 @@ async function watch() {
     `- cuts: ${cuts.length ? cuts.map(k => stamp(rows[k].t) + (rows[k].dissolve ? ' (dissolve)' : '')).join(', ') : 'none'}${dissolves.length ? `; ${dissolves.length} of them dissolves, ${dissolves.map(v => `${((v.to - v.from) / rate).toFixed(1)} s`).join(', ')}` : ''}`,
     ...shapeLines,
     sync ? `- sound: loudness median ${q(loud, 0.5).toFixed(0)} dB; motion vs loudness r = ${sync.r0.toFixed(2)} at no lag, best ${sync.best.toFixed(2)} with motion ${sync.lag >= 0 ? 'following' : 'leading'} the sound by ${Math.abs(sync.lag).toFixed(2)} s` : '- sound: no audio track',
+    ...(moment ? [`- best moment: ${stamp(moment.from)} to ${stamp(moment.to)} (${moment.why}); its frame at ${stamp(moment.at)}`] : []),
+  ];
+  const lines = [
+    `# ${info?.title ?? path.basename(opt.file)}`,
+    '',
+    ...(info ? [`${info.uploader ?? ''} · ${info.url}`, info.description ? `> ${info.description}` : '', ''] : []),
+    ...numbers,
     '',
     ...footageLines(footage),
+    '',
+    '## Read as',
+    '',
+    mode.line,
     '',
     '## Overall',
     '',
     ...result.overall.lines,
     '',
-    '## Report card',
-    '',
-    ...card.lines,
-    '',
+    ...(card ? ['## Report card', '', ...card.lines, ''] : []),
     '## In words',
     '',
     ...words.lines,
@@ -910,6 +939,8 @@ async function watch() {
     ...sheets.map(s => `- ${s.f} (${s.count} frames, ${stamp(s.from)} to ${stamp(s.to)}, ${s.SW}x${s.SH})`),
     ...stills.map(f => `- ${f}`),
     ...(ds.palette.length ? [`- ${palettePng} (the palette, each colour as wide as its share)`] : []),
+    ...(opt.report ? [`- ${path.join(out, 'report.html')} (all of it on one page, for a person)`] : []),
+    ...[bestFiles.clip, bestFiles.still].filter(Boolean).map(f => `- ${f} (the best moment)`),
     `- ${path.join(out, 'stats.tsv')} (every sample)`,
     '',
     ...designOut,
@@ -917,6 +948,11 @@ async function watch() {
     ...table,
   ];
   fs.writeFileSync(path.join(out, 'summary.md'), lines.join('\n') + '\n');
+  if (opt.report) {
+    result.report = writeReport({ out, title: info?.title ?? path.basename(opt.file), meta: info ? [[info.uploader, info.url].filter(Boolean).join(' · '), info.description].filter(Boolean) : [],
+      numbers: numbers.map(l => l.replace(/^- file: .*/, `- file: ${path.basename(opt.file)}`)), footage: footageLines(footage), readAs: [mode.line], overall: ov.lines, card: card?.lines ?? [], words: words.lines,
+      refWords: refWords?.lines ?? null, refTitle, detail: designOut, table, timeline, sheets, stills, palette: ds.palette.length ? palettePng : null, best: moment, bestFiles, hasAudio: !!pr.audio }, { ff: ff() });
+  }
   if (!opt.quiet) console.log(lines.join('\n'));
   if (opt.keep) {
     const kept = keepRef(out, opt.keep, { title: info?.title ?? path.basename(opt.file), url: info?.url ?? (/^https?:/.test(opt.input) ? opt.input : null),

@@ -574,11 +574,63 @@
       ]
     },
     {
+      "name": "General footage gets no liquid verdict",
+      "shard": "sound",
+      "run": "npm run watchmode",
+      "why": [
+        "The watch tool is packaged for anyone (reelreader, PLAN 47p), and its physics",
+        "read, report card, technique guesses, wet-show words and Settings to try are",
+        "a liquid light show's: before 47p-3 an edited cartoon graded Arc 9.0/10",
+        "against the real shows. scripts/watchmode.mjs reads liquid only on three",
+        "cues (one take, its own motion, coloured light on a dark ground) or when",
+        "asked. This holds the cues to the films they were measured on, a synthetic",
+        "street film (bright, panning, cut) to a general read with none of the liquid",
+        "vocabulary even with a settings map and --vs, the same film with --liquid to",
+        "all of it (so the scan sees what it scans for), a dye take to liquid by",
+        "itself, and the config's mode. In the sound shard for its ffmpeg. Under a minute."
+      ]
+    },
+    {
+      "name": "The watch tool's page for a person, and its best moment",
+      "shard": "sound",
+      "run": "npm run watchreport",
+      "why": [
+        "Packaged for anyone (reelreader, PLAN 47p-4), a run must give a person one",
+        "page to read and send, and the clip's strongest moment to show. Every run",
+        "writes report.html (self-contained), best.mp4 (10-15 s) and best.png",
+        "(scripts/watchreport.mjs). This holds the choice on rows made to have one",
+        "answer (a burst of colour and motion wins and moves with it, a loud passage",
+        "breaks a tie, a title card never wins, a cut inside costs, 10-15 s), and end",
+        "to end on a film made here: the window lands on its bright 12 s, the clip",
+        "begins on the source's frame at that time and has its sound, the still is",
+        "the source's frame, and the page holds every picture inside it, reads on a",
+        "phone, names no folder of the machine and escapes the video page's words.",
+        "In the sound shard for its ffmpeg. About half a minute."
+      ]
+    },
+    {
+      "name": "The public judging skill is whole and its test set's answers hold",
+      "shard": "sound",
+      "run": "npm run reelset",
+      "why": [
+        "reelreader ships with a judging skill anyone can install (PLAN 47p-5b):",
+        "reelreader/skill/, copied into the release as it stands. This holds that",
+        "every link in it reaches a file in the folder, that no page names this",
+        "project, its owner, its places, its plan, its run scripts or a model (the",
+        "scan shown to catch them in the project's own layer on top), and that the",
+        "test set's four clips still measure what the answer key leans on: the",
+        "cartoon reads general with its seven cuts, the good liquid take liquid with",
+        "no freeze and no turn, the frozen take one 5.6 s freeze, the turned take a",
+        "steady curl. The bad takes run with --liquid. In the sound shard for its",
+        "ffmpeg. About two minutes."
+      ]
+    },
+    {
       "name": "Watching in words",
       "shard": "sound",
       "run": "npm run watchwords",
       "why": [
-        "The watch tool says what it sees in words (docs/watch-words.md: Laban,",
+        "The watch tool says what it sees in words (reelreader/skill/watch-words.md: Laban,",
         "Itten, Ching, Greenberg, Arnheim, the wet show) and tells a before film",
         "from an after one (PLAN.md 47x). Held to clips made to sit at known poles:",
         "a steady drift reads sustained, analogous and all-over; a picture that",
@@ -1837,6 +1889,21 @@
       ]
     },
     {
+      "name": "The lamp's light is traced through the liquid to the wall (SwiftShader)",
+      "shard": "lab4",
+      "run": "npm run caustics",
+      "why": [
+        "PLAN 31s-2 (src/gpu/caustic.ts, src/gpu/wgsl/caustic.ts, scripts/caustics.mjs):",
+        "the plate's own PlateCaustics on known paths. A flat path lights the wall",
+        "evenly (1%); light is kept (1%); a plano-convex lens focuses at Rc/dn",
+        "(10%) with its light all kept at focus; a ridge folds into bright lines",
+        "where the map says; three domes of 1, 2 and 4 cells light three peaks; a",
+        "ripple follows I = 1/|1 - c sin kx| (6%) and first folds between c 0.9 and 2",
+        "(47j); the display traces at Focus 0.8 and not at 0.5. --first-order (the",
+        "old shadowgraph's law) fails lines 3, 4 and 7."
+      ]
+    },
+    {
       "name": "The water's bioluminescence",
       "shard": "lab4",
       "run": "npm run glow",
@@ -2809,8 +2876,14 @@
         "and resumed by a second server in the same session, a dropped chunk and a 503 resumed",
         "from Google's count, the bytes exact, private when no privacy is named (Google's default",
         "is public since 2026-11-02), the same file twice refused, an update keeping what it did",
-        "not name, no secret in any reply or log. Then fourteen mutants, each of which must fail",
-        "its own line. No GPU, no build, no network; about half a minute."
+        "not name, no secret in any reply or log; since 44i-2a each system's scheduler and",
+        "notifier (macOS, Linux, Windows plans read on one machine), settings.json (the zone a",
+        "release is read in, unknown keys refused) and setup; since 44i-2b (scripts/youtubeText.mjs)",
+        "the credits line once at the foot with its piece named, chapters only as YouTube makes them,",
+        "caption files sent byte for byte as multipart and bad ones refused at the call, other",
+        "languages riding their part and kept on update, YouTube's limits refused at the call. Then an",
+        "unchanged copy that must fail no line and sixty-six mutants, eight at a time, each of which",
+        "must fail its own line. No GPU, no build, no network; about a minute and a half."
       ]
     },
     {
@@ -3243,6 +3316,20 @@
       ]
     },
     {
+      "name": "A held press closes the glass over its own time",
+      "shard": "plate",
+      "run": "npm run pressclock",
+      "why": [
+        "PLAN.md 18a-5 (scripts/pressclock.mjs): the app's Press held on a thin gap closes the",
+        "glass by the same volume in the same seconds at 30, 60 and 120 steps a second, within 3%",
+        "(main's per-step dent, the control, closed 0.64-0.68 of it at 30); and let go, the thin",
+        "gap's squeeze rate is the gap's own change, no memory (the old plate keeps it; with main's",
+        "gap.ts the line read 7.96 rms off, which is its real control). The hand is pressed by",
+        "handPress, the Press tool's own lay.",
+        "About 45 s on SwiftShader (cloud, 2026-11-28)."
+      ]
+    },
+    {
       "name": "The Finger drags the liquid",
       "shard": "plate",
       "run": "npm run fingerflow",
@@ -3526,6 +3613,18 @@
       ]
     },
     {
+      "name": "The ferrofluid maze's period from the Bond number",
+      "shard": "logic",
+      "run": "npm run bondmaze",
+      "why": [
+        "The labyrinth's period follows the coil's field through the magnetic Bond",
+        "number (PLAN 38d-1, src/gpu/fluid/mazeBond.ts): the closed form against",
+        "the stripe energy minimised from its Fourier sum, M on the Langevin curve",
+        "of the inner field, finer with field and a pool under the onset, the",
+        "looks no wider than the old maze, and the field the maze feels averaged over seconds."
+      ]
+    },
+    {
       "name": "The ferrofluid maze's detail",
       "shard": "plate",
       "run": "npm run maze",
@@ -3599,7 +3698,6 @@
       "shard": "plate",
       "run": "npm run spikes",
       "quarantine": [
-        { "line": "held close under a pool, the magnet parts it into domes", "plan": "9e-1", "since": "2026-11-22", "until": "2026-12-06" },
         { "line": "the plate lights a point on the domes", "plan": "9e-1", "since": "2026-11-22", "until": "2026-12-06" }
       ],
       "why": [

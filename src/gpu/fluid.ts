@@ -49,7 +49,8 @@ import type { GpuStepParams } from './solverTypes';
 import { stepDisplacement } from '../lib/detailFlow';
 import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
-import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
+import { FILM_FROM, StandingFilm, filmBuilds, type FilmMagnet } from './standing';
+import { mazePeriodOf, mazeFelt } from './fluid/mazeBond';
 import { holdApartPull, HOLD_APART_CELLS, AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, THIN_GAP_LATER_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, oilTensionOf, OIL_CELLS, SEALED_TENSION, SEALED_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, NU_REF, dripOf, dripWeightOf, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, LIQUID_DENSITY, thinGapViscosity, oilBodyLn, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidCover } from './fluid/cover';
 import { phaseCHPlan, phaseCapillaryPull } from './fluid/phase';
@@ -279,6 +280,7 @@ export class WebGPUFluid extends FluidCover {
       The mix's carry in substeps waits only where the look opens with the
       mix, as the mix's own carry does, and is built behind otherwise.
     */
+    if (open.standing) for (const [k, c] of filmBuilds()) add(k, c, true);
     if (open.thinGap) {
       for (const [key, code] of WebGPUFluid.thinBuilds(dye)) add(key, code, true);
       for (const name of THIN_GAP_LATER_KERNELS) add(`${name}:thin`, kernel(name, 'rgba16float'), false);
@@ -472,7 +474,7 @@ export class WebGPUFluid extends FluidCover {
       a hand is down.
     */
     const handSubs = Math.max(PHASE_SUBSTEPS, Math.min(CARRY_SUBSTEPS, Math.ceil(handCells / CARRY_COURANT)));
-    // The ferrofluid maze: how strong the field is, and its constants on this grid (MAZE_PERIOD).
+    // The ferrofluid maze: how strong the coil's field is, and its constants on this grid.
     const maze = this.phaseLive ? Math.max(0, Math.min(1, p.ferroLabyrinth ?? 0)) : 0;
     /*
       Whether a magnet is close enough under the glass to stand the
@@ -490,10 +492,8 @@ export class WebGPUFluid extends FluidCover {
       phone's other fingers (at the hand's height and strength, as writeSim
       gives them), once the film's kernels are built. Once on, it stays on
       as the field is turned down until it is under FILM_FROM of the onset,
-      so the film lowers the domes it raised (standing.ts, FILM_FROM). Not
-      started below the onset: a
-      look's own magnet (Magnet Garden's is at 0.14, the onset 0.18) keeps
-      its maze, which the film does not model.
+      so the film lowers the domes it raised (standing.ts). Not
+      started below the onset: Ferro Maze's magnet keeps its maze.
     */
     const onAxis = this.phaseLive && p.magnetStrength > 0.0001 ? fieldOnAxis(p.magnetStrength, p.magnetHeight, p.magnetRadius) : 0;
     if (spikes) this.filmHeld = true;
@@ -508,13 +508,11 @@ export class WebGPUFluid extends FluidCover {
     const filmOn = filmMags.length > 0 && !!this.layer?.isReady();
     if (filmOn) this.filmSteps++;
     const field = maze > 0.001 ? Math.max(maze, spikeAmt) : 0;
-    // Never under twelve cells a period: the edge is three or four wide, and
-    // on 192² (8.6 cells) the stripes washed out to grey. Maze Detail divides
-    // the period by up to three (MAZE_FINEST), and that floor is why it is
-    // a setting and not a new constant: see MAZE_FINEST. (Finer still under
-    // the hand was tried for thinner fingers: at 384² they came out at the
-    // floor, grey and too thin to draw.)
-    const period = MAZE_PERIOD / Math.pow(MAZE_FINEST, Math.max(0, Math.min(1, p.mazeDetail ?? 0)));
+    // The period from the coil's field as the maze feels it, by the Bond number
+    // (mazeBond.ts); Maze Detail divides it by up to three. Never under
+    // twelve cells: on 192² (8.6 cells) the stripes washed out to grey.
+    this.mazeMean = maze > 0.001 ? mazeFelt(this.mazeMean, maze, p.magnetSeconds ?? 1 / 60) : 0;
+    const period = (maze > 0.001 ? mazePeriodOf(this.mazeMean) : MAZE_PERIOD) / Math.pow(MAZE_FINEST, Math.max(0, Math.min(1, p.mazeDetail ?? 0)));
     const kk = (2 * Math.PI / Math.max(period * N, 12)) ** 2;
     const m2f = 0.16 + (HAND_SCREEN - 0.16) * spikeAmt;
     const mazeK = { m2: m2f * kk, alpha: ((1 + m2f) * kk) ** 2 };

@@ -149,6 +149,11 @@ phone version in the same PR.
 
 ## 47j. Caustics: the light focused into a network by a rippled or mixing layer (M)
 
+*The projected plate's half shipped as 31s-2 (2026-11-28): the Jacobian of the ray map, folds
+kept by splatting, clamped by the lamp's disc; `npm run caustics` line 7 holds a ripple to
+1/|1 - c sin kx| within 6% and its first fold between c 0.9 and 2. Open: the closeup's half (its
+Focus dial, 47d, and 47b's dark field), and a measure of the onset tighter than that bracket.*
+
 *Seen:* in a whole long shot, the picture is bright lines of focused light on black that
 drift and re-form, like sunlight on a pool floor. *Physics:* a layer whose optical path
 varies (a rippled surface, or two liquids of different index mixing) bends the light by the
@@ -456,7 +461,7 @@ a curling head need).
 
 The owner asked (2026-11-22) for the watch tool to say what it sees, not only measure it,
 and to tell what changed between a before and an after film. The vocabulary is
-`docs/watch-words.md`: Laban's Effort factors for motion, Itten's contrasts for colour,
+`reelreader/skill/watch-words.md`: Laban's Effort factors for motion, Itten's contrasts for colour,
 Ching's ordering principles and Greenberg's all-over against centred for composition,
 Arnheim's balance, and the wet show's own words (cells, beads, threads, marbling, a wash,
 a bloom, a turned dish, a pour). Every word carries the number that chose it, a word from
@@ -646,15 +651,35 @@ makers, video QA). It reads look and motion, not content. Its public name is **r
 under the MIT licence (the owner, 2026-11-28). Five pieces, one PR each, in this
 order; the README is `docs/watch.md`, the plugin's layout `docs/watch-plugin-plan.md`.
 
-- **47p-3** general mode by default: the physics read, the liquid-calibrated report card
-  (`REAL_SHOW_CARDS`), "Settings to try" and the wet show's words only for liquid footage or a
-  `--liquid` flag; otherwise a general read in general words, with a check that non-liquid
-  footage gets no liquid verdict.
-- **47p-4** an HTML report and the best moment: one self-contained page per run (sheets,
-  timeline, numbers, the words), and the strongest moment saved as a still and a 10-15 s clip.
+- **47p-3b** an app take with cuts reads general: the closeup film of 38h-7 (two hard cuts in
+  21 s) did, and a drained or frozen take fails the light or motion cue. Our own films are
+  liquid by construction: have `film.mjs`, `gig.mjs`, `moving.mjs` and the 5b/7a bad-take
+  set pass `liquid: true`, or let a take carry its own sidecar that says it is the app's.
+  A real show can too: one minute (2:00 to 3:00) of the 1969 *Liquid Loops* film reads general
+  on 3 hard cuts a minute from its splices (the test set's linked show, 47p-5b).
+- **47p-3c** footage that is continuous, coloured, on a dark ground and moving by itself reads
+  liquid though it is not (a night street with neon on a tripod, a VJ loop, a fish tank).
+  A fourth cue (rigid motion: the flow's blocks moving as solid pieces) would tell them apart.
+- **47p-4b** the best moment judged on real footage: chosen and checked on made clips only.
+  Watch three or four of the library's films (a real show, an edited film, an app take) and
+  look at whether `best.mp4` is the moment a person would pick; a liquid take may want the
+  swell's peak (shape()'s swells) weighted over colour.
 - **47p-5** a shot list and batch runs: cut and dissolve times, each shot's length, the average
   shot length, a palette per shot and the share of cuts on a beat (CSV and in the summary);
   `--batch <folder|playlist>` with a table across the videos.
+- **47p-5c** a freeze is filed as a title card: on the test set's frozen take the Footage read
+  drops 0:04.8 to 0:10.2 as a "title span", so the motion reads never meet it, Overall says
+  "holds one steady pace from start to end", and the summary never prints what `freezes()`
+  finds (4.7 to 10.3 s). Print the freezes in the summary and keep a still span that is the
+  picture itself (not a card) in the reads. Feeds the fault reads (handoff 7a).
+- **47p-5d** a whole-picture turn reads as the liquid's own flow: the turned take (the whole
+  picture inside a fixed rim, clockwise once every 8 s) reads own flow 17.2%/s, "fast,
+  churning", over every real show, whole-field only 31%, and "about one turn in 22 s". The
+  affine fit takes out too little of a rotation inside a round mask; name a rigid turn and
+  its true period. Feeds 7a and the owner's rule of no whole-frame motion from sound.
+- **47p-5e** the Footage read misfires on a slow dark liquid take: the test set's good take
+  gets four "still overlays" masked (one the left quarter of the frame) and three 0.4 s
+  "title spans" dropped, with no overlay or title on the sheets.
 
 Later, not now: photosensitivity (flash) screening, real units (mm/s), dance and pose, "what is
 in it". The reference library stays private and ships empty (watch-plugin-plan.md, point 3).
@@ -665,7 +690,7 @@ in it". The reference library stays private and ships empty (watch-plugin-plan.m
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q; 47d-1 shipped), 47a, 47e (its glitter half shipped; 47e-1, 47e-2), 47f, 47k; 47b-2 and 47b-3 after 47b-1; 47g,
-47h, 47i and 47n when wanted; 47p-2 to 47p-5 in that order (the owner's pick, 2026-11-28); 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
+47h, 47i and 47n when wanted; 47p-5 next (the owner's pick, 2026-11-28; 47p-4 shipped), 47p-4b when the watch tool next watches real films, 47p-3b and 47p-3c when the watch tool is next touched; 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
 as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4 in that order (the owner asked
 for the drops' physics and their colour, 2026-11-12; ~~47z-5~~ shipped early, 2026-11-13, as Foam
 Cells), then 47z-7 after 47z-3, 47z-8 and 47z-6 after 28k-2 (a). Each its own thread

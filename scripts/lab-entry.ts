@@ -8,7 +8,8 @@ import { WebGPUPlate, lastDisplayName, setLeanDisplay } from '../src/gpu/plate';
 import { DISPLAY_MAIN, plateWgsl } from '../src/gpu/wgsl/plate';
 import { displayGateTests, displayMayMask, leanDisplayWgslCounted } from '../src/gpu/displayLean';
 import type { AirGeo } from '../src/gpu/air';
-import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_ONSET_REAL, SPIKE_FULL, SPIKE_B_REF, MAGNET_E, MAGNET_BS } from '../src/gpu/wgsl/spikes';
+import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_PITCH, SPIKE_B_REF, MAGNET_E, MAGNET_BS } from '../src/gpu/wgsl/spikes';
+import { LIFT_ONSET } from '../src/gpu/wgsl/standing';
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
 import { MAGNET_RADIUS } from '../src/gpu/wgsl/magnetDisc';
 import { BeadField, rasterDrops } from '../src/lib/beads';
@@ -36,6 +37,8 @@ import { GlassPress, glassDepth } from '../src/lib/glassPress';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
 import { layFinger, handEdge } from '../src/lib/handSolid';
 import { layBreath, BREATH_STRESS } from '../src/lib/breath';
+import { PlateCaustics } from '../src/gpu/caustic';
+import { Disposer, PipelineCache } from '../src/gpu/kit';
 import { makeDropQueue, queueDrop, stepDrops, dropsLive, dropSchedule, dropImpact } from '../src/lib/dropImpact';
 import { fingerCarry, blowCarry, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../src/lib/handCarry';
 
@@ -86,6 +89,8 @@ let lab: Lab | null = null;
  *  CPU rasteriser, Apple's on a Mac's Metal), copied out at `create` because a
  *  GPUAdapterInfo does not cross page.evaluate. A check whose claim is the
  *  rasteriser's (`npm run lampzero`) reads this rather than trusting the flags. */
+let lastTraced = false;
+let lastPath: { n: number; w: number[] } | null = null;
 let adapterInfo: { vendor: string; architecture: string; device: string; description: string } | null = null;
 
 let lastDrop: { n: number; h: Float32Array; z: Float32Array } | null = null;
@@ -672,6 +677,57 @@ const api = {
   },
   /** The mix or the reactions (readChemistry), as plain arrays; null when the solver has none. */
   async chemistry(which: 'mix' | 'rxn' | 'lies') { const f = await lab!.solver.readChemistry(which); return f ? { n: f.n, data: Array.from(f.data) } : null; },
+  /**
+   * The lamp's light traced through a path you hand it (PLAN 31s-2, `npm run caustics`):
+   * `paths` is the derive pass's .w (OPL less 1.333, in rest gaps) on a size x size
+   * texture, `dz` the dial's throw times Boundary Contrast's gain (causticDz).
+   * Returns the trace's m and layer 0's light, m x m, through the plate's own
+   * PlateCaustics, so the check measures the code the display reads.
+   */
+  async caustics(paths: number[], size: number, dz: number, back?: number[]) {
+    const device = lab!.solver['device'] as GPUDevice;
+    const cache = new PipelineCache(device);
+    const disposer = new Disposer();
+    for (const p of PlateCaustics.prepare(cache, device)) await p.build();
+    const half = new Uint16Array(size * size * 4);
+    const f32 = new Float32Array(1);
+    const u32 = new Uint32Array(f32.buffer);
+    const toHalf = (v: number) => {
+      f32[0] = v;
+      const x = u32[0];
+      const sign = (x >>> 16) & 0x8000;
+      const e = ((x >>> 23) & 0xff) - 127 + 15;
+      if (e <= 0) return sign;
+      if (e >= 31) return sign | 0x7c00;
+      return sign | (e << 10) | ((x >>> 13) & 0x3ff);
+    };
+    const texOf = (p: number[]) => {
+      for (let i = 0; i < size * size; i++) half[i * 4 + 3] = toHalf(p[i]);
+      const t = device.createTexture({ size: [size, size], format: 'rgba16float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+      device.queue.writeTexture({ texture: t }, half, { bytesPerRow: size * 8 }, [size, size]);
+      return t;
+    };
+    // `back`, when given, is the back plate's path (layer 1, wallLight1).
+    const texs = back ? [texOf(paths), texOf(back)] : [texOf(paths)];
+    const enc = device.createCommandEncoder();
+    const light = new PlateCaustics(device, cache, disposer).trace(enc, texs, dz);
+    if (!light) { for (const t of texs) t.destroy(); disposer.dispose(); return null; }
+    const read = device.createBuffer({ size: light.size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    enc.copyBufferToBuffer(light, 0, read, 0, light.size);
+    device.queue.submit([enc.finish()]);
+    await read.mapAsync(GPUMapMode.READ);
+    const all = new Float32Array(read.getMappedRange().slice(0));
+    read.destroy(); for (const t of texs) t.destroy(); disposer.dispose();
+    const m = all[1];
+    return {
+      dz: all[0], m, words: all.length, light: Array.from(all.subarray(4, 4 + m * m)),
+      light1: back ? Array.from(all.subarray(4 + m * m, 4 + 2 * m * m)) : null,
+    };
+  },
+  /** Whether the last render traced the lamp's light to the wall (PLAN 31s-2). */
+  traced() { return lastTraced; },
+  /** Layer 0's derived path (.w) from the last render that asked for it (`readPath`), rows as the texture holds them (FLIP_Y: uv as the plate's). */
+  path() { return lastPath; },
   /** Free-surface / oil-layer height h in metres (PLAN 31s-1). */
   async surfaceHeight() { const f = await lab!.solver.readSurfaceHeight(); return f ? { n: f.n, data: Array.from(f.data) } : null; },
   setSurfaceHeight(data: number[], props?: { oilMu?: number; oilSigma?: number; oilRho?: number; waterMu?: number; waterSigma?: number; waterRho?: number }) {
@@ -755,7 +811,9 @@ const api = {
    * ramps on, for `npm run disc` to run the shader's own text against the
    * physics.
    */
-  SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_ONSET_REAL, SPIKE_FULL, SPIKE_B_REF, MAGNET_RADIUS, magnetReach, magnetDepth,
+  SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_PITCH, SPIKE_B_REF, MAGNET_RADIUS, magnetReach, magnetDepth,
+  /** The film's lift scale (wgsl/standing.ts), for `npm run standing` to work out the wavelength that grows fastest. */
+  LIFT_ONSET,
   /**
    * The magnet's pull in the solver's own units, and the gap's, for `npm run
    * magnetgain` to derive what MAGNET_GAIN is in tesla, metres and seconds
@@ -916,6 +974,10 @@ const api = {
       leanDrop?: number;
       /** Registered as the app's opening registers it, the whole one building behind the show (`leandisplay`'s control of that path). */
       leanBehind?: boolean;
+      /** Draw with the lamp's light not traced (PLAN 31s-2): the wall falls back to the first-order shadowgraph, `npm run caustics`'s line that the display reads the trace. */
+      noTrace?: boolean;
+      /** Read layer 0's derived path (.w, OPL less 1.333 in rest gaps) back after the draw, for `path()`. */
+      readPath?: boolean;
     } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
@@ -988,7 +1050,17 @@ const api = {
     const flipped = cam.flip || !!cam.sources?.length;
     if (cam.focusMax) plate.focus.maxScale = cam.focusMax;
     for (let i = 1; i < (cam.repeat ?? 1); i++) plate.draw(enc, target.createView(), { width: size, height: size }, layers, undefined, flipped);
+    // An own property shadows the class's trace for this draw only, and is deleted after it.
+    const caustics = (plate as unknown as { caustics: { trace?: () => null } }).caustics;
+    if (cam.noTrace) caustics.trace = () => null;
     plate.draw(enc, target.createView(), { width: size, height: size }, layers, undefined, flipped);
+    if (cam.noTrace) Reflect.deleteProperty(caustics, 'trace');
+    const derivedTex = cam.readPath ? (plate as unknown as { layers: { derived: GPUTexture }[] }).layers[0]?.derived : undefined;
+    const pathRow = derivedTex ? Math.ceil(derivedTex.width * 8 / 256) * 256 : 0;
+    const pathBuf = derivedTex ? device.createBuffer({ size: pathRow * derivedTex.height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }) : null;
+    if (derivedTex && pathBuf) enc.copyTextureToBuffer({ texture: derivedTex }, { buffer: pathBuf, bytesPerRow: pathRow }, [derivedTex.width, derivedTex.height]);
+    // Whether this frame's light was traced to the wall (PLAN 31s-2), for `npm run caustics`.
+    lastTraced = (plate as unknown as { causticLight: GPUBuffer | null }).causticLight !== null;
     // As the app fills them: the frame's settings with the other rows at
     // nothing, no camera and no chain, so each display does its own finish.
     const owns = (cam.sources ?? []).map((kind) => {
@@ -1018,6 +1090,20 @@ const api = {
       }
       buf.unmap(); buf.destroy(); tex.destroy();
       pictures[kind] = Array.from(out);
+    }
+    if (derivedTex && pathBuf) {
+      await pathBuf.mapAsync(GPUMapMode.READ);
+      const src = new Uint16Array(pathBuf.getMappedRange());
+      const n = derivedTex.width, w = new Array<number>(n * derivedTex.height);
+      const fromHalf = (x: number) => {
+        const e = (x >> 10) & 0x1f, f = x & 0x3ff, sign = x & 0x8000 ? -1 : 1;
+        if (e === 0) return sign * f * 2 ** -24;
+        if (e === 31) return f ? NaN : sign * Infinity;
+        return sign * (1 + f / 1024) * 2 ** (e - 15);
+      };
+      for (let y = 0; y < derivedTex.height; y++) for (let x = 0; x < n; x++) w[y * n + x] = fromHalf(src[y * pathRow / 2 + x * 4 + 3]);
+      pathBuf.unmap(); pathBuf.destroy();
+      lastPath = { n, w };
     }
     // The closeup's drop surface this frame solved (PLAN §29a), for npm run ferrodrop.
     lastDrop = await plate.drop.read();

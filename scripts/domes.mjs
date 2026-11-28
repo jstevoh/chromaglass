@@ -62,7 +62,7 @@ const check = (name, ok, detail = '') => {
 };
 
 const HAND = { magnetStrength: 0.9, magnetHeight: 0.15 * 0.9, magnetSeconds: 1 / 60 };
-const GARDEN = { ferroLabyrinth: 0.8, phaseSharp: 0.75, phaseTension: 0.3 * 0.45, phaseDisplace: 0 };
+const GARDEN = { ferroLabyrinth: 1, phaseSharp: 0.75, phaseTension: 0.3 * 0.45, phaseDisplace: 0 };
 const M = { x: 0.36, y: 0.65 };
 const NEAR = 0.08;
 const STEPS = 240;

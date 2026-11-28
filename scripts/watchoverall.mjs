@@ -49,6 +49,8 @@ const LOOK = {
   'hard-edged': 'hard edges', soft: 'soft edges', painterly: 'painterly edges',
   marbling: 'marbling', threads: 'threads', lobes: 'lobes', beads: 'beads', cells: 'cells', wash: 'a wash of colour',
   fine: 'fine detail', broad: 'broad shapes',
+  // General footage's words for the same measures (watchwords.mjs, PLAN 47p-3).
+  'low-key': 'a low-key, dark frame', 'high-key': 'a high-key, bright frame', linear: 'linear forms', clustered: 'clustered forms', 'colour field': 'broad even areas of colour',
   'all-over': 'filling the frame', centred: 'centred', 'off-centre': 'set off centre', kaleidoscopic: 'kaleidoscopic',
   symmetric: 'symmetric', axis: 'laid along an axis',
   bloom: 'blooms opening', 'turned dish': 'a turning dish', pour: 'pours',

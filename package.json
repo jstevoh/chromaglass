@@ -233,6 +233,7 @@
     "microscope": "node scripts/microscope.mjs",
     "ferrolook": "node scripts/ferrolook.mjs",
     "maze": "node scripts/maze.mjs",
+    "bondmaze": "node scripts/bondmaze.mjs",
     "spikes": "node scripts/spikes.mjs",
     "slump": "node scripts/slump.mjs",
     "disc": "node scripts/disc.mjs",
@@ -266,6 +267,7 @@
     "tankgpu": "PW_WEBGPU=1 node scripts/tankgpu.mjs",
     "faraday": "PW_WEBGPU=1 node scripts/faraday.mjs",
     "surfaceheight": "PW_WEBGPU=1 node scripts/surfaceheight.mjs",
+    "caustics": "PW_WEBGPU=1 node scripts/caustics.mjs",
     "boilgpu": "PW_WEBGPU=1 node scripts/boilgpu.mjs",
     "plateboil": "node scripts/plateboil.mjs",
     "argnames": "node scripts/argnames.mjs",
@@ -293,6 +295,7 @@
     "presslift": "node scripts/presslift.mjs",
     "pressfacets": "npm run build && node scripts/pressfacets.mjs",
     "gridlay": "node scripts/gridlay.mjs",
+    "pressclock": "node scripts/pressclock.mjs",
     "fingerflow": "node scripts/fingerflow.mjs",
     "airblow": "node scripts/airblow.mjs",
     "blowrange": "node scripts/blowrange.mjs",
@@ -423,7 +426,10 @@
     "tvvideo": "node scripts/tvvideo.mjs",
     "glow": "PW_WEBGPU=1 node scripts/glow.mjs",
     "linearlight": "node scripts/linearlight.mjs",
-    "watchconfig": "node scripts/watchconfigtest.mjs"
+    "watchconfig": "node scripts/watchconfigtest.mjs",
+    "watchmode": "node scripts/watchmodetest.mjs",
+    "watchreport": "node scripts/watchreporttest.mjs",
+    "reelset": "node scripts/reelsettest.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

@@ -36,9 +36,19 @@ Mac app, and not named on any page a visitor or customer reads.
 
 - `youtube-mcp.js`: the channel, with no show running. The YouTube Data API v3 signed in
   as a desktop app (`login` once: loopback, PKCE, the refresh key at 600 in
-  `~/.chromaglass/youtube/`, `CHROMAGLASS_YOUTUBE_DIR`, beside the Google client file
-  the owner saves there). Tools: `channel`, `list_videos`, `upload_video` (resumable
-  8 MiB chunks; resumes a dropped connection, an expired key, and a closed app from
+  its folder: `~/.config/sendreel/youtube/` or `%APPDATA%\sendreel\youtube\`, the owner's existing
+  `~/.chromaglass/youtube/` while it exists, or `SENDREEL_DIR` / `CHROMAGLASS_YOUTUBE_DIR`;
+  beside the Google client file the user saves there). `settings.json` in that folder:
+  `timeZone` (release times; the computer's own by default), `categoryId` (new
+  uploads; 22 by default, 10 in the owner's old folder) and `credits` (44i-2b: a line, or a
+  list of lines, put at the foot of every new upload's description and each other
+  language's; `{music}` in it is filled from the upload's `music`, and an upload under such a
+  line with no music is refused); an unknown key stops the server at start. Tools: `channel`, `list_videos`, `upload_video` (resumable
+  8 MiB chunks; 44i-2b's words: `chapters` (lines like `0:00 Intro` or `{ at, title }`,
+  refused unless YouTube would make chapters of them: from 0:00, three or more, ten
+  seconds each), `music` and `credits` (the settings line, a line of its own, or `false`),
+  `captions` (`.srt`/`.vtt` files sent once the video is up, each looked at before the job is
+  made), `localizations` (`{"es": {title, description}}`, needs `language`); resumes a dropped connection, an expired key, and a closed app from
   `uploads.json`; emits MCP `notifications/progress` when `progressToken` is sent;
   queues the job with `notBefore` on `uploadLimitExceeded` or `quotaExceeded` instead of
   failing), `queue_upload` (saves a job in state `queued` with optional `key` and
@@ -46,9 +56,12 @@ Mac app, and not named on any page a visitor or customer reads.
   status and playlists via manifest playlist memory or paged `playlists`/`playlistItems`
   search, then queues a private replacement upload via `queue_upload` carrying the old
   metadata, playlists/positions, `replaces` and manifest `key`; never deletes or edits
-  the old video), `upload_status` (lists queued jobs with `not_before` in Pacific time),
-  `update_video` (only the fields named change), `release_plan` (schedules live private
-  videos via `publishAt` — 50 quota units each — and queued jobs at a Pacific clock time,
+  the old video), `upload_status` (lists queued jobs with `not_before` in the settings time zone),
+  `update_video` (only the fields named change; new `chapters` replace the old list, checked
+  against the video's length; `localizations` keeps languages it does not name, `null`
+  takes one off), `add_captions` (an `.srt` or `.vtt` to a video already up, 400 units),
+  `list_captions`, `release_plan` (schedules live private
+  videos via `publishAt` — 50 quota units each — and queued jobs at a clock time in the settings time zone,
   with `dry_run` and DST-safe slot spacing; only run when the owner asked for that
   release), `set_thumbnail`, `list_playlists`, `create_playlist`, `add_to_playlist`,
   `manifest` (reads `~/.chromaglass/youtube/manifest.json` and optionally syncs all
@@ -56,11 +69,13 @@ Mac app, and not named on any page a visitor or customer reads.
   local fields), `mark_video` (sets local manifest fields on one video or a list of
   `video_ids`). No delete. Command-line modes: `login`, `whoami`, `logout`, `drain`
   (uploads queued jobs whose `notBefore` has passed, one at a time, using
-  `busyElsewhere` so two drains never push the same job, and posts a macOS notification
-  via `osascript` after each finished or failed job unless
-  `CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL=1` or `CHROMAGLASS_YOUTUBE_NO_NOTIFY=1`),
-  `install-agent` / `uninstall-agent` (writes/removes the hourly LaunchAgent plist for
-  `drain`), `manifest [--sync] [--md <file>]` (prints or writes the manifest as Markdown).
+  `busyElsewhere` so two drains never push the same job, and shows a notification
+  (osascript, notify-send or a PowerShell balloon) after each finished or failed job unless
+  `NO_SCHEDULER`, `NO_LAUNCHCTL` or `NO_NOTIFY` is `1`),
+  `install-agent` / `uninstall-agent` (the hourly `drain` in the system's own scheduler:
+  a LaunchAgent, a systemd user timer, or a Task Scheduler task; with `NO_SCHEDULER=1`
+  the files are written and the commands printed, not run), `setup` (walks the Google
+  setup in order and prints the fix for the first step not done; exit 1 until all are), `manifest [--sync] [--md <file>]` (prints or writes the manifest as Markdown).
 
   ### Upload sidecar card (`<file without extension>.youtube.json`)
 
@@ -79,16 +94,34 @@ Mac app, and not named on any page a visitor or customer reads.
     "key": "slow-dawn",
     "replaces": "oldVideoId123",
     "publish_at": "2026-12-01T18:00:00Z",
-    "privacy": "private"
+    "privacy": "private",
+    "language": "en",
+    "music": "Unraveling",
+    "chapters": ["0:00 The dish fills", "1:30 Oil", "3:10 Beads"],
+    "captions": ["slow-dawn.en.srt", { "file": "slow-dawn.es.vtt", "language": "es" }],
+    "localizations": { "es": { "title": "Amanecer lento" } }
   }
   ```
 
+  A caption file or thumbnail named in the card is found beside the card.
+
 ## Contracts
 
-- `youtube-mcp.js` imports nothing from the repo (it may move to a repository of its
-  own, 44i-2), uploads private unless told otherwise (Google's own default is public
+- `youtube/`: the YouTube server's own modules (44i-2a). `zone.js` (clock times in a
+  named zone; the quota reset stays Pacific, YouTube's), `platform.js` (`schedulePlan`,
+  `notifyCommand`: per-system scheduler and notifier, pure), `settings.js` (`configDir`,
+  `env`, `readSettings`, whose result now carries `credits`), `setup.js` (`runSetup`,
+  `formatSetup`), and 44i-2b's `describe.js` (`parseChapters`, `stripChapters`,
+  `composeDescription`, `creditsLine`, `composeLocalizations`, `checkTitle`, `validLanguage`,
+  `isoSeconds`, `parseTime`, `formatTime`, `chapterBlock`: the description's parts and
+  YouTube's limits, pure) and `captions.js` (`CAPTION`, `CAPTION_UNITS`, `readCaptionFile`,
+  `captionRequest`: which caption files count and the multipart body). They import only
+  Node's modules and each other.
+- `youtube-mcp.js` imports nothing from the repo but `youtube/` (the two move to a
+  repository of their own, 44i-2), uploads private unless told otherwise (Google's own default is public
   since 2026-11-02), and never puts a key, the client secret or an upload session's
-  address in a reply or the log. `CHROMAGLASS_YOUTUBE_GOOGLE` points it at a stand-in
+  address in a reply or the log. Every variable is read as `SENDREEL_<KEY>` first, then
+  `CHROMAGLASS_YOUTUBE_<KEY>`. `GOOGLE` points it at a stand-in
   for the check, and only on `http://127.0.0.1`.
 
 - Decides nothing: every rule is the show server's guard (`server/assistant.js`), and a
@@ -106,7 +139,8 @@ Mac app, and not named on any page a visitor or customer reads.
 ## Checks
 
 `npm run youtube` (scripts/youtube.mjs): the YouTube server over stdio against a stand-in
-Google on loopback, every rule with a mutant that must fail.
+Google on loopback, every rule with a mutant that must fail (the words around a video,
+44i-2b, in `scripts/youtubeText.mjs` beside it).
 
 `npm run assistant` (scripts/assistant.mjs): this server over stdio against the real show
 server, every rule with a mutant that must fail.

@@ -6,7 +6,7 @@
  * What was asked (the owner, 2026-11-22): the watch tool reads a film as
  * numbers, and should also say in words what it sees, in a vocabulary from
  * art criticism, architecture and the light shows themselves
- * (docs/watch-words.md), and tell what changed between a before and an
+ * (reelreader/skill/watch-words.md), and tell what changed between a before and an
  * after film. This check is the contract for both, written before either
  * was built, so the words are held to pictures and not to their own
  * thresholds: a steady drift must read sustained and a picture that sits and
@@ -36,7 +36,7 @@
  *                                     take (swells, calm, half-life), and its
  *                                     text then says "may vary from take to
  *                                     take". source names a source on
- *                                     docs/watch-words.md (Laban, Itten,
+ *                                     reelreader/skill/watch-words.md (Laban, Itten,
  *                                     Ching, Greenberg, Arnheim, or the wet
  *                                     show), the one its area draws on there
  *                                     (time, weight, space, flow and effort:
@@ -175,7 +175,10 @@ try { ({ watchPair } = await import('./watchpair.mjs')); } catch (e) { check('sc
 try { ({ describe } = await import('./watchwords.mjs')); } catch (e) { check('scripts/watchwords.mjs loads', false, e.message.split('\n')[0]); }
 
 const OUT = { drift: 'o0', jumps: 'o2', crisp: 'o3', soft: 'o4' };
-const opts = name => ({ out: path.join(dir, OUT[name]), quiet: true, frames: 12, perSheet: 12 });
+// These clips hold the liquid light show's vocabulary to pictures (dark-ground, marbling, the
+// show's moves), so they are read as liquid footage whatever the footage cues decide (PLAN 47p-3,
+// scripts/watchmode.mjs); the general read's words are held by npm run watchmode.
+const opts = name => ({ out: path.join(dir, OUT[name]), quiet: true, frames: 12, perSheet: 12, liquid: true });
 const read = {};
 for (const k of ['drift', 'jumps', 'crisp', 'soft']) {
   try { read[k] = await watchVideo(files[k], opts(k)); } catch (e) { read[k] = null; check(`${k}: watched`, false, e.message.split('\n')[0]); }
@@ -187,7 +190,7 @@ const has = (r, area, re) => terms(r, area).some(t => re.test(t));
 const hasNot = (r, area, re) => (r?.words?.words?.length ?? 0) >= 4 && !has(r, area, re);
 
 // ─── the words for one film ──────────────────────────────────────────────────
-const doc = fs.readFileSync(path.join(here, '..', 'docs', 'watch-words.md'), 'utf8').toLowerCase();
+const doc = fs.readFileSync(path.join(here, '..', 'reelreader', 'skill', 'watch-words.md'), 'utf8').toLowerCase();
 // The terms are the page's words in bold, and each area draws on its own sources: "laban" in
 // any source string, or a term that is merely somewhere in nine kilobytes of prose, would
 // pass anything.
@@ -206,7 +209,7 @@ for (const k of ['drift', 'jumps', 'crisp', 'soft']) {
   check(`${k}: every word carries the number that chose it`, ws.length && !bad.length,
     bad.length ? `no number in: ${bad.slice(0, 3).map(w => JSON.stringify(w.text ?? w.term)).join('; ')}` : `${ws.length} of ${ws.length}`);
   const unsourced = ws.filter(w => !sourced(w) || !termOk(w));
-  check(`${k}: every word and its source are on docs/watch-words.md`, ws.length && !unsourced.length,
+  check(`${k}: every word and its source are on reelreader/skill/watch-words.md`, ws.length && !unsourced.length,
     unsourced.length ? unsourced.slice(0, 4).map(w => `${w.term} (${w.source ?? 'no source'})`).join(', ') : 'all');
   const unhedged = ws.filter(w => w.steady === false && !/may vary from take to take/.test(w.text));
   const hedgedSteady = ws.filter(w => w.steady !== false && /may vary from take to take/.test(w.text));
@@ -283,7 +286,7 @@ const steadyMismatch = p => p.diff.changed.filter(c => [...(p.before.words?.word
 const list = d => d.changed.map(c => `${c.area}/${c.measure} ${Number(c.steps).toFixed(1)}`).join(', ') || 'none';
 
 let edge = null;
-if (watchPair) try { edge = await watchPair(files.crisp, files.soft, { out: path.join(dir, 'p1'), quiet: true, frames: 12, perSheet: 12 }); }
+if (watchPair) try { edge = await watchPair(files.crisp, files.soft, { out: path.join(dir, 'p1'), quiet: true, frames: 12, perSheet: 12, liquid: true }); }
 catch (e) { check('crisp → soft: watched as a pair', false, e.message.split('\n')[0]); }
 if (edge) {
   const d = edge.diff;
@@ -315,7 +318,7 @@ if (edge) {
 }
 
 let shift = null;
-if (watchPair) try { shift = await watchPair(files.drift, files.jumps, { out: path.join(dir, 'p2'), quiet: true, frames: 12, perSheet: 12 }); }
+if (watchPair) try { shift = await watchPair(files.drift, files.jumps, { out: path.join(dir, 'p2'), quiet: true, frames: 12, perSheet: 12, liquid: true }); }
 catch (e) { check('drift → jumps: watched as a pair', false, e.message.split('\n')[0]); }
 if (shift) {
   const d = shift.diff;
@@ -332,7 +335,7 @@ const same = (() => { try { return fs.readFileSync(path.join(cliOut, 'diff.md'),
 check('npm run watch -- --before --after writes diff.md', cli.status === 0 && /^# What changed/.test(same), cli.status === 0 ? same.split('\n')[0] || 'empty diff.md' : `exit ${cli.status}: ${(cli.stderr || '').trim().split('\n').pop()}`);
 if (watchPair) {
   let again = null;
-  try { again = await watchPair(files.drift, files.drift2, { out: path.join(dir, 'p4'), quiet: true, frames: 12, perSheet: 12 }); } catch (e) { check('drift → drift2: watched as a pair', false, e.message.split('\n')[0]); }
+  try { again = await watchPair(files.drift, files.drift2, { out: path.join(dir, 'p4'), quiet: true, frames: 12, perSheet: 12, liquid: true }); } catch (e) { check('drift → drift2: watched as a pair', false, e.message.split('\n')[0]); }
   if (again) {
     check('drift → drift2 (the same look, another phase): no steady change past a step; time, colour and composition held',
       !steadyChanges(again.diff).length && again.diff.held.length >= 5 && ['time', 'colour', 'composition'].every(a => heldAreas(again.diff).has(a)),
