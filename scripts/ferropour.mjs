@@ -191,7 +191,9 @@ try {
     The old arm has to be a plate before it can be a comparison: nothing
     poured reads worked 0 and fingers Infinity, and would pass both. So its
     18 drops, poured over a tenth of the plate or more, all of it still
-    there after the steps, and something black left to measure. Until the
+    there after the steps, and still a twentieth of the plate black, half of
+    the 10% the Mac read, so a ring that kept its mass but left the black
+    reads red. Until the
     real 2 mm gap this asked for a tenth of the plate black after the
     steps, which read whether the drops had stood up, not whether they were
     poured: at the liquid's own onset each big drop stands up into a
@@ -202,7 +204,7 @@ try {
     mass are what make it a plate; what it covers after is the physics.
   */
   const ringReal = old.drops === 18 && old[0].cover > 0.1 && Math.abs(old[EARLY].mass / old[0].mass - 1) < 0.001
-    && old[EARLY].cover > 0.02 && Number.isFinite(old[EARLY].width);
+    && old[EARLY].cover > 0.05 && Number.isFinite(old[EARLY].width);
   check('Ferro Paint pours its own shape, not the ring', look === 'scatter', `phasePourShape gives '${look}'`);
   check('its ferrofluid is worked through nearly the whole plate, and still is three times later',
     ringReal && now[EARLY].worked >= 0.9 && now[LATE].worked >= 0.9 && old[EARLY].worked < 0.7,

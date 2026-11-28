@@ -44,8 +44,9 @@
  *     three times in one page, as given, with phaseMomentum off and with
  *     phaseCompress off, and the pass must be worth something: the lead with
  *     phaseMomentum off exceeds the lead as given by at least DLAG_BAR, and the
- *     half-full count as given exceeds the count with phaseCompress off by at
- *     least DBODY_BAR (since 38k-7 of the body, not the count). The absolute bars alone are one-sided (the review of
+ *     body as given (the ferrofluid in its half-full cells; until 38k-7 a
+ *     count of cells) exceeds the body with phaseCompress off by at least
+ *     DBODY_BAR. The absolute bars alone are one-sided (the review of
  *     this check ran the scene with the pull 10% stronger and phaseMomentum
  *     off, and the lead read 2.01R, green: anything that speeds the drop up
  *     stands in for the pass); the differential says the pass itself is on.
