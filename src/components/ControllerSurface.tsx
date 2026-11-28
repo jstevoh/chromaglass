@@ -294,15 +294,22 @@ export function ControllerSurface({ midi, presets, surface, onClose }: Props) {
     setLit(prev => ({ ...prev, [key]: performance.now() }));
   }, [lastEvent, surface.controls]);
 
-  // Fade the touch highlight out.
-  const [, force] = useState(0);
+  // Clear each touch highlight once its 600 ms window ends; idle while nothing is lit (PLAN 46i, 50g).
   useEffect(() => {
-    const id = setInterval(() => force(n => n + 1), 120);
-    return () => clearInterval(id);
-  }, []);
+    const times = Object.values(lit);
+    if (times.length === 0) return;
+    const wait = Math.max(0, 600 - (performance.now() - Math.min(...times))) + 8;
+    const id = setTimeout(() => {
+      const now = performance.now();
+      setLit(prev => {
+        const next: Record<string, number> = {};
+        for (const [k, at] of Object.entries(prev)) if (now - at < 600) next[k] = at;
+        return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+      });
+    }, wait);
+    return () => clearTimeout(id);
+  }, [lit]);
 
-  // Listened for once: this surface re-renders every 120 ms (above), and an
-  // effect keyed on onClose could drop the key (useEscape).
   useEscape(onClose);
 
   const assign = (target: MidiTarget) => {

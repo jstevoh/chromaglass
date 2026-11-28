@@ -76,10 +76,20 @@ with the frame. At 120 Hz a frame has 8.3 ms; the 11-13 audit measured one desk 
   time, the governor's default rung and the closeup's detail rise, not the frame rate's
   headroom alone: finer dye, more of the macro look on the plate. Judged by the owner on the
   plate, one look at a time.
-- **50g** *A weekly tidy, one small PR* (rank 7, S, Antigravity). An unused-code report
-  (exports, files and state nobody reads: `activeMat` and `chem` allocated with chemistry off
-  in 46n, the state nobody reads in 46i) and one pure-move or delete PR from it a week, so
-  the code gets smaller as it grows.
+- **50g** *A weekly tidy, one small PR* (rank 7, S, Antigravity; **shipped**, `npm run unused`).
+  `scripts/unused.mjs` and `scripts/unused-fields.mjs` report files nothing imports, exports
+  nobody imports (`dead` vs `internal`), and fields or React states set and never read across
+  `src/` in ~20–33 s, counting `src/lib/checkHooks.ts` window hooks and `scripts/` imports as
+  used and exiting 0 so it never gates CI (`--selftest` holds the rules). First tidy shipped:
+  deleted 46n's `FluidCore.activeMat` (`2 × N² × 4` B, never read or written by any pass) and
+  allocated `FluidCore.chem` (`2 × N² × 16` B) lazily on first chemistry/reagent use (saving
+  10 MB per solver layer at 512² and 40 MB at 1024² with chemistry off, carried across regrids
+  and undo snapshots); removed 46i's unread `useFilmSense` 150 ms React state (`FilmSenseState`)
+  and `ControllerSurface`'s unconditional 120 ms `force` interval (replaced by a `[lit]` expiry
+  timeout that idles when nothing is lit); and deleted unread `useMusicIntelligence.presetPick`
+  and `FluidSimulation.visc` (829 B trimmed across `src/`, fields set and never read 42 → 33).
+  Open: **50g-2** weekly follow-up tidies on the remaining 37 dead exports and 33 unread fields
+  once their in-flight callers settle (`hearAheadWorker.ts` waits on 17g).
 - **50h** *The new MacBook Pro as the agents' box* (rank 8, S, Claude over Remote Control once
   it arrives, 2026-12-04 to 12-11). Two Antigravity lanes in separate worktrees, 50b's table
   nightly on the machine that is not deploying; the Air keeps the deploy runner. No cloud cost.

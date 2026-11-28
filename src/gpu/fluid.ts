@@ -1108,13 +1108,14 @@ export class WebGPUFluid extends FluidCover {
             print it had made moved off.
           */
           if (this.chemLive) {
-            if (thin) this.runThinFaced(pass, 'bodyAdvectThin', this.chem.write, this.chem.read, sixth);
-            else this.runPressed(pass, 'bodyAdvect', this.chem.write, [this.chem.read, this.velForced], flux);
-            this.chem.swap();
+            const chem = this.ensureChem();
+            if (thin) this.runThinFaced(pass, 'bodyAdvectThin', chem.write, chem.read, sixth);
+            else this.runPressed(pass, 'bodyAdvect', chem.write, [chem.read, this.velForced], flux);
+            chem.swap();
           }
         }
         this.shiftCarried(pass, this.dye);
-        if (this.chemLive) this.shiftCarried(pass, this.chem);
+        if (this.chemLive) this.shiftCarried(pass, this.ensureChem());
         return;
       }
       if (!bodiesOn && thin) {
@@ -1122,14 +1123,14 @@ export class WebGPUFluid extends FluidCover {
         this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider, thinAt);
         speciesCarried = !!rider;
         this.carryLiquids(pass, 'thin', thinAdv, 0, thinAt);
-        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
+        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.ensureChem(), thinAdv, undefined, thinAt);
         this.carrySolvent(pass, thinAdv, thinAt);
         return;
       }
       if (!bodiesOn) { 
         this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); 
         this.carryLiquids(pass, 'mac', null, disp);
-        if (this.chemLive) this.macCormack(pass, this.chem, this.velForced, disp, 'dye'); 
+        if (this.chemLive) this.macCormack(pass, this.ensureChem(), this.velForced, disp, 'dye'); 
         return; 
       }
       /*
@@ -1164,7 +1165,7 @@ export class WebGPUFluid extends FluidCover {
         */
         speciesCarried = this.carryShares(pass, od, true, thinAdv, rider, thinAt);
         this.carryLiquids(pass, 'thin', thinAdv, 0, thinAt);
-        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
+        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.ensureChem(), thinAdv, undefined, thinAt);
         this.carrySolvent(pass, thinAdv, thinAt);
         return;
       }
@@ -1173,8 +1174,9 @@ export class WebGPUFluid extends FluidCover {
       this.carryShares(pass, od, false, adv);
       this.carryLiquids(pass, 'pressed', adv);
       if (this.chemLive) {
-        this.runPressed(pass, 'bodyAdvect', this.chem.write, [this.chem.read, this.velForced], adv);
-        this.chem.swap();
+        const chem = this.ensureChem();
+        this.runPressed(pass, 'bodyAdvect', chem.write, [chem.read, this.velForced], adv);
+        chem.swap();
       }
     });
     // The lamp's heat, carried with the colour (PLAN 38f, carryHeat).

@@ -65,7 +65,6 @@ export class FluidSimulation {
   size: number;
   dt: number;
   diff: number;
-  visc: number;
 
   density: Float32Array;
   densityR: Float32Array;
@@ -482,11 +481,10 @@ export class FluidSimulation {
   get readVx(): Float32Array { return this.gpu ? this.rbVx : this.vx; }
   get readVy(): Float32Array { return this.gpu ? this.rbVy : this.vy; }
 
-  constructor(size: number, diffusion: number, viscosity: number, dt: number) {
+  constructor(size: number, diffusion: number, _viscosity: number, dt: number) {
     this.size = size;
     this.dt = dt;
     this.diff = diffusion;
-    this.visc = viscosity;
     /*
       A pour reaches the GPU's own fields as well (docs/physics-plan.md): oil
       and silicone into the oil, soap into the surfactant, acid and base into

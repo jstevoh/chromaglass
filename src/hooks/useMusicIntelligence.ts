@@ -82,8 +82,6 @@ export interface MusicIntelResult {
   harmonyIndex: number | null;
   /** One-shot lyric trigger — seq increments each time a new trigger fires. */
   trigger: { seq: number; trigger: LyricTrigger } | null;
-  /** One-shot preset pick when a track is (first) identified — seq increments per pick. */
-  presetPick: { seq: number; presetId: string } | null;
   /** Batch of replayed performance gestures to re-fire — seq increments per batch. */
   gestureFire: { seq: number; gestures: GestureEvent[] } | null;
   /** Performances, started and stopped by hand (lib/performanceTake.ts). */
@@ -146,7 +144,6 @@ export function useMusicIntelligence(
   const [replayListenNumber, setReplayListenNumber] = useState<number | null>(null);
   const [allTracks, setAllTracks] = useState<TrackEvolutionState[]>([]);
   const [trigger, setTrigger] = useState<{ seq: number; trigger: LyricTrigger } | null>(null);
-  const [presetPick, setPresetPick] = useState<{ seq: number; presetId: string } | null>(null);
   const [gestureFire, setGestureFire] = useState<{ seq: number; gestures: GestureEvent[] } | null>(null);
   const [livePerformance, setLivePerformance] = useState<PerformanceState['live']>(null);
   const [savedPerformances, setSavedPerformances] = useState<SavedPerformance[]>([]);
@@ -167,7 +164,6 @@ export function useMusicIntelligence(
   /** Where the show reads the map (lib/followedPlace.ts); null while no track has been identified. */
   const placeRef = useRef<{ place: FollowedPlace; map: SongMap | null; isrc: string } | null>(null);
   const triggerSeqRef = useRef(0);
-  const presetSeqRef = useRef(0);
   // The performance being recorded: gestures timed from its start, and the
   // song that was running when it started, if one was.
   const takeRef = useRef<{ startedAtMs: number; date: string; gestures: GestureEvent[]; song: TakeSong | null } | null>(null);
@@ -265,8 +261,6 @@ export function useMusicIntelligence(
       await putTrackState(state);
     }
     setTrackState(state);
-    presetSeqRef.current++;
-    setPresetPick({ seq: presetSeqRef.current, presetId: state.presetId! });
 
     const cached = await getSongMap(identity.isrc);
     setSongMap(cached ?? null);
@@ -670,7 +664,7 @@ export function useMusicIntelligence(
       sectionSentimentValue, heardMap, recording: recordingActive, analyzing,
       replayListenNumber, allTracks,
     },
-    overrides, harmonyIndex, trigger, presetPick, gestureFire, performance: performanceState,
+    overrides, harmonyIndex, trigger, gestureFire, performance: performanceState,
     recordGesture, startPerformance, stopPerformance, replayPerformance, stopPerformanceReplay, deletePerformance,
     manualTag, clearTrack, replayListen, stopReplay, refreshTracks,
     nudgePosition, nudgeToSection, resetNudge, positionNow,
