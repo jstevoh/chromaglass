@@ -1,0 +1,12 @@
+{
+  "about": "This project's places for the watch tool (scripts/watchconfig.mjs says what each field means; docs/watch.md is the tool's README). A packaged copy ships without this file and uses general places.",
+  "references": ["$CHROMAGLASS_REFERENCES", "/mnt/project-files/references", "~/chromaglass-films/references"],
+  "fetch": {
+    "dir": "~/chromaglass-films/watch",
+    "bin": "/opt/homebrew/bin",
+    "where": "the owner's Mac, where YouTube serves it (a home address)",
+    "then": "With the Mac's Desktop Commander tools (start_process), or through Remote Control, run the line below, then stage source.mkv and source.info.json with device_stage_files and run `npm run watch` on the staged source.mkv (the skill says more)."
+  },
+  "settingsMap": "watchsettings.mjs",
+  "scratch": "chromaglass-watch"
+}

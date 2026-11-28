@@ -79,11 +79,11 @@ import { overall } from './watchoverall.mjs';
 import { describe } from './watchwords.mjs';
 import { detectAutocrop, analyseFootage, footageLines, footageOut } from './watchfootage.mjs';
 import { reportCard, loadRatings, formatSideBySideCards } from './watchcard.mjs';
-import { gapSettings } from './watchsettings.mjs';
+import { loadConfig, useConfig, settingsMapFor, macFetch, fetchElsewhere } from './watchconfig.mjs';
 
 // ─── arguments ───────────────────────────────────────────────────────────────
 
-const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', before: '', after: '', selftest: false, quiet: false, crop: null, noAutocrop: false, vs: '', keep: '', note: '', refs: false, settings: null };
+const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', before: '', after: '', selftest: false, quiet: false, crop: null, noAutocrop: false, vs: '', keep: '', note: '', refs: false, settings: null, config: '' };
 const opt = { ...DEFAULTS };
 
 /** A failure the caller can report: a harness catches it, the command line prints it and exits with `code`. */
@@ -115,6 +115,9 @@ function parseArgs(argv) {
     else if (a === '--crop') { const [x, y, w, h] = v().split(',').map(Number); if ([x, y, w, h].every(Number.isFinite) && w > 0 && h > 0) opt.crop = { x, y, w, h }; else fail('--crop wants x,y,w,h as fractions, e.g. 0.5,0,0.25,0.35', 2); }
     else if (a === '--no-autocrop') opt.noAutocrop = true;
     else if (a === '--settings') opt.settings = v();
+    // Where the reference library, the fetch folder and the settings map are
+    // (scripts/watchconfig.mjs, PLAN 47p-1); by default reelreader.config.json.
+    else if (a === '--config') { opt.config = v(); try { useConfig(opt.config); } catch (e) { fail(e.message, 2); } }
     else if (a === '--selftest') opt.selftest = true;
     else if (a === '--help' || a === '-h') { printHelp(); process.exit(0); }
     else if (!opt.input) opt.input = a;
@@ -195,17 +198,10 @@ function download(url, dir) {
           ...thumbs.map(f => `  ${f}`),
           '',
         ] : []),
-        'watch: YouTube refused the video to this machine. It does that to cloud',
-        'addresses; it is not the environment\'s network setting. Ways round it:',
-        '  1. fetch it on the owner\'s Mac, where YouTube serves it (a home address),',
-        '     then bring the file here and watch that. With the Mac\'s Desktop Commander',
-        '     tools (start_process), or through Remote Control, run:',
-        '',
-        `     ${macFetch(url)}`,
-        '',
-        '     then stage source.mkv and source.info.json with device_stage_files and',
-        '     run `npm run watch` on the staged source.mkv (the skill says more);',
-        '  2. ask for the file: a screen recording or a download dropped in the thread;',
+        'watch: YouTube refused the video to this machine. It does that to cloud and',
+        'datacenter addresses; it is not this machine\'s network setting. Ways round it:',
+        ...fetchElsewhere(url),
+        '  2. ask for the file: a screen recording or a download you have the right to;',
         '  3. look for a mirror (archive.org keeps many YouTube uploads).',
       ].join('\n'));
     }
@@ -233,24 +229,6 @@ function fetchArgs(dir, help = '') {
   // Recent yt-dlp needs a JavaScript runtime for YouTube; node is always here.
   if (help.includes('--js-runtimes')) args.push('--js-runtimes', 'node');
   return args;
-}
-
-/**
- * The one line that fetches a URL on the owner's Mac the way `download`
- * does here: Homebrew's yt-dlp and ffmpeg (`brew install yt-dlp ffmpeg`),
- * named by their full paths because a Desktop Commander shell does not have
- * Homebrew on its PATH, and node on PATH for YouTube's JavaScript. Into
- * ~/chromaglass-films/watch/<name>, a folder this project's threads are
- * already allowed to stage files from.
- */
-function macFetch(url) {
-  const name = url.replace(/^https?:\/\/(www\.)?/, '').replace(/[^\w.-]+/g, '_').slice(0, 48);
-  const q = s => `'${s.replace(/'/g, `'\\''`)}'`;
-  return [
-    `export PATH=/opt/homebrew/bin:$PATH; d=~/chromaglass-films/watch/${name}; mkdir -p "$d" && cd "$d" &&`,
-    `yt-dlp --no-playlist --write-info-json --no-progress -f 'bv*+ba/b' -S res:1080 --merge-output-format mkv`,
-    `--ffmpeg-location /opt/homebrew/bin/ffmpeg --js-runtimes node -o 'source.%(ext)s' ${q(url)} && ls -la "$d"`,
-  ].join(' ');
 }
 
 /**
@@ -446,7 +424,7 @@ const stamp = t => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')
 // ─── the watch ───────────────────────────────────────────────────────────────
 
 async function watch() {
-  const out = path.resolve(opt.out || path.join(os.tmpdir(), 'chromaglass-watch',
+  const out = path.resolve(opt.out || path.join(os.tmpdir(), loadConfig().scratch,
     (/^https?:/.test(opt.input) ? opt.input.replace(/^https?:\/\//, '') : path.basename(opt.input)).replace(/[^\w.-]+/g, '_').slice(0, 60)));
   fs.mkdirSync(out, { recursive: true });
   for (const f of fs.readdirSync(out)) if (/^(sheet-\d+|timeline|palette|still-.*)\.png$|^(stats\.tsv|summary\.md|design\.json)$/.test(f)) fs.rmSync(path.join(out, f));
@@ -792,7 +770,10 @@ async function watch() {
     designOut.push('', ...compareDesign(ref, ds, `the reference (${refTitle})`, 'this'));
     if (ref.physics) designOut.push('', ...comparePhysics(ref.physics, ps, 'the reference', 'this'));
     const allGaps = [...designGaps(ref, ds).rows, ...(ref.physics ? physicsGaps(ref.physics, ps).rows : [])];
-    designOut.push('', ...gapSettings(allGaps, takeSettings));
+    // "Settings to try" only for an app the config names a settings map for
+    // (PLAN 47p-1): a gap in edge width is a dial only in an app that has one.
+    const gapSettings = await settingsMapFor(loadConfig()).catch(e => fail(e.message, 2));
+    if (gapSettings) designOut.push('', ...gapSettings(allGaps, takeSettings));
   }
 
   const buckets = Math.min(40, n);
@@ -873,9 +854,9 @@ async function watch() {
 
 /**
  * The shape of a show over minutes, in the units the footage study measured
- * real liquid light shows in (/mnt/project-files/research/light-show/
- * footage.md, "The same clips measured further"), so a take from the app can
- * be put beside the Joshua Light Show and read in the same numbers.
+ * real liquid light shows in (research/light-show/footage.md in the project's
+ * shared folder, "The same clips measured further"), so a take from the app
+ * can be put beside the Joshua Light Show and read in the same numbers.
  *
  * Why these and not the summary's. The summary says how busy a clip is on
  * average; what separated the real shows from our plate was never the
@@ -1413,6 +1394,9 @@ async function selftest() {
  */
 export async function watchVideo(input, options = {}) {
   Object.assign(opt, DEFAULTS, options, { input });
+  // A call names its own config or gets the usual search (watchconfig.mjs),
+  // never the one an earlier call named.
+  useConfig(options.config || null);
   return watch();
 }
 
@@ -1479,7 +1463,7 @@ export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2, blipSeconds =
   return out;
 }
 
-export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg, pickSource, ffmpegLocation, fetchArgs, macFetch, writePng, label };
+export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg, pickSource, ffmpegLocation, fetchArgs, macFetch, fetchElsewhere, writePng, label };
 
 // Run as a command only when this file is the one node was given: a harness
 // that imports it, or bundles it (gig.mjs goes through esbuild, where
