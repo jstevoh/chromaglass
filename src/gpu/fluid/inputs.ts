@@ -14,9 +14,9 @@ import { pressShare } from '../../lib/pressRing';
 import { dyeAbsorbances } from '../../lib/dye';
 import { pouredOf } from '../../lib/bubbleLiquid';
 import { LIQUID_SIGMA } from '../../lib/bubbles';
-import { OIL_SIGMA, interfacialTension } from '../../lib/liquidProps';
+import { interfacialTension } from '../../lib/liquidProps';
 import type { LiquidBehaviour } from '../../types';
-import { LIES_B0, BZ_GRID, CHEM_REF, CHEM_STABLE, CHEM_MOST, LIES_GRID, R32, RG32, RGBA32, type FieldCarry } from './constants';
+import { OIL_TENSION_SIGMA, LIES_B0, BZ_GRID, CHEM_REF, CHEM_STABLE, CHEM_MOST, LIES_GRID, R32, RG32, RGBA32, type FieldCarry } from './constants';
 import { SurfaceHeight } from '../surfaceHeight';
 import { FluidPasses } from './passes';
 import type { CoverState } from '../../lib/cover';
@@ -939,8 +939,10 @@ export class FluidInputs extends FluidPasses {
     const was = this.oilPoured;
     this.oilPoured = Math.max(0, was + Math.max(-1, Math.min(1, what.oil ?? 0)) * Math.PI * radius * radius);
     // The oil's tension (oilSigma, PLAN 38e), the plate's oil averaged by what each pour covers; a hole leaves it as it was.
+    // Oil with no bottle (a look's bodies, a lamp's wax) is at the looks' tuned tension (core.ts oilSigma says why).
     const added = this.oilPoured - was;
-    if (added > 0) this.oilSigma = (this.oilSigma * was + interfacialTension(what.of) * added) / this.oilPoured;
+    const sigma = what.of ? interfacialTension(what.of) : OIL_TENSION_SIGMA;
+    if (added > 0) this.oilSigma = (this.oilSigma * was + sigma * added) / this.oilPoured;
     m.swap();
     pass.end();
     this.submit(enc);
@@ -966,8 +968,8 @@ export class FluidInputs extends FluidPasses {
     }
     this.device.queue.writeTexture({ texture: m.read }, data, { bytesPerRow: n * 16 }, [n, n]);
     this.oilPoured = sum / (n * n);
-    // A look's own oil, laid with no bottle: the shelf's Oil (PLAN 38e).
-    this.oilSigma = OIL_SIGMA;
+    // A look's own oil, laid with no bottle: the tension the looks were tuned at (core.ts oilSigma, PLAN 38e-3).
+    this.oilSigma = OIL_TENSION_SIGMA;
     this.mixLive = true;
     if (sum > 0 || this.surfaceHeight) {
       const enc = this.device.createCommandEncoder({ label: 'lay oil surface' });
@@ -1081,7 +1083,7 @@ export class FluidInputs extends FluidPasses {
     // With the oil gone its colour is the water's: the share is emptied, the dye kept.
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;
-    this.oilSigma = OIL_SIGMA;
+    this.oilSigma = OIL_TENSION_SIGMA;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
     // Gray–Scott too: it was left out, so a look's coral kept growing, and

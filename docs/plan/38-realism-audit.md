@@ -136,6 +136,14 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
     (`oilSigma`, carried and snapshotted with the oil). The dial keeps its 0–1 and is the share
     of the oil's own. The old `OIL_TENSION_GAP` was σ = 0.0239 by the same law, so oil looks
     round 13% faster with sunflower and 55% with silicone. `npm run gap` part 4 holds it.
+    Oil a look lays with no bottle (its bodies, a lava lamp's wax) stays at 0.0239, the
+    tension the looks were tuned at: with sunflower's 27 for it, `lavacycle`'s no-cool-glass
+    control fell 0.88 to 0.71 by 40 s on the Mac (main holds it), so only poured bottles change.
+  - **38e-3** A lava lamp's wax at a measured σ of its own (paraffin against water, about
+    0.04–0.05 N/m, against the 0.0239 the lamp was tuned at), after 19ak-25b says why the
+    no-cool-glass control's window in the wax's weight and tension is narrow. Shortcut in the
+    meantime: a look's bottle-less oil is held at the looks' tuned tension (`fluid/core.ts`
+    `oilSigma`).
   - **38e-2** The cap, still there (`OIL_CELLS` 0.5, `SEALED_CELLS` 1 cell a step). PR #624
     took it off the thin gap outright and needed three things with it, measured on the lab in
     October before 38r: a held film taking the blur's concave waist pull back out (Film Hold's

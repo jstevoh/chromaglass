@@ -20,8 +20,7 @@ import { WebGPUParticles } from '../particles';
 import { WebGPUAir } from '../air';
 import { StandingFilm } from '../standing';
 import { RowUploads } from '../../lib/deltaRows';
-import { OIL_SIGMA } from '../../lib/liquidProps';
-import { REST_GAP, MG_CYCLES, DIV_GROUPS, LIES_B0, BZ_GRID, LIES_GRID, VEL, R32, RGBA32, SIM_FLOATS, type GroupNode, type FieldStats } from './constants';
+import { OIL_TENSION_SIGMA, REST_GAP, MG_CYCLES, DIV_GROUPS, LIES_B0, BZ_GRID, LIES_GRID, VEL, R32, RGBA32, SIM_FLOATS, type GroupNode, type FieldStats } from './constants';
 
 export class FluidCore {
   readonly N: number;
@@ -426,8 +425,18 @@ export class FluidCore {
     poured into it goes toward 37 as the silicone's share grows. One number
     for the plate's oil, not one a cell: the oil is one field, and two oils
     on one plate share it.
+
+    Oil a look lays with no bottle (its own bodies, a lava lamp's wax,
+    oilLay.ts) is at OIL_TENSION_SIGMA, the tension the looks were tuned
+    at, and not the shelf's sunflower 27 mN/m. Measured on the owner's Mac
+    with sunflower's number for it: lavacycle's no-cool-glass control fell
+    0.88 to 0.71 by 40 s (bar 0.05), where main's 0.0239 holds it; that
+    control's window in the wax's weight and tension is narrow and not yet
+    understood (PLAN 19ak-25b), and a lamp's paraffin is not sunflower oil
+    either, so 27 mN/m would be no more real. The wax gets a measured σ
+    of its own once 19ak-25b says why the window is narrow (PLAN 38e-3).
   */
-  protected oilSigma = OIL_SIGMA;
+  protected oilSigma = OIL_TENSION_SIGMA;
   protected rxnLive = false;
   /** What the plate draws from the liquids' own physics, packed (see packView). */
   protected viewTex: GPUTexture | null = null;
@@ -869,7 +878,7 @@ export class FluidCore {
     this.speciesSnap = null;
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;
-    this.oilSigma = OIL_SIGMA;
+    this.oilSigma = OIL_TENSION_SIGMA;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
     this.mixLive = false;
