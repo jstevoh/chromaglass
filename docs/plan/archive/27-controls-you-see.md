@@ -61,7 +61,7 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   on the Mac film decides whether the look stays (2026-11-12: "one last try").
 - **27h-1, shipped (#626).** Twenty-five dials let further where their consumer allowed it;
   story in `docs/plan-shipped.md` §27h-1.
-- **27h-2, shipped (this PR).** The dials whose top the solver held a second time: Swirl,
+- **27h-2, shipped (#1040).** The dials whose top the solver held a second time: Swirl,
   Dye Weight and Heat Spread to 2, Pushes Dye to 1.2, Drop Height to 2, Background Loop to
   1.4, Glass Smear to 3 with no gate, Momentum's lasting current to 0.999. Story in
   `docs/plan-shipped.md` §27h-2; `npm run widedials`.
