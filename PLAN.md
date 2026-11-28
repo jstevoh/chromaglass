@@ -112,8 +112,8 @@ tank (47n, 48k, 48l) and the other ideas (48m, 48o, 15h, 15k). The owner's answe
 (shipped 2026-11-27; **18d-6a** to **18d-6c** are what it left);
 **18d-7** milk blends like milk, no held edge; **18d-5** Surfactant Flow scales soap's real
 spreading strength (1 is real); **38m**, **38n-2** bubble films show their true interference
-colours, Iridescence a boost past real; **38p**, **18k** every look re-baselined for light added
-in linear light; **22l** the middle glass turned against the dish is built as a control;
+colours, Iridescence a boost past real; ~~**38p**~~, ~~**18k**~~ every look re-baselined for light added
+in linear light (shipped 2026-11-27, `npm run linearlight`); **22l** the middle glass turned against the dish is built as a control;
 **33q-4** air bubbles are on by default only in looks made for them. The other open questions
 wait on their themes.
 
@@ -369,7 +369,7 @@ style (§31).
   ~~**31p-1** polarised light~~ (shipped; `npm run polar`), then **31p-2** colour that lingers after the stir, ~~**31p-3** stressed dishes~~ (shipped; `npm run polar`), **31p-3a** a dish that warms, **31p-3b** cellophane, 31p-4 to 31p-7 (§31).
 - **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, ~~**18d-6**~~ dyes that mix with Hold Apart past real, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
 - **6.6** ~~**18m**~~ a drop slumps under its own weight (then ~~**18m-1**~~ #371 inertial regime, ~~**18m-1a**~~ implicit step (then **18m-1b** its cost), **18m-2** to **18m-4**, ~~**18m-5**~~ conservative grid filter, ~~**18m-5a**~~ slump check with grid filter on, ~~**18m-5b**~~ its cost, ~~**18m-5c**~~ the filter's edge reshaping), ~~**18h**~~ #357, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
-  ~~**18a-8**~~ (the corner, the checkerboard and 18a-8b `dampGrid` off the thin gap shipped 2026-11-27, `npm run gridiso`, `npm run gridnull`, `npm run grating`; 18a-8c, the grid filter built with the old plate, shipped 2026-11-27), **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
+  ~~**18a-8**~~ (the corner, the checkerboard and 18a-8b `dampGrid` off the thin gap shipped 2026-11-27, `npm run gridiso`, `npm run gridnull`, `npm run grating`; 18a-8c, the grid filter built with the old plate, shipped 2026-11-27), **18k-film**, ~~**18k-linear**~~ (shipped 2026-11-27 with ~~**16c-linear**~~, `npm run linearlight`; 38p-1, 38p-2 left), **18k-chem**.
 - **6.7** §20 after its prerequisites: ~~**20b**~~ #259, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12, 20b-14 to 20b-16; ~~20b-13~~ the film's dye).
 - **6.8** The ferrofluid: **9t** (**shipped**; then **9u**, **9k**, and 9t's own items), **9h**, **9o**, **9d**, ~~**9v**~~, ~~**9w**~~ #266, **9z**, **9aa** (with **9d**), **9m**,
   **9l**, **9p**, **9q**, **9r**. Spin: **22b** to **22m** (~~22h~~ #252, ~~22j~~ #261, ~~22k~~ #258). Painters: **21b**, **21d**. The

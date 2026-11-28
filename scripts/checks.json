@@ -3790,6 +3790,19 @@
       ]
     },
     {
+      "name": "Light summed where it is light",
+      "shard": "open",
+      "run": "npm run linearlight",
+      "why": [
+        "PLAN 38p / 18k-linear: the plate is drawn in display values, and every",
+        "place it adds or fades light does the sum as light (wgsl/plateLight.ts).",
+        "The functions run in a compute shader on the adapter: a fade exact at its",
+        "ends, halfway from black to white 0.730, two half lights 0.685, Spectral",
+        "Mix's six bands summed as light; then a read of the source that each",
+        "site is wired. Under a minute; lamp line 6 reads the fade off the plate."
+      ]
+    },
+    {
       "name": "The lamp through the dye",
       "shard": "open",
       "run": "npm run lamp",
