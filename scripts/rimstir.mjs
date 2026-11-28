@@ -29,7 +29,7 @@
  *     the dye's picture moved against the still plate's.
  *  3. With no ring at the rim: the rms between r 0.38 and 0.49 over the
  *     middle's no more than 1.5 times the open curl's same ratio (a window
- *     on ψ, the obvious fix, made a jet there).
+ *     on ψ, the obvious fix, would make a jet there).
  *  4. The comet's pull 1.5 (cometX 2.25, with the draught on so the old
  *     code laid it too) keeps the dish's dye (at least 97%; 0.04% before),
  *     and moves its colour along +x against the draught alone.

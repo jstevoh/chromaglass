@@ -45,9 +45,10 @@
  * PLAN 18a-16). That works for the draught because its noise is fine (a
  * period of twenty cells): its ψ is small, so ψ∇(window) is small. The
  * stir's lowest octave is the dish, its ψ about a hundred cells·speed, and
- * the window's gradient across twelve cells turned it into a jet round the
- * rim three to six times the stir in the middle, a ring the dish does not
- * have. Φ by the relaxation has no ring, and costs the source here and
+ * the window's gradient across twelve cells would turn it into a jet round
+ * the rim several times the stir in the middle (worked out on paper, ψ over
+ * the window's width, and not tried), a ring the dish does not have. Φ by
+ * the relaxation has none (\`npm run rimstir\` 3), and costs the source here and
  * hsLiftRelax's sweeps on buffers of its own, as the seal's does.
  *
  * Φ is relaxed LIFT_SWEEPS red-black sweeps a step from where the last step

@@ -86,7 +86,7 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   projection of the same curl noise, u = ∇⊥Φ with −∇²Φ = −∇²ψ inside and Φ = 0 at the rim
   (`src/gpu/wgsl/fluid/stir.ts`, relaxed on hsLiftRelax), and the comet's pull is a tilt's,
   added to Plate Rock's pull in hsBody's closed circulation. Not a window on ψ (the draught's
-  way): the stir's lowest octave is the dish, and a window made a jet round the rim. Lab
+  way): the stir's lowest octave is the dish, and a window would make a jet round the rim (estimated, not tried). Lab
   (128², 600 steps, a disc to r 0.44): Turbulence 0.5 kept 6.86% → 100.01% with the middle's
   stir 96% of the open curl's and no ring at the rim; the comet 1.5 kept 0.04% → 100.02% and
   still moves the colour 0.18 of the plate along its pull. The comet now acts on every thin
