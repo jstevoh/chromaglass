@@ -18,7 +18,7 @@
  * (cleared to no refraction, no height, no bubble), so the camera, the
  * post-effects and the projector take it exactly as they take the plate.
  */
-import { layoutFromWgsl, type PipelineCache } from './kit';
+import { layoutFromWgsl, type PipelineCache, type Prep, type RenderRecipe } from './kit';
 import type { TankPlateField } from './tankPlate';
 
 export const TANK_DRAW_WGSL = /* wgsl */ `
@@ -71,6 +71,35 @@ struct FsOut { @location(0) colour: vec4f, @location(1) aux: vec4f };
 interface DrawState { buf: GPUBuffer; data: Float32Array; u32: Uint32Array; groups: Map<GPUBuffer, Map<GPURenderPipeline, GPUBindGroup>> }
 const states = new WeakMap<GPUTextureView, DrawState>();
 
+function tankDrawName(format: GPUTextureFormat, toTexture: boolean): string {
+  return `tank draw ${format}${toTexture ? ' flipped' : ''}`;
+}
+
+function tankDrawRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: boolean): RenderRecipe {
+  return (module) => {
+    const m = module(TANK_DRAW_WGSL);
+    const constants = toTexture ? { FLIP_Y: -1 } : undefined;
+    return {
+      layout: device.createPipelineLayout({ bindGroupLayouts: [layoutFromWgsl(device, TANK_DRAW_WGSL, 'tank draw', GPUShaderStage.FRAGMENT)] }),
+      vertex: { module: m, entryPoint: 'vs', constants },
+      fragment: { module: m, entryPoint: 'fs', targets: [{ format }, { format: 'rgba8unorm' as GPUTextureFormat }] },
+      primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
+    };
+  };
+}
+
+/**
+ * The tank's draw pipelines (canvas direct, and flipped into the camera/projector
+ * or film-stock picture), built behind the show (`WebGPUPlate.prepare`): no look
+ * opens with Tank on.
+ */
+export function prepareTankDraw(cache: PipelineCache, device: GPUDevice, format: GPUTextureFormat, picture: GPUTextureFormat): Prep[] {
+  return [
+    cache.renderPrep(tankDrawName(format, false), tankDrawRecipe(device, format, false), true),
+    ...[...new Set([format, picture])].map((f) => cache.renderPrep(tankDrawName(f, true), tankDrawRecipe(device, f, true), true)),
+  ];
+}
+
 /**
  * Draw the tank into the plate's targets, if this frame's front plate has one.
  * False (and nothing drawn) when it has none, so the plate draws itself.
@@ -89,16 +118,7 @@ export function drawTank(
   track: (b: GPUBuffer) => GPUBuffer,
 ): boolean {
   if (!field) return false;
-  const pipe = pipelines.renderPipeline(`tank draw ${format}${toTexture ? ' flipped' : ''}`, (module) => {
-    const m = module(TANK_DRAW_WGSL);
-    const constants = toTexture ? { FLIP_Y: -1 } : undefined;
-    return {
-      layout: device.createPipelineLayout({ bindGroupLayouts: [layoutFromWgsl(device, TANK_DRAW_WGSL, 'tank draw', GPUShaderStage.FRAGMENT)] }),
-      vertex: { module: m, entryPoint: 'vs', constants },
-      fragment: { module: m, entryPoint: 'fs', targets: [{ format }, { format: 'rgba8unorm' as GPUTextureFormat }] },
-      primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
-    };
-  });
+  const pipe = pipelines.renderPipeline(tankDrawName(format, toTexture), tankDrawRecipe(device, format, toTexture));
   if (!pipe) return false;
   let u = states.get(auxView);
   if (!u) {

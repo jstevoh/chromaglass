@@ -28,7 +28,7 @@ import { stirCordDepth, withMusicStir } from './lib/stir';
 /*
   Classical Vibe: the photograph style (a lens, its focus and bloom) on a thin
   water at a slow pace, two paper colours, sienna and ice, for the light the
-  dish is shot through. Kept as saved.
+  dish is shot through. Kept as saved, but for its Lamp Ground (below).
 */
 export const CLASSICAL_VIBE: Preset = {
   id: 'classical-vibe',
@@ -69,7 +69,15 @@ export const CLASSICAL_VIBE: Preset = {
     turbulenceDetail: 2,
     boundaryContrast: 0.295,
     saturationBoost: 1.382,
-    lampGround: 1,
+    // Saved at 1, and it never drew: a photograph has its own ground, the lit
+    // paper, and plateUniforms.ts sends the shader a Lamp Ground of 0 whenever
+    // Render Style is Photograph. So the saved 1 was a dial that did nothing,
+    // and `npm run lampzero` read the look as one that ships on the lamp and
+    // found it 0% different from itself at 0 (deploy 1053, 2026-11-27). Set to
+    // what the plate drew as the owner played it: the picture is the same,
+    // byte for byte, and the desk's lamp dial no longer reads 1 on a look it
+    // cannot reach.
+    lampGround: 0,
     dyeBudget: 0.5884,
     edgeRelief: 0.3335,
     plateRock: 0.8054,

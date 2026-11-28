@@ -85,6 +85,7 @@ let lab: Lab | null = null;
 let adapterInfo: { vendor: string; architecture: string; device: string; description: string } | null = null;
 
 let lastDrop: { n: number; h: Float32Array; z: Float32Array } | null = null;
+let lastFocusScale = 1;
 /** The colour drops on their way in (PLAN 18c-2), drained a step at a time by `step` as the app's sim drains its own. */
 const drops = makeDropQueue();
 const api = {
@@ -802,6 +803,10 @@ const api = {
       gelAngle?: number;
       /** The plate drawn this many times into the frame before the one read back, for a timing that the readback does not swamp (the focus pass's cost, PLAN 51b). */
       repeat?: number;
+      /** Each projector's share of a focus dissolve's rack, A's then B's (PLAN 51c), as the stage clocks hand it to the frame. */
+      rack?: number[];
+      /** The most the focus pass may take a melt down by (1: at full size, the check's control; PLAN 51b-3). */
+      focusMax?: number;
       /** The upper moiré sheet's spin, turns (PLAN 45a). */
       moireTurn?: number;
       /*
@@ -875,6 +880,7 @@ const api = {
         // As the app has them: the cells slide on the lab plate's own travel.
         flowRate: CELL_TRAVEL, cellClock: l.cellClock,
         rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: cam.lamp ?? { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, magnets: cam.magnets ?? l.magnets, gelAngle: cam.gelAngle ?? 0, moireTurn: cam.moireTurn ?? 0,
+        rack: cam.rack,
         kaleidoPhase: 0, layer1: { zoom: 1, dx: 0, dy: 0 }, bubbles: { count: 0, strength: cam.bubbles ?? 0 },
         bubblePack: { packed: new Float32Array(160), shape: new Float32Array(160) }, dimmerGain: 1,
         filmLevel: cam.filmLevel ?? 0.05, filmGain: cam.filmGain ?? 3,
@@ -913,6 +919,7 @@ const api = {
       flipped too (`flip`).
     */
     const flipped = cam.flip || !!cam.sources?.length;
+    if (cam.focusMax) plate.focus.maxScale = cam.focusMax;
     for (let i = 1; i < (cam.repeat ?? 1); i++) plate.draw(enc, target.createView(), { width: size, height: size }, layers, undefined, flipped);
     plate.draw(enc, target.createView(), { width: size, height: size }, layers, undefined, flipped);
     // As the app fills them: the frame's settings with the other rows at
@@ -947,10 +954,13 @@ const api = {
     }
     // The closeup's drop surface this frame solved (PLAN §29a), for npm run ferrodrop.
     lastDrop = await plate.drop.read();
+    lastFocusScale = plate.focus.scale;
     // A kept plate lives on for the next render that asks for it (its flakes are on it); a fresh lab drops it.
     if (plate !== l.kept) plate.dispose();
     return cam.sources ? pictures : pictures.wall;
   },
+  /** The scale the focus pass drew the last render at (1 full size, 2 or 4 a melt taken down; PLAN 51b-3). */
+  focusScale() { return lastFocusScale; },
   /** The ferrofluid drop's surface the last render solved, in l_c, or null if it solved none (PLAN §29a). */
   dropHeight() { return lastDrop ? { n: lastDrop.n, h: Array.from(lastDrop.h) } : null; },
   /** Both the solved drop height h and the packed height z = min(h + domes, gap) in l_c (PLAN 29a-11). */

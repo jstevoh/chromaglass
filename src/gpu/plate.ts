@@ -33,7 +33,7 @@ import { BEAD_FLOATS } from '../lib/beadPack';
 import { SOAP_LUT_MAX_NM, SOAP_LUT_STEP_NM, soapFilmLut } from '../lib/soapFilm';
 import { GLINT_SCENE_FORMAT, PlateGlint } from './glint';
 import { FOCUS_SCENE_FORMAT, FOCUS_SHARE_FORMAT, PlateFocus } from './focus';
-import { drawTank } from './tankDraw';
+import { drawTank, prepareTankDraw } from './tankDraw';
 import type { TankPlateField } from './tankPlate';
 import type { FaradayField } from './faraday';
 import { PACK_SURFACE_KERNEL } from './wgsl/plateSurface';
@@ -273,6 +273,7 @@ export class WebGPUPlate {
         : [cache.renderPrep(displayName(GLINT_SCENE_FORMAT, true, true), displayRecipe(device, GLINT_SCENE_FORMAT, true, true), true)]),
       // Each projector's focus (PLAN 51b) and its displays, whole and lean: behind the show.
       ...PlateFocus.prepare(cache, device, format, picture),
+      ...prepareTankDraw(cache, device, format, picture),
       cache.renderPrep(focusName(), displayRecipe(device, FOCUS_SCENE_FORMAT, true, true, WHOLE_DISPLAY, true), true),
       ...(direct && open.display !== WHOLE_DISPLAY
         ? [cache.renderPrep(focusName(open.display), displayRecipe(device, FOCUS_SCENE_FORMAT, true, true, open.display, true), true)] : []),
@@ -623,7 +624,7 @@ export class WebGPUPlate {
     if (focusOn && aux) {
       const into = this.focus.targets(size.width, size.height, two);
       this.display(encoder, into.scene, aux, this.uniformBuffer, this.pack.bytes, fields, timestamps, true, FOCUS_SCENE_FORMAT, { view: into.share, pipe: focusPipe });
-      this.focus.run(encoder, target, toTexture, format, this.uniformBuffer, this.sampler, this.source('mark'), two);
+      this.focus.run(encoder, target, toTexture, format, this.uniformBuffer, this.sampler, this.source('mark'), two, this.pack.get('projFocus'));
       return;
     }
     this.display(encoder, target, aux, this.uniformBuffer, this.pack.bytes, fields, timestamps, toTexture, format);

@@ -268,12 +268,15 @@ function CuesBody({ p }: { p: DeskProps }) {
               >
                 {c.kind === 'sequence' && <span aria-hidden className="pointer-events-none absolute -inset-[3px] rounded-full border border-dashed border-text-2" />}
                 {c.song && <span className="pointer-events-none absolute -bottom-1 -left-1 rounded-full bg-elevated px-1 text-[11px] leading-4 text-muted" title={`Goes up on its own when ${c.song} plays`} data-testid={`cue-song-${c.id}`}>♪</span>}
+                {/* 24 px, not the 16 it shipped at (34b-6): the smallest target `npm run qa`
+                    lets a desk draw ("nothing is smaller than 24px"), and a corner button on a
+                    40 px chip is the one place a hand is likeliest to miss. */}
                 <button
                   type="button"
                   onClick={e => { e.stopPropagation(); p.onItemAction(c.id, 'remove'); }}
                   title="Remove from the set"
                   aria-label={`Remove ${c.name} from the set`}
-                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full border border-border-strong bg-elevated text-[11px] leading-none text-muted opacity-0 hover:text-text focus:opacity-100 group-hover:opacity-100"
+                  className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-border-strong bg-elevated text-[13px] leading-none text-muted opacity-0 hover:text-text focus:opacity-100 group-hover:opacity-100"
                   data-testid={`cue-remove-${c.id}`}
                 >×</button>
               </LookChip>
@@ -344,7 +347,7 @@ function CuesBody({ p }: { p: DeskProps }) {
                       onClick={() => p.onAddSavedToSet(l.id)}
                       title={`Add ${l.name} to the set`}
                       aria-label={`Add ${l.name} to the set`}
-                      className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full border border-border-strong bg-elevated text-[11px] leading-none text-muted opacity-0 hover:text-text focus:opacity-100 group-hover:opacity-100"
+                      className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-border-strong bg-elevated text-[13px] leading-none text-muted opacity-0 hover:text-text focus:opacity-100 group-hover:opacity-100"
                       data-testid={`perform-saved-add-${l.id}`}
                     >+</button>
                   </LookChip>

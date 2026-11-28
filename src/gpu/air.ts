@@ -124,9 +124,13 @@ export class WebGPUAir {
   private readonly uniformF32 = new Float32Array(this.uniformData, 4, 3);
   private disposed = false;
 
-  /** Its one pipeline, built before the show opens (`gpu/prepare.ts`). */
+  /** Its splat built before the show opens (`gpu/prepare.ts`), and the boil's pass behind it (Heat is 0 at opening). */
   static prepare(device: GPUDevice): Prep[] {
-    return [PipelineCache.for(device, 'air').renderPrep('air splat', splatRecipe(device))];
+    const cache = PipelineCache.for(device, 'air');
+    return [
+      cache.renderPrep('air splat', splatRecipe(device)),
+      cache.renderPrep('air boil', boilRecipe(device), true),
+    ];
   }
 
   constructor(private readonly device: GPUDevice, readonly grid: number, capacity: number) {

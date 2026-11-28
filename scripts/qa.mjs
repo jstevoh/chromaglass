@@ -28,6 +28,7 @@ import { chromium } from 'playwright';
 import { launchChromium, port } from './chromium.mjs';
 import { installFrameReader, isGpuEngine, lastFrameRead } from './frame.mjs';
 import { clickAt, modeSwitchX, legibility, coveredControls, statusDots, COVER_WIDTHS } from './layoutProbe.mjs';
+import { chooseSourceOn, presetChecks } from './qaDesk.mjs';
 import { spawn } from 'node:child_process';
 
 // Overridable so two runs can share a machine — measuring a change to this
@@ -170,18 +171,14 @@ const browser = await launchChromium(chromium, { headless: !HEADED });
 
 const errors = [];
 /*
-  Starts narrow on purpose.
+  Starts at 900 px, and why it no longer means the overlay.
 
-  Everything from here to the desk section drives the floating overlay UI —
-  the bottle rail, the toolbar, the preset title menu. That surface has not
-  gone anywhere, but it is now what the app shows *below* 1024px: at laptop
-  width the desk owns the window and none of those controls are rendered.
-  Running these checks at 1440 counted 59 visible buttons instead of 69 and
-  then waited forever for a title button that does not exist.
-
-  So: the overlay checks run at the width the overlay lives at, and the desk
-  gets its own section further down at 1440 — including the two sheets, which
-  are the only way to reach Settings and MIDI once the toolbar is gone.
+  Chosen for the floating overlay, which the app drew below 1024 px. Since 49b
+  (#962, 2026-11-26) there is no overlay at any width (`overlayUp` is false),
+  and the steps below waited sixty seconds for its Band button: main's `qa`
+  ran five checks on every deploy from then on. They take the desk's ways to
+  the same things now (qaDesk.mjs; the command palette for MIDI, Songs and the
+  Guide). 900 px stays as the desk folded; the 1440 section asks the full one.
 */
 const context = await browser.newContext({ permissions: ['camera'], viewport: { width: 900, height: 860 } });
 const page = await context.newPage();
@@ -342,6 +339,8 @@ const viaPalette = async (query) => {
   await settle(700);
 };
 
+const chooseSource = (id) => chooseSourceOn(page, clickOn, settle, id);
+
 /** Every `data-testid` in the document now, with how many elements carry it. */
 const testIdCounts = () => page.evaluate(() => {
   const seen = {};
@@ -454,7 +453,7 @@ try {
     check('and a click anywhere does not start the band: the Source opens on Off',
       (await heard()) === null,
       `volume ${await heard()}`);
-    await clickOn(firstVisible('simulated-audio-button'));
+    await chooseSource('simulated');
     // The analyser has to open and the room calibration has to learn a floor
     // before a level means anything, which takes seconds by design (and more
     // of them under software rasterisation). This waits for a reading rather
@@ -514,57 +513,14 @@ try {
   const buttons = await page.locator('button:visible').count();
   check('the toolbar is there', buttons > 8, `${buttons} buttons`);
 
-  // ── Presets ───────────────────────────────────────────────────────
-  await clickOn('preset-title-button');
-  await settle();
-  const menu = firstVisible('preset-menu');
-  const entries = await menu.locator('button').count();
-  check('the preset menu opens with presets in it', (await menu.count()) === 1 && entries > 10, `${entries} entries`);
-
-  // Read it while it is still open: applying a preset closes the menu, and
-  // saving and loading must still be reachable now that the settings panel's
-  // copy of the presets is gone — one menu, or the feature was lost rather
-  // than de-duplicated.
-  const menuText = await menu.innerText();
-  check('the preset menu can still save and load a look',
-    /save/i.test(menuText) && /load/i.test(menuText));
-  // Apply one and make sure the app survives having its whole look replaced.
-  //
-  // Picking from the menu only *cues* a look now: it waits in the cue bar as
-  // CUED against ON STAGE and reaches the plate on Go, over a crossfade. That
-  // is right for a desk and a trap for a script, so this drives the cue the way
-  // a projectionist does — set the fade to a cut, press Go — and then reads the
-  // settings back. Checking that the click happened is not checking that the
-  // look landed: before this, a preset that never reached the glass passed.
-  const crowd = menu.locator('button', { hasText: /Crowd Plate/i }).first();
-  if (await crowd.count()) {
-    // main's check, kept whole: this branch had `check('a preset can be
-    // applied', true)` here, which is the same literal-true that let painting
-    // die on both desks unnoticed. The clicks go through clickOn because
-    // locator.click() stalls in this environment — see its comment above.
-    await clickOn(crowd);
-    await settle(600);
-    const cued = await firstVisible('cue-armed').count();
-    if (cued) {
-      await firstVisible('cue-fade').selectOption('0');
-      await clickOn(firstVisible('cue-go'));
-    }
-    await settle(2500);
-    // The name on the title is the app's own answer to "what is on the plate",
-    // so it is what the check reads — not the fact that a click happened.
-    const nowOn = await firstVisible('preset-title-button').innerText().catch(() => '');
-    check('a preset reaches the plate', /crowd plate/i.test(nowOn),
-      `${cued ? 'cued, then Go' : 'applied straight'} → ${nowOn.replace(/\s+/g, ' ').trim() || '(no name on the title)'}`);
-  } else {
-    check('a preset reaches the plate', false, 'Crowd Plate not in the menu');
-  }
-  await page.keyboard.press('Escape');
-  await settle(400);
+  // ── Presets ── (the desk's Looks grid, File menu, cue list and Go: qaDesk.mjs)
+  await presetChecks({ page, clickOn, settle, check, firstVisible });
 
   // ── Settings, and every section of it ─────────────────────────────
-  await clickOn(page.locator('button[title*="Settings" i]').first());
+  await clickOn('open-all-settings');
   await settle();
-  const headings = await page.locator('section h3').allInnerTexts();
+  // In the sheet only: the desk's own panels draw some of the same sections.
+  const headings = await page.locator('[data-testid="settings-panel"] section h3').allInnerTexts();
   check('settings opens with its sections', headings.length > 8, `${headings.length}: ${headings.slice(0, 6).join(', ')}…`);
   await noteDuplicates();
 
@@ -644,6 +600,17 @@ try {
   const unlabelled = await page.evaluate(() =>
     [...document.querySelectorAll('input[type="range"]')].filter(i => !i.getAttribute('aria-label')).length);
   check('every slider is labelled', unlabelled === 0, `${unlabelled} without a label`);
+  // Shut again before the plate is measured: the overlay's panel stood beside
+  // the plate, and the desk's Settings sheet at this width lies over it, so an
+  // Alt-click meant for the plate landed on the sheet's rail.
+  await page.keyboard.press('Escape');
+  await settle(500);
+  /** The Settings sheet up, for a section the steps below go to by its rail. */
+  const sheetUp = async () => {
+    if (await page.getByTestId('settings-panel').count()) return;
+    await clickOn('open-all-settings');
+    await settle(800);
+  };
 
   // ── The macro zoom is a move, not a switch ────────────────────────
   //
@@ -875,6 +842,7 @@ try {
   // a mark that is only in the DOM would pass a DOM check and be missing from
   // every screen that matters.
   {
+    await sheetUp();
     await clickOn('settings-nav-mark');
     await settle(300);
     // Eight magenta pixels: full red and full blue with no green. The plate
@@ -940,6 +908,7 @@ try {
   // ── The room camera ───────────────────────────────────────────────
   // One click on the rail, which is the whole point of the rail: the thing
   // that turns the video on and tracks people has a row with its own name.
+  await sheetUp();
   await clickOn('settings-nav-room');
   await settle(500);
   const roomToggle = firstVisible('scene-toggle');
@@ -989,21 +958,30 @@ try {
   // break, rather than assuming it starts from off. Clicking it once must stop
   // the band, and clicking it again must start it, and neither may open a
   // device.
-  const band = firstVisible('simulated-audio-button');
+  // On the desk the sources are a chooser, not a toggle (the Settings sheet's
+  // Sound section): the band is stopped by choosing Silent and started by
+  // choosing it again, and each line reads the level reaching the show as
+  // well as which button is lit.
   const beforeBand = await page.evaluate(() => window.__media.length);
-  // Read by what the button says, not by its colour: it was fuchsia while
-  // playing and is the shared lit look now (PLAN 35a), and the next look
-  // would break a class match again. aria-pressed is the state itself.
-  const bandLit = async () => (await band.getAttribute('aria-pressed')) === 'true';
-  const wasLit = await bandLit();
-  await clickOn(band);
+  // Read by what the button says, not by its colour: aria-pressed is the state
+  // itself (PLAN 35a).
+  // `undefined` when the hook is not there, which is not Silent.
+  const volume = () => page.evaluate(() => (window.chromaglassCastState ? window.chromaglassCastState().audio?.volume ?? null : undefined));
+  const playingBefore = await volume();
+  const silentLit = await chooseSource('none');
   await settle(2000);
-  check('the band button turns it off', (await bandLit()) !== wasLit, wasLit ? 'was on' : 'was off');
-  await clickOn(band);
-  await settle(3000);
+  const silentVolume = await volume();
+  check('choosing Silent stops the band',
+    playingBefore > 0 && silentLit && (silentVolume === null || silentVolume === 0),
+    `volume ${playingBefore} before, Silent ${silentLit ? 'lit' : 'not lit'}, volume ${silentVolume} after`);
+  const bandLit = await chooseSource('simulated');
+  // Waits for a level, as the first five seconds do: the analyser reopens.
+  let bandVolume = null;
+  for (let i = 0; i < 20 && !(bandVolume > 0); i++) { await settle(1000); bandVolume = await volume(); }
   check('the band plays without opening a device',
     (await page.evaluate(() => window.__media.length)) === beforeBand);
-  check('the band reports itself as playing', await bandLit());
+  check('the band reports itself as playing', bandLit && bandVolume > 0,
+    `Band ${bandLit ? 'lit' : 'not lit'}, volume ${bandVolume}`);
 
   // ── Tools and the plate ───────────────────────────────────────────
   //
@@ -1028,14 +1006,18 @@ try {
     }, [mid.x, mid.y]);
     check('the plate is what the cursor is over', topmost.ok, `the cursor is over ${topmost.what}`);
 
-    // Pause from the overlay's own transport, not the F key: F is gated on
-    // `deskUp` and this section runs at 900px, where the narrow-screen UI is
-    // the surface and F does nothing. Pressed it anyway and the plate kept
-    // running, and the check read the liquid's own evaporation — density fell
-    // by 489 across a drag that had just added dye to it.
+    // Still the plate for the drag, or the check reads the liquid's own
+    // evaporation (density once fell by 489 across a drag that had just added
+    // dye). This used the overlay's Pause, because F is gated on `deskUp` and
+    // the overlay had no desk; at 900 px the desk is up now (49b), it has no
+    // Pause button, and F (lib/shortcuts.ts) is the same isActive. Whether it
+    // took is read from the loop's own flag, not assumed.
+    const frozen = () => page.evaluate(() => window.chromaglassDebug?.().active?.() ?? null);
     const pause = page.locator('button[title="Pause"]').first();
-    const canPause = await pause.count() > 0;
-    if (canPause) { await clickOn(pause); await settle(900); }
+    const byButton = await pause.count() > 0;
+    if (byButton) await clickOn(pause); else await page.keyboard.press('f');
+    await settle(900);
+    const canPause = byButton || (await frozen()) === false;
     const before = await page.evaluate(() => {
       const f = window.chromaglassDebug?.().fluids?.[0];
       return f ? f.density.reduce((a, b) => a + b, 0) : null;
@@ -1049,7 +1031,8 @@ try {
       const f = window.chromaglassDebug?.().fluids?.[0];
       return f ? f.density.reduce((a, b) => a + b, 0) : null;
     });
-    if (canPause) { await clickOn(page.locator('button[title="Play"]').first()); await settle(400); }
+    if (byButton) { await clickOn(page.locator('button[title="Play"]').first()); await settle(400); }
+    else { await page.keyboard.press('f'); await settle(400); }
     /*
       A drag has to reach the plate, and this is where that is caught.
 
@@ -1075,12 +1058,20 @@ try {
   check('the keyboard shortcuts run without throwing', true);
 
   // ── The other panels ──────────────────────────────────────────────
-  for (const [title, what] of [['MIDI', 'the MIDI panel'], ['Songs', 'the songs sheet'], ['Track', 'the track panel']]) {
+  // The overlay had a button for each; the desk reaches MIDI and Songs from
+  // the command palette (useCommandPalette.ts, Open), so a panel with no
+  // button is opened there rather than skipped.
+  // Opened from the palette, the panel's own element has to be there: the
+  // palette's Enter runs whatever row comes first, and a line that passes on
+  // the keystroke would pass with the panel gone.
+  for (const [title, what, palette, root] of [['MIDI', 'the MIDI panel', 'MIDI', 'midi-state'], ['Songs', 'the songs sheet', 'Songs', 'songs-panel'], ['Track', 'the track panel', null, null]]) {
     const b = page.locator(`button[title*="${title}" i]`).first();
-    if (await b.count()) {
-      await clickOn(b);
+    const byButton = (await b.count()) > 0;
+    if (byButton || palette) {
+      if (byButton) await clickOn(b); else await viaPalette(palette);
       await settle(800);
-      check(`${what} opens`, true);
+      const up = byButton || (await page.getByTestId(root).count()) > 0;
+      check(`${what} opens`, up, byButton ? '' : `from the command palette, "${palette}": ${up ? root : `no ${root}`}`);
       await noteDuplicates();
       await page.keyboard.press('Escape');
       await settle(400);
@@ -1091,9 +1082,11 @@ try {
 
   // The manual: it opens, it has its sections, and it closes again.
   {
+    // The ? button was the overlay's; on the desk the manual is the command
+    // palette's Guide (useCommandPalette.ts open-guide) and the phone's.
     const b = page.getByTestId('guide-button');
-    if (await b.count()) {
-      await clickOn(b.first());
+    if (await b.count()) await clickOn(b.first()); else await viaPalette('Guide');
+    {
       await settle(1200);
       const navs = await page.locator('[data-testid^="guide-nav-"]').count();
       check('the manual opens with its sections', navs > 8, `${navs} sections`);
@@ -1116,8 +1109,6 @@ try {
       await noteDuplicates();
       const closed = await escapeCloses('guide-panel');
       check('and closes again', closed, closed ? '' : 'still open after six seconds');
-    } else {
-      check('the manual opens with its sections', false, 'no ? button');
     }
   }
 
