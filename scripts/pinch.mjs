@@ -12,14 +12,15 @@
  * across the gap (2/w − 2/h, THREAD in src/gpu/wgsl/fluid/capillary.ts), and
  * threads beaded (`npm run beads`); but every cell's capillary force was then
  * clipped to the most the oil may move in a step (OIL_CELLS). At the oil's
- * real tension that clip binds fourteen times over on a thread's edge, so
+ * tension (0.024 N/m) that clip binds about twelve times over on a 4-cell
+ * thread's edge, so
  * every edge cell pushed at the cap whatever its curvature: the neck and the
  * bulge pushed alike, the force kept only its sign, and the law that picks a
  * bead's spacing was gone. Measured with this script on main: every wave
  * from kr 0.25 to 1.5 grew, the one at 1.5 (8.4 cells), which a real thread
- * smooths in a few milliseconds, at +0.055 a step, faster than the one at
- * 0.55; and four threads from the same ±2% noise broke into 13, 20, 24 and
- * 28 beads, 4.0 to 8.6 widths apart.
+ * smooths in a few milliseconds, at +0.042 a step, faster than the one at
+ * 0.55; and four threads from the same ±2% noise broke into 27, 13, 24 and
+ * 20 beads, their median gaps 3.8 to 9.6 widths.
  *
  * The law. Between two glasses the liquids answer a pressure gradient as
  * Darcy says, u = M(f − ∇p), M = h²/12μ, and the plate's oil is about twice
@@ -44,19 +45,23 @@
  * where a real one would in a few milliseconds: the frame cannot show those,
  * and the spacing is what one sees.
  *
- *   1. Eight threads 4 cells wide, each with one wave of 5% at kr = 0.24 to
- *      1.43, side by side across the dish; their waves' growth over the first
- *      twenty steps (a third of a second), each as a rate a step:
- *      a. the shortest, at kr = 1.5, shrinks (main: +0.055 a step);
+ *   1. Eight threads 4 cells wide, each with one wave of 5% at kr = 0.25 to
+ *      1.5, side by side across the dish; their waves' growth from step 5 to
+ *      25 (a third of a second, past the laid edge's settling), as a rate a
+ *      step:
+ *      a. the rate crosses zero within 30% of Plateau's kr = 1 and every
+ *         wave past it shrinks (main: all eight grew, kr 1.5 at +0.042);
  *      b. the fastest of the eight is at kr 0.45 to 0.8 (the law: 0.67;
- *         main: 0.85, and the four past the cutoff all grew);
+ *         main's is at 0.70 too: a coarse line, two of the eight in range);
  *      c. the three longest, resolved by eight cells a wave or more of the
  *         grid's two-cell edge, grow within 30% of the law's s(k) with
- *         THREAD_PULL's σ and the oil's m.
+ *         THREAD_PULL's σ and the oil's m (main: +19% to +45%, its clip
+ *         no law's σ at all).
  *   2. Four threads 3.5 cells wide with ±2% of white noise in their width
- *      break into beads in two seconds, each thread's beads spaced 4.7
- *      widths (the law's fastest wave) within 15%, the plan's bar (main:
- *      4.0 to 8.6 widths, thread to thread).
+ *      break into beads in two seconds, the median gap between neighbouring
+ *      beads (satellites left out) 4.7 widths (the law's fastest wave)
+ *      within 15% over all four, the plan's bar, and within 25% on each
+ *      (main: 3.8 to 9.6 widths, thread to thread).
  *   3. The dish makes and loses no oil, within 0.1%.
  *   And any GPU validation error fails the run.
  *
@@ -154,6 +159,7 @@ try {
         // The bodies: 4-connected cells over half oil in the thread's band, and its mean width.
         const seen = new Uint8Array(n * n);
         let bodies = 0, sum = 0, cols = 0;
+        const blobs = [];
         for (let i = Math.round(0.12 * n); i <= Math.round(0.88 * n); i++) {
           let w = 0;
           for (let jj = yc - band; jj <= yc + band; jj++) w += Math.max(0, d[(i + jj * n) * 4]);
@@ -165,26 +171,32 @@ try {
           bodies++;
           const stack = [k0];
           seen[k0] = 1;
+          let area = 0, cx = 0;
           while (stack.length) {
             const q = stack.pop(), a = q % n, bb = (q - a) / n;
+            area++; cx += a;
             for (const [u, v] of [[a + 1, bb], [a - 1, bb], [a, bb + 1], [a, bb - 1]]) {
               if (u < 0 || u >= n || v < yc - band || v > yc + band) continue;
               const qq = u + v * n;
               if (!seen[qq] && d[qq * 4] > 0.5) { seen[qq] = 1; stack.push(qq); }
             }
           }
+          blobs.push({ area, x: cx / area });
         }
-        return { amp, mean, bodies, width: sum / cols };
+        return { amp, mean, bodies, blobs, width: sum / cols };
       });
       return { total, threads };
     };
     const gapCells = () => lab.coverMetres() / 0.2 * N;
+    // The waves' rate from step 5 to 25, past the laid edge's first settling.
     const r0 = await read();
+    await lab.step(5, T);
+    const r5 = await read();
     await lab.step(20, T);
     const r20 = await read();
-    await lab.step(100, T);
+    await lab.step(95, T);
     const r120 = await read();
-    return { gap: gapCells(), r0, r20, r120, length: 0.76 * N };
+    return { gap: gapCells(), r0, r5, r20, r120, length: 0.76 * N };
   }, { N, MODES, W_MODE, EPS, W_NOISE, NOISY });
 } finally {
   await close();
@@ -194,28 +206,54 @@ check('no GPU pass failed validation (a force that never ran would read as a hel
 console.log(`   the gap ${r.gap.toFixed(1)} cells; the law: m = ${m.toFixed(2)}, fastest at kr = ${xBest.toFixed(2)} (${(2 * xBest > 0 ? 2 * Math.PI / xBest : 0).toFixed(1)} radii, ${widthsPerBead.toFixed(2)} widths), σ ${sigmaCells.toFixed(1)} cells³ a step`);
 // 1. The waves.
 const waves = MODES.map((x0, j) => {
-  const a = r.r0.threads[j], b = r.r20.threads[j];
+  const a = r.r5.threads[j], b = r.r20.threads[j];
   const rad = a.mean / 2, x = x0 / (W_MODE / 2) * rad; // the laid width's own radius (the edge's clamp leaves it under 4)
   const rate = Math.log((b.amp / b.mean) / (a.amp / a.mean)) / 20;
   return { x, rate, model: sigmaCells / rad ** 3 * law(x), lambdaCells: 2 * Math.PI / (x0 / (W_MODE / 2)) };
 });
 for (const w of waves) console.log(`   kr ${w.x.toFixed(2)} (a wave ${w.lambdaCells.toFixed(1)} cells): ${w.rate >= 0 ? '+' : ''}${w.rate.toFixed(4)} a step, the law ${w.model >= 0 ? '+' : ''}${w.model.toFixed(4)}`);
-const short = waves[waves.length - 1];
-check(`a wave at kr = ${short.x.toFixed(2)}, past Plateau's cutoff, smooths out (main: +0.055 a step)`,
-  short.rate < 0, `${short.rate.toFixed(4)} a step, the law ${short.model.toFixed(4)}`);
+/*
+  Where the growth changes sign, not only that it does: Cahn–Hilliard's own
+  smoothing alone shrinks a short wave, so a sign would pass with no thread
+  force at all. Between the last wave that grows and the first that shrinks,
+  the zero by straight interpolation, within 30% of Plateau's kr = 1.
+*/
+const turn = waves.findIndex((w) => w.rate < 0);
+const zero = turn > 0 ? waves[turn - 1].x + (waves[turn].x - waves[turn - 1].x) * waves[turn - 1].rate / (waves[turn - 1].rate - waves[turn].rate) : NaN;
+check(`a thread's waves stop growing at Plateau's cutoff, kr = 1, within 30%, and every one past it shrinks (main: all eight grew, the one at 1.5 at +0.042 a step)`,
+  turn > 0 && Math.abs(zero - 1) < 0.3 && waves.slice(turn).every((w) => w.rate < 0),
+  `the rate crosses zero at kr ${Number.isFinite(zero) ? zero.toFixed(2) : 'never'}; at kr ${waves[waves.length - 1].x.toFixed(2)} ${waves[waves.length - 1].rate.toFixed(4)} a step`);
 const fastest = waves.reduce((a, b) => (b.rate > a.rate ? b : a));
-check(`the fastest wave of the eight is at kr 0.45 to 0.8 (the law: ${xBest.toFixed(2)}; main: 0.85)`,
+check(`the fastest wave of the eight is at kr 0.45 to 0.8 (the law: ${xBest.toFixed(2)}; main's is 0.70 too, so this line alone does not tell them apart)`,
   fastest.x >= 0.45 && fastest.x <= 0.8, `kr ${fastest.x.toFixed(2)}, ${fastest.rate.toFixed(4)} a step`);
 const resolved = waves.filter((w) => w.lambdaCells >= 22);
 const off = resolved.map((w) => w.rate / w.model - 1);
 check(`the ${resolved.length} longest waves grow at the law's rate within 30%`,
   off.every((e) => Math.abs(e) < 0.3), off.map((e, i) => `kr ${resolved[i].x.toFixed(2)} ${e >= 0 ? '+' : ''}${(100 * e).toFixed(0)}%`).join(', '));
 // 2. The beads.
+/*
+  The beads' spacing as the median gap between neighbouring beads' centres
+  along each thread, satellites (under a quarter of the median bead's area)
+  left out, so close and wide gaps cannot average to the law.
+*/
 const noisy = r.r120.threads.slice(MODES.length);
-const each = noisy.map((t, j) => r.length / t.bodies / r.r0.threads[MODES.length + j].width);
-check(`four threads ${W_NOISE} cells wide each break into beads ${widthsPerBead.toFixed(1)} widths apart within 15% (main: 4.0 to 8.6)`,
-  each.every((e) => Math.abs(e / widthsPerBead - 1) < 0.15),
-  `${noisy.map((t) => t.bodies).join(', ')} beads, ${each.map((e) => e.toFixed(2)).join(', ')} widths a bead`);
+const median = (a) => { const b = [...a].sort((p, q) => p - q); return b.length ? b[b.length >> 1] : NaN; };
+const each = noisy.map((t, j) => {
+  const big = median(t.blobs.map((b) => b.area));
+  const xs = t.blobs.filter((b) => b.area >= big / 4).map((b) => b.x).sort((p, q) => p - q);
+  const w = r.r0.threads[MODES.length + j].width;
+  return { beads: xs.length, gaps: xs.slice(1).map((x, i) => (x - xs[i]) / w) };
+});
+/*
+  Pooled, the four threads' gaps hold the law within the plan's 15%; one
+  thread alone is two dozen gaps from white noise, whose own spread is
+  some 10%, so each is held to 25%, which main's 9.6 is far past.
+*/
+const pooled = median(each.flatMap((e) => e.gaps));
+const per = each.map((e) => median(e.gaps));
+check(`four threads ${W_NOISE} cells wide break into beads ${widthsPerBead.toFixed(1)} widths apart, the median gap of all within 15% and of each thread within 25% (main: 3.8 to 9.6 thread by thread)`,
+  each.every((e) => e.beads >= 6) && Math.abs(pooled / widthsPerBead - 1) < 0.15 && per.every((e) => Math.abs(e / widthsPerBead - 1) < 0.25),
+  `${each.map((e) => e.beads).join(', ')} beads; ${pooled.toFixed(2)} widths a bead in all (${(100 * (pooled / widthsPerBead - 1)).toFixed(0)}%), ${per.map((e) => e.toFixed(2)).join(', ')} thread by thread`);
 // 3. The oil.
 const drift = Math.abs(r.r120.total / r.r0.total - 1);
 check('the dish makes and loses no oil (its total within 0.1%)', drift < 0.001, `${r.r0.total.toFixed(1)} → ${r.r120.total.toFixed(1)} cells' worth`);
