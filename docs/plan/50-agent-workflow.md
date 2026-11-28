@@ -168,6 +168,11 @@ more gates: a check that can no longer fail is worse than none, because it reads
   line of the first run becomes a check (Claude), one PR per area; **50l-2** a fault per
   area the list does not yet reach (the desks, the phone, the server) as their fixes land;
   **50l-3** the app's checks (`--app`) in the weekly run once a run's length is known.
-- **50m** *The scorecard as a script* (S, Claude). `/mnt/project-files/workflow/scorecard.md`
-  is written by hand; a script that reads the merged PRs, main's deploy runs and the plan's
-  status writes it, weekly, beside the mutation report.
+- **50m** *The scorecard as a script* (S, Antigravity under brief `50k`; **shipped** 2026-11-27,
+  `npm run scorecard -- --since <date>`). `scripts/scorecard.mjs` reads git and the GitHub
+  API only, and prints per day (Pacific time, at most five lines a day, plus `--json`)
+  merged PRs by side (`antigravity/` or `claude/`), escapes (revert commits on `main`, or
+  merged PRs whose title or body says they fix something an earlier merged PR broke, naming
+  that PR), and the gap in hours between green `"Build and deploy"` jobs of `deploy.yml`,
+  printing no names, emails or account figures. Open: **50m-1** weekly run beside the
+  mutation report writing `scorecard.md` if still wanted.
