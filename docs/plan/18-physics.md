@@ -196,12 +196,11 @@ its frame rate live. "Free" means no new passes or texture reads.
       bar of 1.4–1.8 (cold 0.00829, warm 0.01566). Real water's μ(20 °C)/μ(50 °C) is
       1.0016/0.5465 = 1.83, so the bar's "~2%/K" may be the thing that is off, or the
       warm plate's speed carries more than the viscosity. Measure which before moving it.
-  - **18a-5, the press over its own time.** `squish` can lay a press's dent in one
-    step, so the displaced volume leaves in one step, faster than the dye's face
-    fluxes may carry it (0.45 of a cell a step). The app's Press lays its dent a step
-    at a time (`lib/squish.ts`), and `npm run thingap` presses over ten steps; the
-    glass should close over the press's own time wherever a dent is laid, and
-    `gapMemory` then has no job in a thin gap.
+  - **18a-5b, the presses laid per event.** A pad's or a remote's 'press' gesture
+    (`performGesture`) and a Touch tool's move (`sim/tools.ts`) lay a dent per event, not
+    per step, so how fast they close follows the event rate (a MIDI pad's or a phone's
+    message rate). A held gesture could carry its seconds held. And the old plate's pile
+    (`applySquish`, 45 presses' steps) still counts steps. (S; not reported.)
   - **18a-6, inertia for water.** The velocity's self-advection is dropped. The reduced
     Reynolds number Re·h/L is under 0.1 for oils and near 2 for water in the plate's
     6 mm middle, so water in a deep gap has more inertia than this keeps. Measure it on
@@ -435,22 +434,6 @@ its frame rate live. "Free" means no new passes or texture reads.
     keeps it (tried here: a mixed ring of the meniscus's volume, π h / 4R of the dish) is the
     model if it ever matters; Oil Bodies' own share past the rim (oilDye, never cleared there)
     would have to be cleared with it, or bodyUnspread raises the dye to it.
-  - **18a-25, the comet's pull and the Turbulence noise are through-flows at the open rim.**
-    Found re-tuning the looks the real dye mixing left bare (28i-8, 2026-11-27). On Classical
-    Vibe's thin gap, each stir alone on its own pours (lab, Metal, the dish's mean dye): with
-    nothing stirring the dish held 0.59; the comet's pull (`cometSpeed`) at 0.75 took it to
-    0.05 in 10 s; Turbulence 0.25 to 0.17 in 30 s; the music's stir cord on Turbulence alone
-    to 0.08; Air changed nothing. Lacing Run read the same (a mean of 0.08 at 30 s at Turbulence 0.1,
-    0.02–0.04 at 0.2, and 0.06 at 60 s at 0 with the music's stir cord still on it). The comet is a uniform drift and the curl noise in forcesB
-    (`src/gpu/wgsl/fluid/forces.ts`) has a lowest octave the size of the dish, and neither is
-    held closed at the rim, so both carry liquid, and its dye, out over it; the regulator
-    cannot put back what has left. The looks were re-tuned around it (less of both); the fix
-    is the physics: lay both as stream functions held at zero near the rim, the way 18a-16
-    did the draught and 18a-17 the tilt, so they turn the liquid inside the dish and send
-    none out. Then the looks 28i-8 calmed can have their stir back. Measure with the dish's
-    own mean over 60 s at Turbulence 0.5 and the comet at 1.5 on Classical Vibe's saved
-    settings (a mean under 0.4 at 60 s means it still leaks).
-
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 

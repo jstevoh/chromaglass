@@ -3207,3 +3207,20 @@ each top.
 2. Relief / 3D at 0: the old flat drawing, black domes.
 3. Bad: domes that read as holes or bowls rather than raised, a sheen that looks painted on, or
    any change to the plate at 1x.
+
+## 153. Caustics: each drop focuses the lamp's light (PLAN 31s-2)
+
+With Projector Focus off its middle, the light is traced through the liquid to the wall instead
+of being darkened and brightened in place. The judging films are on the thread's page.
+
+1. Any oil look (Classic, Clock Glass), Projector Focus 0.6: every drop should have a bright
+   rim just inside its edge and a dark band at the edge, one smooth line, not beads.
+2. Projector Focus 0.8 to 1: the drop's light gathers to a bright core or crosses into a wide
+   bright rim; softer the further off focus (the lamp's size). Below 0.5 the drops throw their
+   light outward instead.
+3. Projector Focus 0.5: nothing changed.
+4. Bad: a rim drawn as dots, a seam or square at a drop's edge, flicker as a drop moves, a
+   whole look much darker or brighter off focus than before.
+
+To put it back: `causticDz` in `src/gpu/caustic.ts` returns 0 (the display falls back to the
+first-order shadowgraph it drew before).

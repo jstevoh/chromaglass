@@ -247,24 +247,39 @@ how much dye sits in a cell, not from the shape of the oil and water surface, an
 only darkened where it is, never moved, so there are no caustics: no bright rims focused by a
 lens-shaped drop, no shadow beside it.*
 
-- **31s-1a. The height field is paid for before anything draws it** (S; Medium for frame
-  time, found landing 31s-1, 2026-11-27). On a look with oil the field is levelled every
-  frame (`fluid/passes.ts` stepSurfaceHeight) and packed whole for the plate
-  (`plate.ts` packSurface), and the plate reads it only when `U.gridSize < 0`, which never
-  happens: a step and a full-grid pack a frame for no picture, until 31s-2 reads it. Its
-  `profiler.pass` is also not behind the `stageTimings` gate the particles use. Either gate
-  both on a reader existing, or land 31s-2 next (the owner's physics queue has it in batch
-  2). Measure: `npm run encode`'s dispatch count on an oil look, with and without. none.
-- **31s-2. Light traced through the surface, gathered on the wall.** Each lamp ray leaves the
-  lamp, bends at the surface by Snell's law (air, oil, water and glass indices, the slope from
-  31s-1), and lands on the wall where its new direction takes it; the wall's brightness is how
-  many rays land in each pixel (the inverse Jacobian of that map). A lens-shaped drop then
-  focuses a bright rim and throws a shadow beside it by itself, as on an overhead projector.
-  This replaces the dye-thickness optical path and the aperture darkening (refractionOptics),
-  and the stopgap's dense slope stencil (15g-15). *Measure (lab):* a plano-convex drop of
-  radius R focuses at R/(n-1) within 10%; a flat plate lights the wall evenly (1%); light is
-  kept (total on the wall within 1% of total in); no feature is drawn twice (one peak per drop
-  in the wall's autocorrelation).
+- **31s-2b. The pupil's loss from the same traced path** (M; changes every oil look in focus, so
+  films for the owner). In focus `oplPupilLoss` still reads the derive pass's `.z`, |grad OPL|
+  from the view's oil share, a phase-field edge a cell or two wide, where the trace reads the
+  height's meniscus. Move `.z` onto the same path (`surfacePath` per tap) and let the trace drop
+  rays bent past the lens's acceptance (the aperture loss as optics, not a stencil), then retire
+  `oplPupilLoss`. Measure: an oil drop's in-focus rim width against 2 l_c; light kept apart from
+  what the pupil takes.
+- **31s-2c. Each projector traces its own Focus** (S). The trace runs once a frame at the main
+  uniforms' Focus; a projector source drawn again with its own (`drawSource`) reads the header,
+  sees another dz, and falls back to the first-order shadowgraph. Trace per source when two
+  projectors' Focus differ. Measure: two sources at Focus 0.5 and 0.8, the second traced.
+- **31s-2d. The trace's cost on the Air** (S). Off focus it adds, per layer, a ray pass over
+  (m + 9)^2 vertices, 2 (m + 8)^2 triangles drawn and splatted (m = half the packed dye, at most
+  512, so about 0.54 M triangles at grid 768) and two blur passes. Measure the frame on the Air at
+  1600^2 at Focus 0.8 against 0.5 (`npm run encode` counts the passes); if it is past a
+  millisecond, trace at m/2 when the lamp's disc is wider than two texels. Measured on the
+  owner's Mac in the first films (Oil & Water, 1440x900, 10.8 s takes): Focus 0.8 recorded 485
+  frames against main's 566 (about 45 fps against 52); at 0.5 and 0.6 both 646 to 647 (60 fps).
+  So it is the far throw that costs, where more triangles gather into splats and folds overlap.
+- **31s-2e. The pupil's conversion still takes a rest gap as 6 mm** (S, found building 31s-2).
+  `oplPupilLoss` turns rest gaps per texel into plate widths by `DISH_REST_GAP * logicalGrid`,
+  which is a rest gap of 0.03 plate widths (6 mm); since 38r the gap is 2 mm
+  (`DISH_GAP_METRES`), as the trace uses. Fold into 31s-2b, or fix alone with the in-focus films.
+- **31s-2f. `npm run caustics` line 7 (ripple) on Metal** (S, found building 31s-2; the owner
+  chose to merge 31s-2 with it open, 2026-11-28). On the owner's Mac the ripple reads 6.1%
+  against its 6% bar, where SwiftShader reads 4.8%; the other nine lines pass on both. The gap
+  is in how each rasteriser covers the slivers of the ripple's folds at periods of two to three
+  texels, so it shows red in main's Mac report until the trace stops depending on which texel
+  centres a sliver happens to cover. Tried and dropped: 4x MSAA (11.5%, light kept 0.99937),
+  splats fully from gain 1.5, the lamp disc's least blur at 0.7 texels (the lens line broke).
+  The bar stays at 6%. Next to try: splat a triangle once any side is under a texel, not only
+  when its gain says it gathered. Also seen in the second round of films: one black frame at
+  Focus 0.8 (3.17 s into branch2-f08); look for it while measuring 31s-2d.
 - **31s-3. The other sparse stencils.** Still reading the plate at a stride: the camera's
   camLap (an 8-tap max, plateTransmit.ts), lacing() (a 4-tap cross at 3 cells, 33c), the
   lamp's lampBendAt and defocusShadow's reads of the derived layer, and blurAlpha (3x3). (The
@@ -274,8 +289,9 @@ lens-shaped drop, no shadow beside it.*
   ghost copies of anything narrower than its stride the way the slope did. Replace each with the
   traced light of 31s-2 where it is optics, or a dense stencil where it is a field read. `npm run flower`
   measures only the slope and its ∇², so none of these is covered by it yet (31s-10).
-- **31s-4. Retune the looks on the traced light.** Once 31s-2 draws the plate, every preset's
-  brightness, contrast and rim weight moves. Retune on films from the Mac, judged by the owner
+- **31s-4. Retune the looks on the traced light.** Now 31s-2 draws the plate off focus (and
+  31s-2b will in focus), every preset's brightness, contrast and rim weight moves where Focus is
+  set off its middle. Retune on films from the Mac, judged by the owner
   against the reference library (watch skill).
 - **31s-6. Open, found on main's deploy of 2026-11-22 (ebfa3324): `npm run holeline` was
   calibrated on the stride-3 stencil 15g-15 replaced.** The dense slope (#933, `plateSlope.ts`,

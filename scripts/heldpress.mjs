@@ -166,7 +166,7 @@ let nodeTwist = null;
 {
   const fs = await import('node:fs');
   const out = 'node_modules/.cache/heldpress-press.mjs';
-  await build({ stdin: { contents: "export * from './src/lib/pressRing.ts';", resolveDir: process.cwd(), loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
+  await build({ stdin: { contents: "export * from './src/lib/pressRing.ts'; export { handPress } from './src/sim/pressLay.ts';", resolveDir: process.cwd(), loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
   const M = await import(`../${out}`);
   const lv = fs.readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
   const between = (from, to) => {
@@ -187,7 +187,8 @@ let nodeTwist = null;
     };
     const af = new Proxy(rec, { get: (t, key) => (KNOWN.has(key) ? t[key] : (unknown.add(String(key)), () => {})) });
     const scope = {
-      ...M, af, x: X0, y: Y0, GRID_SCALE: GS, GRID_SIZE: N, S: N, layer: 0,
+      // simStepS: the hand's press (handPress) is a rate laid as the step's share (PLAN 18a-5), at sixty a second as before.
+      ...M, af, x: X0, y: Y0, GRID_SCALE: GS, GRID_SIZE: N, S: N, layer: 0, simStepS: 1 / 60,
       beadsRef: { current: { disturb() {} } }, activeLayerRef: { current: 0 },
       currentSettings: { fingering: 0 }, settingsRef: { current: { fingering: 0 } }, ...vars,
     };

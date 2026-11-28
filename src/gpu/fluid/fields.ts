@@ -479,6 +479,9 @@ export class FluidFields extends FluidCore {
       // The sealed bottle's (PLAN 27f-9, wgsl/fluid/seal.ts): the same grid, a weight of its own.
       this.hsSealSrc = this.disposer.track(this.device.createBuffer({ label: 'seal source', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE }));
       this.hsSealPsi = this.disposer.track(this.device.createBuffer({ label: 'seal psi', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
+      // Turbulence's closed stir (PLAN 18a-25, wgsl/fluid/stir.ts): the same grid again.
+      this.hsStirSrc = this.disposer.track(this.device.createBuffer({ label: 'stir source', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE }));
+      this.hsStirPsi = this.disposer.track(this.device.createBuffer({ label: 'stir psi', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
       // The thin solve's own P, packed as the old solver's pressure is. The thin
       // carries read the faces since 18a-8 (hsFlow); hsGradient hands phaseAdvect's area form c·P
       // in that one (wgsl/thinGap.ts, hsGradient).
