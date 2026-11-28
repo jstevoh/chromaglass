@@ -106,6 +106,13 @@ export type Stroke = 'press' | 'lift' | 'splash';
  * the velocity kick, and a multiplier on the dye (1 leaves it).
  */
 export type SquishCell = (idx: number, gap: number, vx: number, vy: number, mul: number) => void;
+/**
+ * A press's bowl laid by the solver at its own cells (PLAN 18a-14, 18a-15):
+ * centre and radius in logical cells, unrounded, the bowl −3·amount·(1 − d²/R²)²
+ * squishDisc lays on a thin gap. The 192² grid's bowl, carried up by the
+ * bilinear, reached the solver as facets with creases between them.
+ */
+export type BowlLay = (x: number, y: number, radius: number, amount: number) => void;
 
 export interface Spokes { count: number; phase: number; seed: number }
 
@@ -128,16 +135,67 @@ function spokeProp(s: number, seed: number) {
 
 const TAU = Math.PI * 2;
 
-/** Where a direction falls on the spokes: how far onto one (−1..1) and which. */
-function onSpoke(theta: number, sp: Spokes) {
+/**
+ * Where a direction falls on the spokes: how far onto one (−1..1) and which.
+ *
+ * Two seams were taken out of it when the lift came to be laid at the
+ * solver's own cells (PLAN 18a-15, `spokeLift` in gpu/wgsl/splat.ts, which
+ * is this function in WGSL). The spoke's index changed where n·warped +
+ * phase crossed a whole turn, which is where the cosine is 1: the crest of
+ * a spoke, so every spoke was two halves with two widths, lengths and
+ * strengths, and the gap it opened stepped along its middle. Counted from
+ * half a turn on, the index changes at a trough, where nothing is laid. And
+ * the spacing's wobble ran at (n/2 + 1) turns a turn, a half-integer for an
+ * odd count, so warped jumped where atan2 wraps (the −x axis). A whole
+ * number of turns closes it. On the 192² grid both were a cell's step the
+ * bilinear smeared; at 768² each is a cliff a solver cell wide.
+ */
+function onSpoke(theta: number, sp: Spokes, seamless = true) {
   const n = sp.count;
-  const warped = theta + 0.35 * Math.cos((n * 0.5 + 1) * theta + sp.phase * 1.7) / n * TAU;
-  const sIdx = Math.floor(((warped + sp.phase / n) / TAU * n) % n + n) % n;
+  // A drop's splash keeps the spokes it was drawn with (`npm run lift` holds it cell for cell): it is laid on the 192² grid, pushes and all.
+  const warped = theta + 0.35 * Math.cos((seamless ? Math.floor(n / 2) + 1 : n * 0.5 + 1) * theta + sp.phase * 1.7) / n * TAU;
+  const sIdx = seamless ? Math.floor(((n * warped + sp.phase) / TAU + 0.5) % n + n) % n : Math.floor(((warped + sp.phase / n) / TAU * n) % n + n) % n;
   const prop = spokeProp(sIdx, sp.seed);
   const raw = Math.cos(n * warped + sp.phase);
   // Narrow spokes: the cosine sharpened by this spoke's width.
   const ang = Math.max(-1, Math.min(1, (raw - (1 - prop.w * 0.85)) / (prop.w * 0.85)));
   return { ang, prop };
+}
+
+/** Hermite's smoothstep of t in 0..1: 0 and 1 met with no slope. */
+const smooth = (t: number) => t * t * (3 - 2 * t);
+
+/**
+ * How much a lift opens the glass at (dx, dy) cells from its press's middle,
+ * 0 to 1 before Fingering: along the spokes, from the rim inward, as far as
+ * this spoke reaches. The invading front starts at the edge of the pressed
+ * disc and runs toward the centre, strongest at the rim where the gap opens
+ * first. A function of a point, not of a cell, so the solver lays the same
+ * glass at its own cells (`spokeLift` in gpu/wgsl/splat.ts is this in WGSL,
+ * and `npm run gridlay` holds the two against each other, PLAN 18a-15).
+ *
+ * Each of its edges is met with no slope (`smooth`): a spoke's sides, where
+ * the sharpened cosine leaves 0 and reaches 1; its inner tip, where the CPU
+ * once started a spoke at 0.35 of its strength in one step (eased over
+ * the cell outward from where it started, so no spoke reaches further in
+ * than it did: `npm run lift` reads the share of a ring opened near the
+ * centre against near the rim, and easing it inward raised it); the reach,
+ * where it was cut at a whole cell; and the rim, where the strength stops
+ * growing. On the 192² grid each was a step or a kink the bilinear smeared
+ * over a cell. At the solver's cells a kink is a crease a solver cell wide,
+ * and a crease in the gap is a jump in its rate (squeezeUpdate's dh/dt, the
+ * flow's source), which 18a-14 found drawing a press's polygon. Eased, a
+ * spoke's glass has the total curvature of its width, not of its edges.
+ */
+export function liftShare(dx: number, dy: number, radius: number, reach: number, sp: Spokes): number {
+  const dist = Math.hypot(dx, dy);
+  if (sp.count === 0 || dist >= reach || dist === 0) return 0;
+  const { ang, prop } = onSpoke(Math.atan2(dy, dx), sp);
+  if (ang <= 0) return 0;
+  const inner = radius * (1 - prop.len);
+  const along = Math.max(0, Math.min(1, (dist - inner) / Math.max(1, radius - inner)));
+  const ends = smooth(Math.max(0, Math.min(1, dist - inner))) * smooth(Math.max(0, Math.min(1, reach - dist)));
+  return smooth(ang) * prop.k * (0.35 + 0.65 * smooth(along)) * ends;
 }
 
 /**
@@ -200,15 +258,8 @@ export function squishDisc(
       if (stroke === 'lift') {
         if (sp.count === 0 || d2 === 0) continue;
         const dist = Math.sqrt(d2);
-        const { ang, prop } = onSpoke(Math.atan2(j, i), sp);
-        if (ang <= 0) continue;
-        // From the rim inward, as far as this spoke reaches: the invading
-        // front starts at the edge of the pressed disc and runs toward the
-        // centre, strongest at the rim where the gap opens first.
-        const inner = radius * (1 - prop.len);
-        if (dist < inner) continue;
-        const along = Math.min(1, (dist - inner) / Math.max(1, radius - inner));
-        const w = ang * prop.k * fingering * (0.35 + 0.65 * along);
+        const w = liftShare(i, j, radius, reach, sp) * fingering;
+        if (w <= 0) continue;
         const push = amount * 8 * w;
         /*
           The gap opens along the spoke ahead of the spring, back toward
@@ -245,7 +296,7 @@ export function squishDisc(
           const rimW = pile > 0 ? Math.max(0, 1 - Math.abs(dist - radius * 0.8) / (radius * 0.2)) : 0;
           if (rimW > 0) mul *= 1 + pile * 0.5 * rimW;
         } else {
-          const { ang, prop } = onSpoke(Math.atan2(j, i), sp);
+          const { ang, prop } = onSpoke(Math.atan2(j, i), sp, false);
           a *= Math.max(0.05, 1 + spokeGain * ang * prop.k);
           // The rim at the finger's end: a band hugging this spoke's own
           // tip, where the dye pushed along the channel piles up.
@@ -706,20 +757,28 @@ export function bassPressDepth(level01: number, impact: number): number {
  */
 export const BASS_STEP = 0.03;
 export class BassPress {
-  private at: { x: number; y: number; r: number; thin: boolean } | null = null;
+  private at: { x: number; y: number; r: number; thin: boolean; fine: boolean } | null = null;
   /** The depth the glass is down now, each disc's amount as `squishDisc` takes it. */
   depth = 0;
 
-  follow(S: number, x: number, y: number, radius: number, depth: number, thin: boolean, cell: SquishCell): void {
+  /**
+   * `bowl` (a thin gap whose solver lays a press's bowl at its own cells,
+   * PLAN 18a-15): the hand's bowl laid there, not on the 192² grid, whose
+   * bilinear carried it up as facets. Each change of depth is a bowl, so
+   * the glass was creased afresh every time the bass moved it.
+   */
+  follow(S: number, x: number, y: number, radius: number, depth: number, thin: boolean, cell: SquishCell, bowl?: BowlLay): void {
     const want = Number.isFinite(depth) && depth > 0 ? depth : 0;
     x = Math.round(x); y = Math.round(y); radius = Math.max(1, Math.round(radius));
     const moved = this.at !== null && (this.at.x !== x || this.at.y !== y || this.at.r !== radius);
-    if (moved || (want === 0 && this.depth > 0)) this.letGo(S, thin, cell);
+    if (moved || (want === 0 && this.depth > 0)) this.letGo(S, thin, cell, bowl);
     const d = want - this.depth;
     if (d === 0 || Math.abs(d) < BASS_STEP * BASS_PRESS) return;
-    squishDisc(S, x, y, radius, d, 0, 'press', 0, cell, thin);
+    const fine = thin && !!bowl && !(this.at && !this.at.fine);
+    if (fine) bowl!(x + 0.5, y + 0.5, radius, d);
+    else squishDisc(S, x, y, radius, d, 0, 'press', 0, cell, thin);
     this.depth = want;
-    this.at = want > 0 ? { x, y, r: radius, thin } : null;
+    this.at = want > 0 ? { x, y, r: radius, thin, fine } : null;
   }
 
   /**
@@ -728,8 +787,12 @@ export class BassPress {
    * that turns Thin Gap off mid-show would otherwise give a flat disc back
    * for a bowl, leaving the middle pressed and lifting the rim.
    */
-  letGo(S: number, _thin: boolean, cell: SquishCell): void {
-    if (this.at && this.depth > 0) squishDisc(S, this.at.x, this.at.y, this.at.r, -this.depth, 0, 'press', 0, cell, this.at.thin);
+  letGo(S: number, _thin: boolean, cell: SquishCell, bowl?: BowlLay): void {
+    const at = this.at;
+    if (at && this.depth > 0) {
+      if (at.fine && bowl) bowl(at.x + 0.5, at.y + 0.5, at.r, -this.depth);
+      else squishDisc(S, at.x, at.y, at.r, -this.depth, 0, 'press', 0, cell, at.thin);
+    }
     this.depth = 0;
     this.at = null;
   }
