@@ -41,7 +41,7 @@ import { pourShare, speciesOf } from '../lib/liquidProps';
 import { RhythmSheet } from '../lib/sheet';
 import { GlassPress } from '../lib/glassPress';
 import { layKick } from './kickLay';
-import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_HOLD, KICK_RELEASE, BassPress, type Presser, type Stroke } from '../lib/squish';
+import { glassSpring, PressLifts, KickRelease, KICK_HOLD, KICK_RELEASE, BassPress, type BowlLay, type Presser, type Stroke } from '../lib/squish';
 import { type Phrase } from '../lib/phrasing';
 import { stream, type Rng } from '../lib/rng';
 import { showNow } from '../lib/showClock';
@@ -51,7 +51,7 @@ import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, B
 import { SIM_STEP, stepCurrentCpu, pressSheetKick } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
 import { layDrop, stepPlateDrops } from './dropSplash';
-import { layPress } from './pressLay';
+import { layLift, layPress, type SpokesLay } from './pressLay';
 import { SolverSeeds, takeBack, addShare, scaleSince, OwedLay, dishMean } from './solverLay';
 import { makeDropQueue, dropsLive } from '../lib/dropImpact';
 import { besideStep } from '../gpu/besidePlate';
@@ -2006,15 +2006,7 @@ export class FluidSimulation {
     const fine = this.thinGap && stroke === 'press' && !!this.gpu!.pressBowl;
     if (fine) { this.gpu!.pressBowl!(x + 0.5, y + 0.5, radius * GRID_SCALE, amount); this.foldDue = true; }
     radius = Math.round(radius * GRID_SCALE);
-    /*
-      A press lands on a whole cell. Beat Squeeze's centre was the middle of
-      the plate plus a fraction of thirty cells, never rounded, so every cell
-      index its disc reported was a fraction too, and a write to a typed
-      array at a fractional index is dropped without a word: the rhythm
-      plate never pressed, from the day it was written until #185 found it
-      (PLAN §10 step 4). Rounded here, for every caller, and in squishDisc
-      too, so the lab and the checks draw the same disc.
-    */
+    // A press lands on a whole cell, for every caller, as in squishDisc (Beat Squeeze's fractional centre: #185, PLAN §10 step 4).
     x = Math.round(x);
     y = Math.round(y);
     // The first moments of a press shove the dye out to its front, where it
@@ -2041,18 +2033,10 @@ export class FluidSimulation {
    * and nothing at all with Fingering at 0.
    */
   private liftStep(): void {
-    for (const lift of this.pressLift.step(showNow(), this.dtSeconds)) {
-      // Cells that land: an index that is not a whole number is a write a
-      // typed array drops without a word (the beat squeeze's fractional
-      // centre, PLAN §10 step 4), and counting those called a lift that
-      // laid nothing a lift.
-      let cells = 0;
-      squishDisc(this.size, lift.x, lift.y, lift.radius, lift.amount, lift.fingering, 'lift', 0, (idx, gap, vx, vy, m) => {
-        if (Number.isInteger(idx)) cells++;
-        this.squishCell(idx, gap, vx, vy, m);
-      }, this.thinGap);
-      this.lastLift = { x: lift.x, y: lift.y, cells };
-    }
+    // At the solver's own cells where it lays them (PLAN 18a-15: the 192² grid's bilinear drew facets).
+    const fine = this.thinGap && !!this.gpu!.liftSpokes;
+    for (const lift of this.pressLift.step(showNow(), this.dtSeconds))
+      this.lastLift = { x: lift.x, y: lift.y, cells: layLift(this.size, lift, this.thinGap, this.squishCell, fine ? this.spokesLay : undefined) };
     // The kicks' presses, held against the spring, let go (`pressKick`): only the gap
     // given back, never past rest.
     this.kickRelease.step(this.size, this.dtSeconds, this.squishCell, this.lastStep?.gapSpring);
@@ -2089,8 +2073,12 @@ export class FluidSimulation {
    */
   pressBass(x: number, y: number, radius: number, depth: number): void {
     if (!this.thinGap) { if (this.bassPress.depth > 0) this.bassPress.letGo(this.size, false, this.squishCell); return; }
-    this.bassPress.follow(this.size, x, y, radius, depth, true, this.squishCell);
+    this.bassPress.follow(this.size, x, y, radius, depth, true, this.squishCell, this.gpu!.pressBowl ? this.bowlLay : undefined);
   }
+
+  /** A bowl and a lift's spokes laid by the solver, at its own cells, folded at the next flush (PLAN 18a-14, 18a-15). */
+  private readonly bowlLay: BowlLay = (x, y, r, a) => { this.gpu!.pressBowl!(x, y, r, a); this.foldDue = true; };
+  private readonly spokesLay: SpokesLay = (...a) => { this.gpu!.liftSpokes?.(...a); this.foldDue = true; };
 
   /** Whether the plate is stepping as a thin gap (PLAN §18a), where a hand lays only the glass. */
   get thinGap(): boolean { return !!this.gpu?.thinGapLive; }

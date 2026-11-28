@@ -174,17 +174,35 @@ console.log('The strokes, as drawn\n');
     Read as the share of a ring the lift opens, near the centre against near
     the rim.
   */
-  const openShare = (cells, q) => {
+  /*
+    Over sixteen presses, not one (PLAN 18a-15). A spoke's length is drawn
+    per spoke, between 0.45 and 1.05 of the press, so about two in five
+    reach in past 0.2 of it, and one press's twenty-odd spokes are a small
+    sample: on main, 35 of 200 presses' own spokes read over half the rim's
+    share at 0.2, and once each spoke had one length (squish.ts onSpoke, its
+    seams), 72 of 200, with the mean share hardly moved (0.42 to 0.43 of the
+    rim's). The press this check used to read, at (113, 85), was one of
+    main's lucky ones (15 % against 44 %). What it asks is the pattern's,
+    so it is asked of the mean over presses at sixteen places; a lift whose
+    spokes start at the centre (`inner = 0`) reads the same share at 0.2 as
+    at 0.9 on every one of them.
+  */
+  const openShare = (cells, q, x0 = cx, y0 = cy) => {
     let on = 0;
     for (let k = 0; k < 720; k++) {
       const t = k / 720 * Math.PI * 2;
-      if ((cells.get((cx + Math.round(Math.cos(t) * q * R)) + (cy + Math.round(Math.sin(t) * q * R)) * S)?.gap ?? 0) > 0) on++;
+      if ((cells.get((x0 + Math.round(Math.cos(t) * q * R)) + (y0 + Math.round(Math.sin(t) * q * R)) * S)?.gap ?? 0) > 0) on++;
     }
     return on / 720;
   };
-  const nearCentre = openShare(lift, 0.2), nearRim = openShare(lift, 0.9);
+  let nearCentre = 0, nearRim = 0;
+  for (let p = 0; p < 16; p++) {
+    const x0 = 70 + (p % 4) * 17, y0 = 64 + Math.floor(p / 4) * 19, cells = new Map();
+    squishDisc(S, x0, y0, R, 0.008, 0.8, 'lift', 0, (idx, gap, vx, vy, m) => cells.set(idx, { gap, vx, vy, m }));
+    nearCentre += openShare(cells, 0.2, x0, y0) / 16; nearRim += openShare(cells, 0.9, x0, y0) / 16;
+  }
   check('and the fingers come in from the rim: far less of a ring near the centre is opened than near the rim', nearCentre < 0.5 * nearRim,
-    `${(100 * nearCentre).toFixed(0)} % at 0.2 of the press, ${(100 * nearRim).toFixed(0)} % at 0.9`);
+    `${(100 * nearCentre).toFixed(0)} % at 0.2 of the press, ${(100 * nearRim).toFixed(0)} % at 0.9, the mean over 16 presses`);
   check('a lift with Fingering at 0 lays nothing', lay('lift', 0, 0.008).size === 0);
 
   /*

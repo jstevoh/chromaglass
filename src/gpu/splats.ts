@@ -19,6 +19,8 @@ export const SPLAT_FLOATS = 16;
 export type Falloff = 'flat' | 'linear' | 'squared' | 'gaussian' | 'plate';
 
 const FALLOFF: Record<Falloff, number> = { flat: 0, linear: 1, squared: 2, gaussian: 3, plate: 4 };
+/** A lift's spokes' record (`spokes`), past every falloff. */
+const SPOKES = 5;
 
 export interface SplatOpts {
   /** How much dye lands at the middle. */
@@ -60,6 +62,21 @@ export class SplatList {
   /** A stroke from (x0, y0) to (x1, y1), in logical cells. */
   line(x0: number, y0: number, x1: number, y1: number, radius: number, o: SplatOpts = {}): this {
     return this.write(x0, y0, Math.max(radius, 0.5), 1, x1, y1, o);
+  }
+
+  /**
+   * A lift's spokes (PLAN 18a-15, `spokeLift` in wgsl/splat.ts): only the gap,
+   * `gap` at a spoke's full strength, out to `reach` from (x, y). The record's
+   * dye column carries the spokes instead (count, phase, and the seed in two
+   * 16-bit halves, each a whole number an f32 holds exactly), and the line's
+   * far end the press's radius.
+   */
+  spokes(x: number, y: number, radius: number, reach: number, gap: number, count: number, phase: number, seed: number): this {
+    this.write(x, y, reach, 0, x, y, { gap });
+    const d = this.data, i = (this.n - 1) * SPLAT_FLOATS;
+    d[i + 4] = count; d[i + 5] = phase; d[i + 6] = seed & 0xffff; d[i + 7] = (seed >>> 16) & 0xffff;
+    d[i + 13] = SPOKES; d[i + 14] = radius;
+    return this;
   }
 
   private write(x: number, y: number, radius: number, kind: number, ex: number, ey: number, o: SplatOpts): this {
