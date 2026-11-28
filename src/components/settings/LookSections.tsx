@@ -2,7 +2,7 @@ import { Palette, Microscope, Film, Clapperboard, Lightbulb, Aperture } from 'lu
 import { VisualizerSettings } from '../../types';
 import { groupOf } from '../../lib/settingsMap';
 import { Info } from '../Info';
-import { Segmented, LIT } from '../ui';
+import { Segmented, LIT, Toggle } from '../ui';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
 
@@ -293,7 +293,7 @@ export const ShowSection = ({ c }: { c: SectionCtx }) => {
           settingKey="melodyWalk"
         />
         <Info>
-          Kick Bloom is the dye each kick throws outward from the bass spot. Melody Walk lets each note of a tune go as a drop, low notes on one side of the plate and high ones on the other, so a played line draws itself across it. Beat Squeeze presses a thin sheet on the liquid where the kick lands: a dent as wide as the sheet bends over this liquid, wide on thin oil, a fingertip on syrup. Plate Rock is the slow one: a hand tipping the dish on the one and three, the heavier colour running downhill each way.
+          Kick Bloom is the dye each kick throws outward from the bass spot. Melody Walk lets each note of a tune go as a drop, low notes on one side of the plate and high ones on the other, so a played line draws itself across it. Beat Squeeze presses a thin sheet on the liquid where the kick lands: a dent as wide as the sheet bends over this liquid, wide on thin oil, a fingertip on syrup. Press the Whole Glass makes the kick bear on the cover glass across the dish instead, as a projectionist's hand did: the liquid squeezes out across the picture and draws back on every kick. Plate Rock is the slow one: a hand tipping the dish on the one and three, the heavier colour running downhill each way.
         </Info>
         <Slider
           label="Beat Squeeze"
@@ -303,6 +303,13 @@ export const ShowSection = ({ c }: { c: SectionCtx }) => {
           step={0.05}
           onChange={(v: number) => onUpdate({ beatSqueeze: v })}
           settingKey="beatSqueeze"
+        />
+        <Toggle
+          label="Press the Whole Glass"
+          on={!!settings.kickGlass}
+          onChange={(v) => onUpdate({ kickGlass: v })}
+          testId="kick-glass-toggle"
+          title="Each kick presses the whole clock glass down and lets it back up, so the picture breathes on the beat"
         />
         <Slider
           label="Accent the One"

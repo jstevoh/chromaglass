@@ -466,12 +466,14 @@ export function dentRadius(nu: number, hold = KICK_HOLD, gapMetres = DISH_GAP_ME
  * The discs a kick presses, in cells of a 128-cell plate, and each one's
  * share of the press: the glass's three across the dish where the look may
  * move the frame (Frame Sway above 0, the cover loose; lib/plateRock.ts
- * FRAME_MOVING_LOOKS), and otherwise the sheet's one dent, as deep in the
+ * FRAME_MOVING_LOOKS) or where the look presses the whole glass (`glass`,
+ * Press the Whole Glass), and otherwise the sheet's one dent, as deep in the
  * middle as the glass's three stacked (each bowl's middle is three times its
  * amount, so the one dent carries all three's).
  */
-export function kickPress(nu: number, sway: number, gapMetres?: number): { radii: number[]; share: number } {
-  if (Number.isFinite(sway) && sway > 0) return { radii: KICK_RADII, share: 1 };
+export function kickPress(nu: number, sway: number, gapMetres?: number, glass?: boolean): { radii: number[]; share: number } {
+  // And the glass wherever the look asks the kick to press it whole (Press the Whole Glass, PLAN 38w-28).
+  if (glass || (Number.isFinite(sway) && sway > 0)) return { radii: KICK_RADII, share: 1 };
   const h = Number.isFinite(gapMetres) ? gapMetres! : DISH_GAP_METRES;
   return { radii: [Math.max(4, Math.round(dentRadius(nu, KICK_HOLD, h) * 128))], share: KICK_RADII.length };
 }

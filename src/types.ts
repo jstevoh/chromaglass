@@ -998,6 +998,15 @@ export interface VisualizerSettings {
   hueJourney: number;         // minutes per step of a slow walk through the preset's dyes (0 = the old random rotation); a set drifts hue over minutes
   beatSqueeze: number;        // the rhythm sheet: each kick presses a dent as wide as the sheet bends over the liquid (lib/squish.ts kickPress)
   /**
+   * Press the Whole Glass (PLAN 38w-28): Beat Squeeze's kick bears on the
+   * clock glass across the dish, one rigid piece down and back up
+   * (lib/glassPress.ts), as a 1960s projectionist's hand did, rather than a
+   * fingertip on the rhythm sheet. The whole picture breathes on the kick.
+   * Off by default: every look keeps the sheet but Lava Pop (and Bass Drop,
+   * whose Frame Sway already presses the glass).
+   */
+  kickGlass?: boolean;
+  /**
    * Kick Bloom: how far each kick throws a ring of dye outward from the bass
    * spot, and the little push on each droplet. 1 is the ring every look has
    * always had; 0 is none. It is the kick's visible outward pulse, apart from
@@ -1364,6 +1373,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   layerScaleVariety: 0.5,
   hueJourney: 3,
   beatSqueeze: 0.0,
+  kickGlass: false,           // the kick a fingertip on the rhythm sheet, as every look had it
   kickBloom: 1,               // the ring each kick has always thrown
   melodyWalk: 0,              // off: no note lays a drop, as every look had it
   beatAccent: 0,            // off: every kick pressed alike, as every look had it
