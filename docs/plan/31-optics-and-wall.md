@@ -270,6 +270,16 @@ lens-shaped drop, no shadow beside it.*
   `oplPupilLoss` turns rest gaps per texel into plate widths by `DISH_REST_GAP * logicalGrid`,
   which is a rest gap of 0.03 plate widths (6 mm); since 38r the gap is 2 mm
   (`DISH_GAP_METRES`), as the trace uses. Fold into 31s-2b, or fix alone with the in-focus films.
+- **31s-2f. `npm run caustics` line 7 (ripple) on Metal** (S, found building 31s-2; the owner
+  chose to merge 31s-2 with it open, 2026-11-28). On the owner's Mac the ripple reads 6.1%
+  against its 6% bar, where SwiftShader reads 4.8%; the other nine lines pass on both. The gap
+  is in how each rasteriser covers the slivers of the ripple's folds at periods of two to three
+  texels, so it shows red in main's Mac report until the trace stops depending on which texel
+  centres a sliver happens to cover. Tried and dropped: 4x MSAA (11.5%, light kept 0.99937),
+  splats fully from gain 1.5, the lamp disc's least blur at 0.7 texels (the lens line broke).
+  The bar stays at 6%. Next to try: splat a triangle once any side is under a texel, not only
+  when its gain says it gathered. Also seen in the second round of films: one black frame at
+  Focus 0.8 (3.17 s into branch2-f08); look for it while measuring 31s-2d.
 - **31s-3. The other sparse stencils.** Still reading the plate at a stride: the camera's
   camLap (an 8-tap max, plateTransmit.ts), lacing() (a 4-tap cross at 3 cells, 33c), the
   lamp's lampBendAt and defocusShadow's reads of the derived layer, and blurAlpha (3x3). (The
