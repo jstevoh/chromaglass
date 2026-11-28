@@ -39,9 +39,16 @@ Mac app, and not named on any page a visitor or customer reads.
   its folder: `~/.config/sendreel/youtube/` or `%APPDATA%\sendreel\youtube\`, the owner's existing
   `~/.chromaglass/youtube/` while it exists, or `SENDREEL_DIR` / `CHROMAGLASS_YOUTUBE_DIR`;
   beside the Google client file the user saves there). `settings.json` in that folder:
-  `timeZone` (release times; the computer's own by default) and `categoryId` (new
-  uploads; 22 by default, 10 in the owner's old folder); an unknown key stops the server at start. Tools: `channel`, `list_videos`, `upload_video` (resumable
-  8 MiB chunks; resumes a dropped connection, an expired key, and a closed app from
+  `timeZone` (release times; the computer's own by default), `categoryId` (new
+  uploads; 22 by default, 10 in the owner's old folder) and `credits` (44i-2b: a line, or a
+  list of lines, put at the foot of every new upload's description and each other
+  language's; `{music}` in it is filled from the upload's `music`, and an upload under such a
+  line with no music is refused); an unknown key stops the server at start. Tools: `channel`, `list_videos`, `upload_video` (resumable
+  8 MiB chunks; 44i-2b's words: `chapters` (lines like `0:00 Intro` or `{ at, title }`,
+  refused unless YouTube would make chapters of them: from 0:00, three or more, ten
+  seconds each), `music` and `credits` (the settings line, a line of its own, or `false`),
+  `captions` (`.srt`/`.vtt` files sent once the video is up, each looked at before the job is
+  made), `localizations` (`{"es": {title, description}}`, needs `language`); resumes a dropped connection, an expired key, and a closed app from
   `uploads.json`; emits MCP `notifications/progress` when `progressToken` is sent;
   queues the job with `notBefore` on `uploadLimitExceeded` or `quotaExceeded` instead of
   failing), `queue_upload` (saves a job in state `queued` with optional `key` and
@@ -50,7 +57,10 @@ Mac app, and not named on any page a visitor or customer reads.
   search, then queues a private replacement upload via `queue_upload` carrying the old
   metadata, playlists/positions, `replaces` and manifest `key`; never deletes or edits
   the old video), `upload_status` (lists queued jobs with `not_before` in the settings time zone),
-  `update_video` (only the fields named change), `release_plan` (schedules live private
+  `update_video` (only the fields named change; new `chapters` replace the old list, checked
+  against the video's length; `localizations` keeps languages it does not name, `null`
+  takes one off), `add_captions` (an `.srt` or `.vtt` to a video already up, 400 units),
+  `list_captions`, `release_plan` (schedules live private
   videos via `publishAt` — 50 quota units each — and queued jobs at a clock time in the settings time zone,
   with `dry_run` and DST-safe slot spacing; only run when the owner asked for that
   release), `set_thumbnail`, `list_playlists`, `create_playlist`, `add_to_playlist`,
@@ -84,17 +94,29 @@ Mac app, and not named on any page a visitor or customer reads.
     "key": "slow-dawn",
     "replaces": "oldVideoId123",
     "publish_at": "2026-12-01T18:00:00Z",
-    "privacy": "private"
+    "privacy": "private",
+    "language": "en",
+    "music": "Unraveling",
+    "chapters": ["0:00 The dish fills", "1:30 Oil", "3:10 Beads"],
+    "captions": ["slow-dawn.en.srt", { "file": "slow-dawn.es.vtt", "language": "es" }],
+    "localizations": { "es": { "title": "Amanecer lento" } }
   }
   ```
+
+  A caption file or thumbnail named in the card is found beside the card.
 
 ## Contracts
 
 - `youtube/`: the YouTube server's own modules (44i-2a). `zone.js` (clock times in a
   named zone; the quota reset stays Pacific, YouTube's), `platform.js` (`schedulePlan`,
   `notifyCommand`: per-system scheduler and notifier, pure), `settings.js` (`configDir`,
-  `env`, `readSettings`), `setup.js` (`runSetup`, `formatSetup`). They import only Node's
-  modules and each other.
+  `env`, `readSettings`, whose result now carries `credits`), `setup.js` (`runSetup`,
+  `formatSetup`), and 44i-2b's `describe.js` (`parseChapters`, `stripChapters`,
+  `composeDescription`, `creditsLine`, `composeLocalizations`, `checkTitle`, `validLanguage`,
+  `isoSeconds`, `parseTime`, `formatTime`, `chapterBlock`: the description's parts and
+  YouTube's limits, pure) and `captions.js` (`CAPTION`, `CAPTION_UNITS`, `readCaptionFile`,
+  `captionRequest`: which caption files count and the multipart body). They import only
+  Node's modules and each other.
 - `youtube-mcp.js` imports nothing from the repo but `youtube/` (the two move to a
   repository of their own, 44i-2), uploads private unless told otherwise (Google's own default is public
   since 2026-11-02), and never puts a key, the client secret or an upload session's
@@ -117,7 +139,8 @@ Mac app, and not named on any page a visitor or customer reads.
 ## Checks
 
 `npm run youtube` (scripts/youtube.mjs): the YouTube server over stdio against a stand-in
-Google on loopback, every rule with a mutant that must fail.
+Google on loopback, every rule with a mutant that must fail (the words around a video,
+44i-2b, in `scripts/youtubeText.mjs` beside it).
 
 `npm run assistant` (scripts/assistant.mjs): this server over stdio against the real show
 server, every rule with a mutant that must fail.

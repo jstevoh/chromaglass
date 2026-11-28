@@ -71,6 +71,8 @@ import { homedir } from 'node:os';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { CAPTION, CAPTION_UNITS, captionRequest, readCaptionFile } from './youtube/captions.js';
+import { checkTitle, composeDescription, composeLocalizations, creditsLine, isoSeconds, parseChapters, validLanguage } from './youtube/describe.js';
 import { notifyCommand, schedulePlan } from './youtube/platform.js';
 import { configDir, env, readSettings } from './youtube/settings.js';
 import { formatSetup, runSetup } from './youtube/setup.js';
@@ -316,11 +318,13 @@ const describe = (v) => ({
   likes: v.statistics ? Number(v.statistics.likeCount ?? 0) : undefined,
   description: v.snippet?.description, tags: v.snippet?.tags ?? [], category_id: v.snippet?.categoryId,
   made_for_kids: v.status?.selfDeclaredMadeForKids ?? v.status?.madeForKids,
+  ...(v.snippet?.defaultLanguage ? { language: v.snippet.defaultLanguage } : {}),
+  ...(v.localizations && Object.keys(v.localizations).length ? { localizations: v.localizations } : {}),
 });
 
 async function videos(ids) {
   if (!ids.length) return [];
-  const { j } = await api('GET', 'videos', { query: { part: 'snippet,status,statistics,contentDetails', id: ids.join(','), maxResults: 50 } });
+  const { j } = await api('GET', 'videos', { query: { part: 'snippet,status,statistics,contentDetails,localizations', id: ids.join(','), maxResults: 50 } });
   return j.items ?? [];
 }
 
@@ -342,11 +346,32 @@ async function updateVideo(a) {
   if (!cur) throw new Error(`No video ${a.video_id} on this channel.`);
   const snippet = { ...cur.snippet };
   for (const k of ['thumbnails', 'localized', 'publishedAt', 'channelId', 'channelTitle', 'liveBroadcastContent']) delete snippet[k];
-  if (a.title !== undefined) snippet.title = a.title;
-  if (a.description !== undefined) snippet.description = a.description;
+  if (a.title !== undefined) snippet.title = checkTitle(a.title);
   if (a.tags !== undefined) snippet.tags = a.tags;
   if (a.category_id !== undefined) snippet.categoryId = String(a.category_id);
   if (a.language !== undefined) snippet.defaultLanguage = snippet.defaultAudioLanguage = a.language;
+  /* The words (44i-2b). The description is put together again only when one
+     of its parts is named: new text keeps its chapters and gets the credits
+     line, new chapters replace the old ones, checked against the video's own
+     length. A title-only update leaves the description exactly as it was. */
+  let localizations;
+  if (['description', 'chapters', 'credits', 'music', 'localizations'].some((k) => a[k] !== undefined)) {
+    /* Other languages added alone to a video whose description has no credits line (one from
+       before 44i-2b, or uploaded with credits: false) take its description as it is: adding a
+       Spanish title is not the moment to demand the music's name. */
+    const wordsNamed = ['description', 'chapters', 'credits', 'music'].some((k) => a[k] !== undefined);
+    const body = a.description ?? cur.snippet?.description ?? '';
+    let lenient = {};
+    if (!wordsNamed) { try { creditsLine(SETTINGS.credits, undefined, undefined, body); } catch { lenient = { credits: false }; } }
+    const w = wordsFor({ ...a, ...lenient, description: body, language: snippet.defaultLanguage }, isoSeconds(cur.contentDetails?.duration));
+    if (wordsNamed) snippet.description = w.description;
+    /* The localizations part is whole as well: languages not named are kept,
+       one set to null is taken off. */
+    if (w.localizations) {
+      localizations = { ...(cur.localizations ?? {}) };
+      for (const [lang, v] of Object.entries(w.localizations)) { if (v === null) delete localizations[lang]; else localizations[lang] = v; }
+    }
+  }
   /* The status part is whole too: a field left out is reset (a Studio
      "altered or synthetic" mark, embedding, the licence). So it starts from
      all of the video's status and drops only what YouTube sets itself;
@@ -356,7 +381,7 @@ async function updateVideo(a) {
   if (a.privacy !== undefined) { status.privacyStatus = a.privacy; if (a.privacy !== 'private') delete status.publishAt; }
   if (a.publish_at !== undefined) { status.publishAt = a.publish_at || undefined; if (a.publish_at) status.privacyStatus = 'private'; }
   if (a.made_for_kids !== undefined) status.selfDeclaredMadeForKids = Boolean(a.made_for_kids);
-  const { j } = await api('PUT', 'videos', { query: { part: 'snippet,status' }, body: { id: cur.id, snippet, status } });
+  const { j } = await api('PUT', 'videos', { query: { part: localizations ? 'snippet,status,localizations' : 'snippet,status' }, body: { id: cur.id, snippet, status, ...(localizations ? { localizations } : {}) } });
   return describe({ ...cur, ...j });
 }
 
@@ -407,6 +432,45 @@ async function setThumbnail(videoId, file) {
   if (statSync(path).size > 2 * 1024 * 1024) throw new Error('A thumbnail must be 2 MB or less.');
   await api('POST', 'thumbnails/set', { base: G.upload, query: { videoId, uploadType: 'media' }, raw: readFileSync(path), type });
   return 'thumbnail set';
+}
+
+/*
+  Captions (44i-2b, youtube/captions.js). Every caption an upload names is
+  looked at when the job is made (its file, its kind, its cues, its language),
+  so the drain hours later sends only what passed. `captions.insert` is 400
+  units, so a film with three languages is 1,200 of the day's 10,000.
+*/
+function captionsFor(a) {
+  if (a.captions === undefined || a.captions === null) return [];
+  const list = Array.isArray(a.captions) ? a.captions : [a.captions];
+  return list.map((c) => {
+    const o = typeof c === 'string' ? { file: c } : c;
+    if (!o || typeof o !== 'object') throw new Error('captions is a list of caption files, each a path or { file, language, name }.');
+    const { path } = uploadable(o.file, CAPTION, 'A caption file');
+    readCaptionFile(path);
+    const language = String(o.language ?? a.language ?? '');
+    if (!validLanguage(language)) throw new Error(`The caption file ${basename(path)} needs its language (e.g. "en"): on the caption, or the upload's language.`);
+    return { file: path, language, ...(o.name ? { name: String(o.name) } : {}), ...(o.draft ? { draft: true } : {}) };
+  });
+}
+async function addCaptions(videoId, c) {
+  const { path } = uploadable(c.file, CAPTION, 'A caption file');
+  const { raw, type } = captionRequest({ videoId, language: c.language, name: c.name ?? '', draft: c.draft }, readCaptionFile(path));
+  const { j } = await api('POST', 'captions', { base: G.upload, query: { part: 'snippet', uploadType: 'multipart' }, raw, type });
+  return `captions ${c.language}${c.name ? ` (${c.name})` : ''} added (${j.id})`;
+}
+async function listCaptions(videoId) {
+  const { j } = await api('GET', 'captions', { query: { part: 'snippet', videoId } });
+  return (j.items ?? []).map((t) => ({ id: t.id, language: t.snippet?.language, name: t.snippet?.name, kind: t.snippet?.trackKind, draft: t.snippet?.isDraft, status: t.snippet?.status }));
+}
+
+/* The description and the other languages' words for an upload or an update (youtube/describe.js). */
+function wordsFor(a, durationSec) {
+  const chapters = parseChapters(a.chapters, durationSec);
+  const credits = creditsLine(SETTINGS.credits, a.credits, a.music, a.description);
+  const description = composeDescription(a.description ?? '', chapters, credits);
+  const localizations = composeLocalizations(a.localizations, { language: a.language, chapters, credits, fallbackDescription: description });
+  return { description, localizations };
 }
 
 async function addToPlaylist(videoId, playlistId, position) {
@@ -515,7 +579,7 @@ async function askOffset(job, retried = false) {
 }
 
 async function startSession(job) {
-  const { r } = await api('POST', 'videos', { base: G.upload, query: { uploadType: 'resumable', part: 'snippet,status' }, body: job.meta, headers: { 'x-upload-content-length': String(job.size), 'x-upload-content-type': job.mime } });
+  const { r } = await api('POST', 'videos', { base: G.upload, query: { uploadType: 'resumable', part: job.meta.localizations ? 'snippet,status,localizations' : 'snippet,status' }, body: job.meta, headers: { 'x-upload-content-length': String(job.size), 'x-upload-content-type': job.mime } });
   const at = r.headers.get('location');
   if (!at) throw new Error('YouTube gave no upload address.');
   return at;
@@ -748,6 +812,7 @@ function run(job, onProgress) {
         job.after.push(await addToPlaylist(video.id, pl.id, pl.position).catch((e) => `playlist ${pl.id} not added: ${e.message}`));
       }
       if (job.thumbnail) job.after.push(await setThumbnail(video.id, job.thumbnail).catch((e) => `thumbnail not set: ${e.message}`));
+      for (const c of job.captions ?? []) job.after.push(await addCaptions(video.id, c).catch((e) => `captions ${c.language} not added: ${e.message}`));
       recordUploadedManifest(job, video, finishedAt);
       log(`uploaded ${job.file} as ${watchUrl(video.id)}`);
       job.pid = undefined; saveJob(job, { lastUploadAt: finishedAt });
@@ -774,7 +839,7 @@ function run(job, onProgress) {
 }
 
 const PRIVACY = ['private', 'unlisted', 'public'];
-const SIDECAR_FIELDS = new Set(['title', 'description', 'tags', 'playlist', 'thumbnail', 'key', 'replaces', 'publish_at', 'privacy']);
+const SIDECAR_FIELDS = new Set(['title', 'description', 'tags', 'playlist', 'thumbnail', 'key', 'replaces', 'publish_at', 'privacy', 'language', 'chapters', 'music', 'credits', 'captions', 'localizations']);
 function readUploadCard(videoPath) {
   const ext = extname(videoPath);
   const cardPath = `${ext ? videoPath.slice(0, -ext.length) : videoPath}.youtube.json`;
@@ -815,6 +880,16 @@ function readUploadCard(videoPath) {
   if (raw.replaces !== undefined) out.replaces = String(raw.replaces);
   if (raw.publish_at !== undefined) out.publish_at = String(raw.publish_at);
   if (raw.privacy !== undefined) out.privacy = String(raw.privacy);
+  /* 44i-2b. A caption file named in the card is found beside the card, like its thumbnail. */
+  if (raw.language !== undefined) out.language = String(raw.language);
+  if (raw.chapters !== undefined) out.chapters = raw.chapters;
+  if (raw.music !== undefined) out.music = String(raw.music);
+  if (raw.credits !== undefined) out.credits = raw.credits === false ? false : String(raw.credits);
+  if (raw.localizations !== undefined) out.localizations = raw.localizations;
+  if (raw.captions !== undefined) {
+    const here = (f) => resolve(dir, String(f ?? '').trim().replace(/^~(?=$|\/)/, homedir()));
+    out.captions = (Array.isArray(raw.captions) ? raw.captions : [raw.captions]).map((c) => (typeof c === 'string' ? here(c) : c && typeof c === 'object' ? { ...c, file: here(c.file) } : c));
+  }
   return out;
 }
 function mergeArgsWithCard(a, card) {
@@ -831,6 +906,10 @@ function validateUploadArgs(a, resolvedFile) {
   const st = statSync(file);
   if (!a.title) throw new Error('A title is needed.');
   if (String(a.title).length > 100) throw new Error('YouTube takes a title of at most 100 characters.');
+  checkTitle(a.title);
+  /* The words and the captions are judged here, before a job exists, so a bad chapter list or caption file is refused at the call and never fails later in the drain (44i-2b). */
+  wordsFor(a);
+  captionsFor(a);
   if (a.privacy !== undefined && !PRIVACY.includes(a.privacy)) throw new Error(`privacy is one of ${PRIVACY.join(', ')}.`);
   if (a.publish_at && a.privacy && a.privacy !== 'private') throw new Error('A scheduled video goes up private and turns public at publish_at; leave privacy out or private.');
   if (a.thumbnail) uploadable(a.thumbnail, IMAGE, 'A thumbnail');
@@ -840,12 +919,16 @@ function buildJob(a, file, st) {
   const playlists = Array.isArray(a.playlists)
     ? a.playlists.map((p) => (typeof p === 'string' ? { id: p } : { id: String(p.id), ...(Number.isInteger(p.position) ? { position: p.position } : {}) }))
     : a.playlist_id ? [{ id: String(a.playlist_id) }] : undefined;
+  const words = wordsFor(a);
+  const captions = captionsFor(a);
   return {
     id: b64url(randomBytes(6)), file, size: st.size, mtime: st.mtimeMs, mime: MIME[extname(file).toLowerCase()],
     meta: {
-      snippet: { title: a.title, description: a.description ?? '', tags: a.tags ?? [], categoryId: String(a.category_id ?? SETTINGS.categoryId), ...(a.language ? { defaultLanguage: a.language, defaultAudioLanguage: a.language } : {}) },
+      snippet: { title: a.title, description: words.description, tags: a.tags ?? [], categoryId: String(a.category_id ?? SETTINGS.categoryId), ...(a.language ? { defaultLanguage: a.language, defaultAudioLanguage: a.language } : {}) },
       status: { privacyStatus: a.privacy ?? 'private', selfDeclaredMadeForKids: Boolean(a.made_for_kids ?? false), ...(a.publish_at ? { publishAt: a.publish_at } : {}) },
+      ...(words.localizations ? { localizations: words.localizations } : {}),
     },
+    ...(captions.length ? { captions } : {}),
     playlist_id: a.playlist_id ?? playlists?.[0]?.id,
     ...(playlists?.length ? { playlists } : {}),
     thumbnail: a.thumbnail ? resolve(a.thumbnail) : undefined,
@@ -968,6 +1051,7 @@ async function replaceVideo(a) {
     tags: old.snippet?.tags ?? [],
     category_id: old.snippet?.categoryId ? String(old.snippet.categoryId) : SETTINGS.categoryId,
     ...(old.snippet?.defaultLanguage ? { language: old.snippet.defaultLanguage } : {}),
+    ...(old.localizations && Object.keys(old.localizations).length ? { localizations: old.localizations } : {}),
     made_for_kids: Boolean(old.status?.selfDeclaredMadeForKids ?? false),
     ...(playlists.length ? { playlists } : {}),
     ...(oldEntry?.key ? { key: oldEntry.key } : {}),
@@ -1232,6 +1316,10 @@ const GUIDE = `You manage the owner's YouTube channel. Nothing here needs the li
 
 - Uploads go up PRIVATE unless you pass privacy. Make a video unlisted or public, or schedule it (publish_at), or run release_plan, only when the owner said so in this conversation. A scheduled video is private until its time; YouTube only schedules a private video.
 - Before uploading, say what you will upload: the file, the title, the privacy. Credit the music's source in the description when the owner has one (where a recording came from and its date).
+- Credits: when settings.json has a credits line, every new upload's description ends with it (and each other language's). If the line holds {music}, pass music (the title of the piece); for a film with other music pass a credits line of its own, or credits: false only when the owner said the film needs none.
+- Chapters: pass chapters (lines like "0:00 Intro", or { at, title }) and they go into the description as YouTube reads them: first at 0:00, three or more, each ten seconds or longer. update_video with chapters replaces the old list.
+- Captions: an upload's captions (.srt or .vtt, with a language) are added once it is up; add_captions adds one to a video already up. Each costs 400 quota units, so say so first.
+- Other languages: localizations ({"es": {"title", "description"}}) need the video's own language (language).
 - If a file has a sidecar card beside it (<file without extension>.youtube.json), upload_video, queue_upload and replace_video read it for any field the call leaves out (call wins); unknown fields in the card are refused.
 - upload_video answers within about 45 seconds: a short film is done by then; a long one answers "uploading" and carries on. Check it with upload_status. If an upload stops (the computer slept, the app closed), ask upload_video again with the same file and title: it carries on where it stopped and never makes a second copy unless you pass again: true.
 - A job in state "queued" (from queue_upload, replace_video, or from upload_video hitting YouTube's daily upload limit or quota) is NOT a failure: this computer's hourly drain finishes it on its own after not_before (shown in the settings time zone) and shows a notification when done or failed. Do not retry it by hand.
@@ -1242,6 +1330,13 @@ const GUIDE = `You manage the owner's YouTube channel. Nothing here needs the li
 - Quota: 100 uploads a day; an update, thumbnail or playlist change costs 50 of 10,000 a day (release_plan costs 50 per live video updated, 0 per queued job — state the cost first); reading (and each manifest sync page or playlist scan) costs 1.`;
 
 const str = { type: 'string' };
+/* The parts of the description and the other languages (44i-2b), shared by uploads and update_video. */
+const wordProps = {
+  chapters: { description: 'Chapters written into the description: lines like "0:00 Intro" (one string or a list), or [{ at: "1:30" or seconds, title }]. First at 0:00, three or more, each ten seconds or longer.', anyOf: [str, { type: 'array', items: { anyOf: [str, { type: 'object', properties: { at: { anyOf: [str, { type: 'number' }] }, title: str } }] } }] },
+  music: { ...str, description: 'The title of the piece of music, for a credits line in settings.json that holds {music}.' },
+  credits: { description: 'This upload\'s own credits line instead of the one in settings.json, or false for none.', anyOf: [str, { type: 'boolean' }] },
+  localizations: { type: 'object', description: 'Title and description in other languages: {"es": {"title": "...", "description": "..."}}; needs language. A language without a description gets the default one. On update_video, null for a language removes it.', additionalProperties: { anyOf: [{ type: 'object', properties: { title: str, description: str } }, { type: 'null' }] } },
+};
 const uploadProps = {
   file: { ...str, description: 'Full path to the video file on this computer.' },
   title: { ...str, description: 'At most 100 characters (may come from <file>.youtube.json).' },
@@ -1257,6 +1352,8 @@ const uploadProps = {
   key: { ...str, description: 'Optional short film id (e.g. "hymn-to-the-dawn") recorded in the channel manifest.' },
   replaces: { ...str, description: 'Optional existing video id this upload replaces in the manifest.' },
   again: { type: 'boolean', description: 'Upload a second copy of a file already up with this title.' },
+  ...wordProps,
+  captions: { type: 'array', description: 'Caption files to add once it is up (400 quota units each): a path, or { file, language, name, draft }. language defaults to the upload\'s.', items: { anyOf: [str, { type: 'object', required: ['file'], properties: { file: str, language: str, name: str, draft: { type: 'boolean' } } }] } },
 };
 const TOOLS = [
   { name: 'channel', description: 'The signed-in channel: its name, link, subscribers, views and video count.', inputSchema: { type: 'object', properties: {} } },
@@ -1286,9 +1383,15 @@ const TOOLS = [
   { name: 'upload_status', description: 'How the uploads are going (or one, by its job id): MB sent, queued jobs with not_before in the settings time zone (not a failure; this computer finishes them on its own — do not retry by hand), done, failed and why, the link once up.', inputSchema: { type: 'object', properties: { job: str } } },
   {
     name: 'update_video',
-    description: "Change a video's title, description, tags, category, privacy or schedule. Only the fields you pass change.",
-    inputSchema: { type: 'object', required: ['video_id'], properties: { video_id: str, title: str, description: str, tags: { type: 'array', items: str }, category_id: str, language: str, privacy: { type: 'string', enum: PRIVACY }, publish_at: { ...str, description: 'ISO time to go public; empty string to unschedule.' }, made_for_kids: { type: 'boolean' } } },
+    description: "Change a video's title, description, chapters, credits, other languages, tags, category, privacy or schedule. Only the fields you pass change; new chapters replace the old list.",
+    inputSchema: { type: 'object', required: ['video_id'], properties: { video_id: str, title: str, description: str, tags: { type: 'array', items: str }, category_id: str, language: str, privacy: { type: 'string', enum: PRIVACY }, publish_at: { ...str, description: 'ISO time to go public; empty string to unschedule.' }, made_for_kids: { type: 'boolean' }, ...wordProps } },
   },
+  {
+    name: 'add_captions',
+    description: `Add a caption track to a video already up, from an .srt or .vtt file on this computer (${CAPTION_UNITS} quota units).`,
+    inputSchema: { type: 'object', required: ['video_id', 'file', 'language'], properties: { video_id: str, file: str, language: { ...str, description: 'e.g. en, es, pt-BR' }, name: { ...str, description: 'The track\'s name as viewers see it (optional).' }, draft: { type: 'boolean', description: 'Keep it hidden from viewers until published in Studio.' } } },
+  },
+  { name: 'list_captions', description: "A video's caption tracks: id, language, name, draft (50 quota units).", inputSchema: { type: 'object', required: ['video_id'], properties: { video_id: str } } },
   {
     name: 'release_plan',
     description: 'Schedule a release across private live videos and queued upload jobs, one slot apart at a clock time in the settings time zone (the computer\'s own unless settings.json names one). Only run this without dry_run when the owner asked for that release in this conversation. Live video updates cost 50 quota units each (queued jobs cost 0); YouTube only schedules a private video.',
@@ -1355,6 +1458,11 @@ async function call(name, a = {}, onProgress = null) {
       return text(await updateVideo(a));
     }
     case 'release_plan': return text(await releasePlan(a));
+    case 'add_captions': {
+      const [c] = captionsFor({ captions: [{ file: a.file, language: a.language, name: a.name, draft: a.draft }] });
+      return text(await addCaptions(String(a.video_id), c));
+    }
+    case 'list_captions': return text(await listCaptions(String(a.video_id)));
     case 'set_thumbnail': return text(await setThumbnail(String(a.video_id), String(a.file)));
     case 'list_playlists': {
       const { j } = await api('GET', 'playlists', { query: { part: 'snippet,status,contentDetails', mine: true, maxResults: 50 } });
