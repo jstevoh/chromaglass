@@ -799,7 +799,7 @@ export class WebGPUFluid extends FluidCover {
       before the forces, and their share is zero.
     */
     const mixOn = !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001);
-    const rockOn = thin && Math.hypot(p.rockX, p.rockY) > 1e-5;
+    const rockOn = thin && Math.hypot(p.rockX, p.rockY, p.cometX || 0, p.cometY || 0) > 1e-5;
     const rockGain = p.rockGain ?? 1;
     const thinBody = thin && (dripOf(p) > 0.01 || p.air > 0.1 || !!breath || rockOn);
     if (thinBody) {
@@ -825,13 +825,12 @@ export class WebGPUFluid extends FluidCover {
       */
       const lifting = rockOn && !!mix && this.mixLive && oil > 0.001;
       /*
-        With no oil the colour's own weight (Plate Rock's, and Rain Drip's on
-        a standing plate) goes through the same closed circulation (PLAN
-        18a-17; hsBody says why): laid straight into the gap's solve, whose
-        rim is open, the heavy colour left over the downhill rim, Rain Drip
-        0.5 keeping 1.8% of its dish (\`npm run draught\`). Rain Drip's pull is
-        down S.up, and hsBody adds it to the tilt's as one in-plane weight
-        (A.b.w 2). With oil, Rain Drip stays laid directly (27f-6).
+        With no oil the colour's own weight (Plate Rock's, the comet's,
+        Rain Drip's on a standing plate) goes through the same closed
+        circulation (PLAN 18a-17, 18a-25; hsBody says why): laid into the
+        open-rim solve, the heavy colour left over the downhill rim
+        (\`npm run draught\`). hsBody adds Rain Drip's pull, down S.up, to
+        the tilt's as one weight (A.b.w 2). With oil it is laid directly.
       */
       const closing = thin && !(!!mix && this.mixLive && oil > 0.001) && (rockOn || (dripWeightOf(p) > 0 && upright > 0.001));
       const mixTex = lifting ? mix!.read : this.blank('rgba');
@@ -935,6 +934,7 @@ export class WebGPUFluid extends FluidCover {
       stage('forces', (pass) => {
         this.run2(pass, 'forcesB', this.vel.write, this.velForced, [this.vel.read, this.dye.read, this.cur.read, this.squeeze.read, this.swirl.read, this.holdSoftStep(pass, p)], this.arg('current grid thin', [1, this.M, 0, swirlScale]));
         this.vel.swap();
+        this.stirClosed(pass, p);
       });
       stage('thin gap', (pass) => {
         this.thinProject(pass, p, disp, hands);
