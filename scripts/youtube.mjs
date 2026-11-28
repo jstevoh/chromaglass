@@ -49,6 +49,7 @@ import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { port } from './ports.mjs';
 import { captionRoutes, textScenario } from './youtubeText.mjs';
+import { shortsScenario } from './youtubeShorts.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const SERVER = resolve(import.meta.dirname, '../mcp/youtube-mcp.js');
@@ -352,7 +353,7 @@ async function scenario(server, gport) {
     const init = await a.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'check', version: '1' } });
     const list = await a.rpc('tools/list', {});
     const names = (list.result?.tools ?? []).map((t) => t.name);
-    line('protocol', `it speaks MCP: initialize with a guide, and its sixteen tools listed (${names.join(', ')})`, init.result?.serverInfo?.name === 'youtube' && /PRIVATE/.test(init.result?.instructions ?? '') && names.length === 16 && names.includes('add_captions') && names.includes('list_captions'));
+    line('protocol', `it speaks MCP: initialize with a guide, and its seventeen tools listed (${names.join(', ')})`, init.result?.serverInfo?.name === 'youtube' && /PRIVATE/.test(init.result?.instructions ?? '') && names.length === 17 && names.includes('queue_folder') && names.includes('add_captions') && names.includes('list_captions'));
     const before = g.refreshes;
     const ch = await a.tool('channel');
     line('refresh', 'an access key Google refuses is refreshed once and the call goes through', !ch.error && ch.v.title === 'Stand-in Channel' && g.refreshes === before + 1 && g.rejected401 >= 1, ch.text.slice(0, 160));
@@ -770,6 +771,9 @@ async function scenario(server, gport) {
     // (m) the words around a video (44i-2b): credits, chapters, captions, other languages (scripts/youtubeText.mjs)
     await textScenario({ server, start, env, conf, dir, g, line, logs, chunk: CHUNK });
 
+    // (n) Shorts and folders (44i-2c): real MP4 and WebM headers, read by the server's own probe (scripts/youtubeShorts.mjs)
+    await shortsScenario({ server, start, env, conf, dir, g, line, logs });
+
     // (i) nothing secret in any reply, the log, the manifest, uploads.json or the plist
     const manifestRaw = readText(join(conf, 'manifest.json'));
     const uploadsRaw = readText(join(conf, 'uploads.json'));
@@ -864,6 +868,46 @@ const MUTANTS = [
   { rule: 'captions', find: "query: { part: 'snippet', uploadType: 'multipart' }", replace: "query: { uploadType: 'multipart' }", as: 'captionsPart' },
   { rule: 'addCaptions', find: 'language: t.snippet?.language,', replace: '', as: 'listLanguage' },
   { rule: 'addCaptions', find: "...(o.draft ? { draft: true } : {})", replace: '', as: 'captionDraft' },
+  // Shorts and folders (44i-2c): the server's wiring, then youtube/shorts.js, youtube/probe.js and youtube/folder.js.
+  { rule: 'shortLength', find: 'if (a.short) checkShort(shape, basename(file));', replace: '', as: 'shortWired' },
+  { rule: 'shortLength', in: 'youtube/shorts.js', find: 'const over = p.durationSec > SHORT_MAX_SEC', replace: 'const over = false' },
+  { rule: 'shortShape', in: 'youtube/shorts.js', find: 'wide = p.width > p.height', replace: 'wide = false' },
+  { rule: 'shortShape', in: 'youtube/probe.js', find: 'const turned = rotation === 90 || rotation === 270;', replace: 'const turned = false;', as: 'shortTurn' },
+  { rule: 'shortTag', find: "a.short ? tagShort(a.title, a.description) : a.description ?? ''", replace: "a.description ?? ''" },
+  { rule: 'tagOnce', in: 'youtube/shorts.js', find: "if (TAGGED.test(String(title ?? '')) || TAGGED.test(d)) return d;", replace: '' },
+  { rule: 'shortUnknown', in: 'youtube/shorts.js', find: 'if (!p.durationSec) {', replace: 'if (false) {' },
+  { rule: 'webmLength', in: 'youtube/probe.js', find: 'if (f.id === ID.SCALE) scale = uint(buf, f);', replace: 'if (false) scale = uint(buf, f);' },
+  { rule: 'shortsNote', find: '...(a.short ? { short: true } : {}), ...(shorts ? { shorts } : {}),', replace: '...(a.short ? { short: true } : {}),' },
+  { rule: 'shortsNote', in: 'youtube/shorts.js', find: 'return is ? `YouTube will show', replace: 'return false ? `YouTube will show', as: 'notAsked' },
+  { rule: 'shortsNote', in: 'youtube/shorts.js', find: '${p.durationSec > 60 ?', replace: '${false ?', as: 'contentId' },
+  { rule: 'mp4Read', in: 'youtube/probe.js', find: 'size = Number(h.readBigUInt64BE(8)); head = 16; }', replace: '}', as: 'mp4Large' },
+  { rule: 'mp4Read', in: 'youtube/probe.js', find: '(moov[tkhd.start] === 1 ? 32 : 20)', replace: '20', as: 'tkhdVersion' },
+  { rule: 'mp4Read', in: 'youtube/probe.js', find: 'const scale = v === 1 ? moov.readUInt32BE(mvhd.start + 20) : moov.readUInt32BE(mvhd.start + 12);', replace: 'const scale = moov.readUInt32BE(mvhd.start + 12);', as: 'mvhdVersion' },
+  { rule: 'mp4Read', in: 'youtube/probe.js', find: "!== 'vide') continue;", replace: "!== 'vide' && false) continue;", as: 'videoTrack' },
+  { rule: 'uploadChapters', find: 'wordsFor(a, shape?.durationSec)', replace: 'wordsFor(a)', all: true },
+  { rule: 'cardShort', find: 'if (raw.short !== undefined) out.short = raw.short;', replace: '' },
+  { rule: 'cardShort', find: "if (a.short !== undefined && typeof a.short !== 'boolean') throw", replace: 'if (false) throw', as: 'shortType' },
+  { rule: 'shortsNote', in: 'youtube/shorts.js', find: 'return p.durationSec <= SHORT_MAX_SEC && p.height >= p.width;', replace: 'return p.height >= p.width;', as: 'notAskedLen' },
+  { rule: 'shortsNote', in: 'youtube/shorts.js', find: 'return p.durationSec <= SHORT_MAX_SEC && p.height >= p.width;', replace: 'return p.durationSec <= SHORT_MAX_SEC;', as: 'notAskedShape' },
+  { rule: 'mp4Read', in: 'youtube/probe.js', find: 'size = Number(h.readBigUInt64BE(8));', replace: 'size = h.readUInt32BE(12);', as: 'lowWord' },
+  { rule: 'webmLength', in: 'youtube/probe.js', find: 'let value = keepMarker ? first : first & (0xff >> len);', replace: 'let value = keepMarker ? first : first & (0x7f >> len);', as: 'vintMask' },
+  { rule: 'shortTag', find: "composeDescription(a.short ? tagShort(a.title, a.description) : a.description ?? '', chapters, credits)", replace: "(a.short ? (x) => tagShort(a.title, x) : (x) => x)(composeDescription(a.description ?? '', chapters, credits))", as: 'tagAfter' },
+  { rule: 'folderAgain', find: "if (done) return { ...row, title: m.title, state: 'already up'", replace: "if (false) return { ...row, title: m.title, state: 'already up'", as: 'alreadyUp' },
+  { rule: 'probeKinds', in: 'youtube/probe.js', find: 'if (width && height && (rotation === 90 || rotation === 270)) [width, height] = [height, width];', replace: '', as: 'webmRoll' },
+  { rule: 'probeKinds', in: 'youtube/probe.js', find: 'width = get(ID.DW) ?? get(ID.PW); height = get(ID.DH) ?? get(ID.PH);', replace: 'width = get(ID.PW); height = get(ID.PH);', as: 'displaySize' },
+  { rule: 'probeKinds', in: 'youtube/probe.js', find: 'if (mehd) whole =', replace: 'if (false) whole =', as: 'mehd' },
+  { rule: 'probeKinds', in: 'youtube/probe.js', find: 'if (stsd && stsd.start + 8 + 36 <= stsd.end)', replace: 'if (false)', as: 'stsd' },
+  { rule: 'folderWhole', find: 'const go = !a.dry_run && (!refused || a.skip_refused === true);', replace: 'const go = !a.dry_run;' },
+  { rule: 'folderDry', find: 'const go = !a.dry_run && (!refused || a.skip_refused === true);', replace: 'const go = !refused || a.skip_refused === true;' },
+  { rule: 'folderSkip', find: ' || a.skip_refused === true);', replace: ');' },
+  { rule: 'folderCard', find: 'mergeArgsWithCard(readUploadCard(path), shared)', replace: 'mergeArgsWithCard(shared, readUploadCard(path))' },
+  { rule: 'folderAgain', find: "if (pending) return { ...row", replace: "if (false) return { ...row" },
+  { rule: 'folderOrder', in: 'youtube/folder.js', find: "{ numeric: true, sensitivity: 'base' }", replace: "{ sensitivity: 'base' }" },
+  { rule: 'folderOrder', in: 'youtube/folder.js', find: "replace(/[-_.]+/g, ' ')", replace: "replace(/[_.]+/g, ' ')", as: 'titleFromName' },
+  { rule: 'folderFilms', in: 'youtube/folder.js', find: "!n.startsWith('.') && ", replace: '' },
+  { rule: 'folderFilms', in: 'youtube/folder.js', find: 'try { if (!statSync(p).isFile()) continue; } catch { continue; }', replace: '', as: 'folderIsFile' },
+  { rule: 'folderHidden', in: 'youtube/folder.js', find: 'if (/[\\/\\\\]\\.[^\\/\\\\]/.test(under)) throw', replace: 'if (false) throw' },
+  { rule: 'folderMax', in: 'youtube/folder.js', find: 'if (films.length > FOLDER_MAX) throw', replace: 'if (false) throw' },
   { rule: 'releasePlan', find: 'const slotMs = every % 24 === 0\n      ? zoneWall(y, mo, d + i * (every / 24), h, min, 0)\n      : slot0Ms + i * every * 3600_000;', replace: 'const slotMs = slot0Ms + i * every * 3600_000;' },
 ];
 
@@ -879,7 +923,7 @@ function mutant(m) {
   const src = readFileSync(m.in ? join(MODULES, '..', m.in) : SERVER, 'utf8');
   if (!src.includes(m.find)) return { why: `its text is not in mcp/${m.in ?? 'youtube-mcp.js'}: "${m.find}"` };
   if (m.in) writeFileSync(file, readFileSync(SERVER, 'utf8'));
-  writeFileSync(target, src.replace(m.find, m.replace));
+  writeFileSync(target, m.all ? src.split(m.find).join(m.replace) : src.replace(m.find, m.replace));
   return { file };
 }
 
