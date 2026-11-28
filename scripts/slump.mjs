@@ -71,7 +71,10 @@
  *  13. and the same on a 1024² plate
  *  14. the grid's checkerboard filter (dampGrid) makes no dye at a drop's
  *      rim and does not move its front: the glycerine drop of 7, run once
- *      with the filter on (as every look has it) and once with it off, has
+ *      with the filter forced on at GRID_DAMP (0.05, the old plate's; since
+ *      18a-8b, #1024, the thin gap runs none, so a run at the look's own
+ *      setting read 0 cells changed and failed the guard below) and once
+ *      with it off, has
  *      the bare run's total to within 0.01% at 2 s and 20 s, and its front
  *      (the radius at 2% of the peak) within 0.05 mm of the bare run's (a
  *      cell here is 0.78 mm, and one cell more over the contour moves the
@@ -93,11 +96,19 @@
  *      (PLAN 18m-5c). The front is its own line, 14b, owed to 18m-5c since
  *      the 2 mm gap (see there): the dye and the filter-ran guard are held.
  *
+ *  15. and the plate's size does not set how far it slumps: the pool of 12
+ *      and 13 at 2 s, its middle within 3%, its half-peak radius and its
+ *      front within 2% between 768² and 1024² (PLAN 18m-1a; the numbers
+ *      before and after are at reportSizes)
+ *
  * 12 and 13 are here because the drop in 1 to 11 is too shallow and too
- * coarse to find what the review of #371 (2026-10-24) found: the slump is
- * an explicit step, stable only while each face moves at most about a
+ * coarse to find what the review of #371 (2026-10-24) found: the slump was
+ * then an explicit step, stable only while each face moves at most about a
  * quarter of the difference across it, and a cell's rate goes as the pool's
- * depth cubed and as one over the cell's width squared. With that bound
+ * depth cubed and as one over the cell's width squared. Since 18m-1a it is a
+ * backward-Euler step, stable at any rate, and 12 and 13 hold the solve's
+ * sweeps to it: a red-black solve stopped short leaves its residual on one
+ * colour of the grid, which is a checkerboard (wgsl/slump.ts, slumpSmooth). With that bound
  * taken off the face and the substeps still capped, this pool at 768² went
  * from a total of 5003 to 25174 in 36 frames, every cell at the cap in a
  * checkerboard; on main it holds 5003.56 to the last digit and its peak falls
@@ -109,8 +120,9 @@
  * Not covered here: the oil's share (a cell of oil holds no current) and a
  * step other than 1/60 s.
  *
- * The grid's checkerboard filter (dampGrid, GRID_DAMP a step on every look
- * with no Diffusion Rate) is on in 1 to 11, as the app has it (PLAN 18m-5a).
+ * The grid's checkerboard filter (dampGrid, GRID_DAMP a step on the old
+ * plate with no Diffusion Rate) runs as the app has it in 1 to 11, which
+ * since 18a-8b (#1024) is not at all on the thin gap (PLAN 18m-5a had it on).
  * Until 18m-5 it was off here: it clamped its high-pass to the 3×3
  * neighbourhood's range, a drop's rim is where that clamp bites, and it
  * moved the glycerine drop's front 0.72 mm in 20 s and added 3.2% to its dye
@@ -182,7 +194,13 @@ async function deepPool(N) {
         least = Math.min(least, a); most = Math.max(most, a); total += a;
         alternating += (x + y) & 1 ? -a : a;
       }
-      return { frame, least, most, total, checker: Math.abs(alternating) / total };
+      // The radius inside which the pool stands over a share of its peak, in mm, from the area (check 15).
+      const radius = (share) => {
+        let c = 0;
+        for (let k = 3; k < f.length; k += 4) if (f[k] > share * most) c++;
+        return Math.sqrt(c / Math.PI) * 0.2 / N * 1000;
+      };
+      return { frame, least, most, total, checker: Math.abs(alternating) / total, front: radius(0.02), r50: radius(0.5) };
     };
     const rows = [await read(0)];
     let frame = 0;
@@ -212,12 +230,47 @@ function reportDeep(label, N, rows) {
       + `least ${Math.min(...rows.map((r) => r.least)).toFixed(4)}, checker at most ${Math.max(...rows.map((r) => r.checker)).toExponential(1)}`);
 }
 
+/*
+  Check 15 (PLAN 18m-1a): the same pool on 768² and 1024² slumps the same.
+  Its middle at 2 s within 3%, its half-peak radius and its front (the
+  radius at 2% of the peak) within 2%. A gravity current's speed is set by
+  its depth and its weight, not by the grid it is drawn on. The inertial cap
+  #371 wrote as a diffusive rate (K = u_f Δx, the front taken to drop across
+  one cell) slowed the current inside a pool by a cell's width over the
+  length its depth falls across, so a finer plate ran slower: on main
+  cbd5a6c this pool at 2 s stood at 1.649 in its middle on 768² and 1.958 on
+  1024² (+19%), its half-peak radius 8.14 → 7.15 mm (−12%), its front 10.86 →
+  10.37 mm (CPU model of main's kernels; the lab on main read 1.653 and
+  1.962, 8.14 and 7.15 mm, 10.83 and 10.34 mm, so check 15 fails there). With
+  the Froude speed as a cap on the layer's flux (wgsl/slump.ts) it is 1.048
+  and 1.048, 10.93 and 10.95 mm, 12.08 and 12.05 mm. The bar is not tighter
+  because a front that moves under a cell reads up to a cell wide, and a
+  768² cell is 0.26 mm.
+*/
+function reportSizes(a, b) {
+  const [la, lb] = [a[a.length - 1], b[b.length - 1]];
+  const middle = lb.most / la.most - 1, half = lb.r50 / la.r50 - 1, front = lb.front / la.front - 1;
+  const pct = (x) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`;
+  /*
+    And both pools slumped: two pools that never moved agree too. Each
+    middle under half what was laid (6 → about 1.05) and each front out
+    more than 3 mm from where it was laid (about 6 mm → 12). Neither 12 nor
+    13 asks it: a pool that sits still keeps its dye and raises no peak.
+  */
+  const moved = [[a[0], la], [b[0], lb]].every(([laid, last]) => last.most < 0.5 * laid.most && last.front > laid.front + 3);
+  report('15. the plate\'s size does not set how far a deep heavy pool slumps',
+    moved && Math.abs(middle) <= 0.03 && Math.abs(half) <= 0.02 && Math.abs(front) <= 0.02,
+    `at 2 s, 768² against 1024²: middle ${la.most.toFixed(3)} and ${lb.most.toFixed(3)} (${pct(middle)}; laid ${a[0].most.toFixed(2)} and ${b[0].most.toFixed(2)}), `
+      + `half-peak radius ${la.r50.toFixed(2)} and ${lb.r50.toFixed(2)} mm (${pct(half)}), front ${la.front.toFixed(2)} and ${lb.front.toFixed(2)} mm (${pct(front)}; laid ${a[0].front.toFixed(2)} and ${b[0].front.toFixed(2)})`);
+}
+
 if (process.argv.includes('--deep')) {
   const d768 = await deepPool(768);
   const d1024 = await deepPool(1024);
   await close();
   reportDeep('12', 768, d768);
   reportDeep('13', 1024, d1024);
+  reportSizes(d768, d1024);
   console.log(failed.length ? `\n${failed.length} failed` : '\nall passed');
   process.exit(failed.length ? 1 : 0);
 }
@@ -231,7 +284,8 @@ const g0 = 9.81 * 0.02, g1 = 9.81 * 0.15;
 
 const water = await drop([0, 5, 20, 30], { gapThickness: 0, solutalBuoyancy: 0 });
 const heavy = await drop([0, 20], { gapThickness: 0, solutalBuoyancy: 1 });
-const syrup = await drop([0, 2, 20], { gapThickness: 1, solutalBuoyancy: 0 }, false, 256, true);
+// The grid filter forced on (GRID_DAMP, 0.05): the thin gap has run none since 18a-8b (#1024), and 14 is about the filter where it runs.
+const syrup = await drop([0, 2, 20], { gapThickness: 1, solutalBuoyancy: 0, gridDamp: 0.05 }, false, 256, true);
 const syrupBare = await drop([0, 2, 20], { gapThickness: 1, solutalBuoyancy: 0, gridDamp: 0 }, false, 256, true);
 const clear = await drop([0, 10], { gapThickness: 0, solutalBuoyancy: 0 }, true);
 // 18h calibrated diff: 0.0002 to physical molecular diffusion (Dm ≈ 4e-10 m²/s),
@@ -344,6 +398,7 @@ report('11. the slump makes and loses no dye', Math.abs(kept - 1) <= 0.001,
 
 reportDeep('12', 768, d768);
 reportDeep('13', 1024, d1024);
+reportSizes(d768, d1024);
 
 const rim = [2, 20].map((T) => {
   const on = at(syrup, T), bare = at(syrupBare, T);

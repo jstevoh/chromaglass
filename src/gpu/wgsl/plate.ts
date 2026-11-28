@@ -39,8 +39,10 @@ import { FILM_DYE_WGSL } from './filmDye';
 import { FILM_FRAME_WGSL } from './plateFilm';
 import { LAMP_MIX_WGSL } from './plateLamp';
 import { PROJECTOR_WGSL } from './projectors';
+import { LIGHT_WGSL } from './plateLight';
 import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
 import { FINE_WINDOW_WGSL } from './fineWindow';
+import { DYE_INDEX_WGSL } from './dyeIndex';
 import { SLOPE_WGSL } from './plateSlope';
 
 /** Bindings every plate shader shares. */
@@ -140,35 +142,7 @@ fn lampThrough(unit: vec3f, amount: f32) -> vec3f {
   return mix(rgb, spectralThrough(unit, max(amount, 0.0)), U.spectral);
 }
 
-/*
-  Dyes mixed across six bands of the spectrum instead of three.
-
-  A dye's colour is a spectrum, and light through two dyes is the product of
-  their transmissions wavelength by wavelength; only then does the eye sum it
-  into three responses. Doing the product on the three sums instead is the
-  shortcut every RGB mixer takes, and it is why mixtures go muddy and
-  thickness only darkens instead of shifting hue (dichromatism, which is why
-  a deep glass of a yellow dye goes red). So the RGB absorbance is spread
-  over six overlapping bands (420–670 nm), each band is attenuated by the
-  path on its own, and the eye's three responses sum them back. White stays
-  white: every row of the response sums to one.
-*/
-fn spectralThrough(unit: vec3f, path: f32) -> vec3f {
-  let a = -log(max(unit, vec3f(1e-4)));
-  let b0 = dot(a, vec3f(0.10, 0.10, 0.80));
-  let b1 = dot(a, vec3f(0.05, 0.35, 0.60));
-  let b2 = dot(a, vec3f(0.05, 0.80, 0.15));
-  let b3 = dot(a, vec3f(0.35, 0.60, 0.05));
-  let b4 = dot(a, vec3f(0.80, 0.20, 0.00));
-  let b5 = dot(a, vec3f(0.95, 0.05, 0.00));
-  let t0 = exp(-b0 * path); let t1 = exp(-b1 * path); let t2 = exp(-b2 * path);
-  let t3 = exp(-b3 * path); let t4 = exp(-b4 * path); let t5 = exp(-b5 * path);
-  return vec3f(
-    0.30 * t3 + 0.45 * t4 + 0.25 * t5,
-    0.05 * t0 + 0.20 * t1 + 0.45 * t2 + 0.30 * t3,
-    0.45 * t0 + 0.40 * t1 + 0.15 * t2);
-}
-
+${LIGHT_WGSL}
 fn lightThrough(unit: vec3f, thickness: f32) -> vec3f {
   var base = unit;
   if (U.spectral > 0.001) { base = mix(unit, spectralThrough(unit, gapScale), U.spectral); }
@@ -232,13 +206,13 @@ fn onGround(bg: vec3f, f: vec4f, through: vec3f) -> vec3f {
     painted = mix(effBg, f.rgb, f.a);
   }
   if (U.lampGround <= 0.001) { return painted; }
-  return onWall(mix(painted, lampBg * through, U.lampGround));
+  return onWall(mixLight(painted, lampBg * through, U.lampGround));
 }
 
 /* The bare ground, where no plate is: the black one, the lamp, or between. */
 fn groundOf(bg: vec3f) -> vec3f {
   if (U.lampGround <= 0.001) { return bg; }
-  return onWall(mix(bg, lampBg, U.lampGround));
+  return onWall(mixLight(bg, lampBg, U.lampGround));
 }
 
 /*
@@ -350,7 +324,7 @@ fn reliefOf(tintNow: vec3f, tintDecoded: vec3f, aDecoded: f32) -> f32 {
 */${PH_WGSL}
 fn chemOnGround(c: vec3f, painted: vec3f, tint: vec3f, w: f32) -> vec3f {
   if (U.lampGround <= 0.001) { return painted; }
-  return mix(painted, c * pow(max(tint, vec3f(1e-3)), vec3f(w)), U.lampGround);
+  return mixLight(painted, c * pow(max(tint, vec3f(1e-3)), vec3f(w)), U.lampGround);
 }
 `;
 
@@ -1209,7 +1183,7 @@ export const DERIVE_WGSL = `${HEAD}${SAMPLING}${DECODE}${VERT}
 // The bubbles' air, 1x1 blank with none, read as missing dye (plateSlope.ts).
 @group(0) @binding(5) var airSrc: texture_2d<f32>;
 
-// The plate's clear liquid: water, n 1.333 at 589 nm and room temperature.
+// Water, n 1.333 (589 nm, room temperature); .w holds the path less it (38u-20).
 const N_CLEAR: f32 = 1.333;
 
 fn viewProps(uv: vec2f) -> vec3f {
@@ -1240,27 +1214,25 @@ fn pouredDn(uv: vec2f) -> f32 {
   return sp.a - sp.r * N_CLEAR;
 }
 
+${DYE_INDEX_WGSL}
 /*
   The optical path through the column, OPL = n·h, with h in rest gaps
   (DISH_REST_GAP, 6 mm on the 0.2 m dish), so a column of clear water at
-  rest reads 1.333. v is viewProps' (oil, gap, film); dn is pouredDn's.
-  The dye's own term, d·0.06·dyeGain, is a named stand-in (refractionOptics
-  note 6): a dilute dye barely moves water's index, and this is what gives
-  a dye-only look its edges.
+  rest reads 1.333. dyeN is dyeDn's (dyeIndex.ts), v is viewProps' (oil,
+  gap, film), dn is pouredDn's: every term an index rise, so they add.
 */
-fn calcOpl(d: f32, v: vec3f, dn: f32, dyeGain: f32) -> f32 {
-  let deltaDye = d * (0.06 * dyeGain);
+fn calcOpl(dyeN: f32, v: vec3f, dn: f32) -> f32 {
   let deltaOil = v.x * 0.137;
   let deltaFilm = v.z * 0.087;
-  let n = N_CLEAR + deltaDye + deltaOil + deltaFilm + dn;
+  let n = N_CLEAR + dyeN + deltaOil + deltaFilm + dn;
   let gap = v.y;
   let h = select(1.0, clamp(gap / 0.03, 0.3, 3.0), gap > 0.001);
   return n * h;
 }
 
 // One tap's optical path, from its own view and its own poured index.
-fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
-  return calcOpl(d, viewProps(uv), pouredDn(uv), dyeGain);
+fn oplAt(dyeN: f32, uv: vec2f) -> f32 {
+  return calcOpl(dyeN, viewProps(uv), pouredDn(uv));
 }
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4f {
@@ -1268,25 +1240,24 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
   let closeup = macroAmt > 0.001;
   let isCamera = U.photo > 0.5 || closeup;
   // The camera's views keep their own slope. The closeup's .w is the dye's
-  // path alone, its stand-in index at 0.015 (gain 0.25 against the projector's
-  // retuned 0.06 in 18e-2; the dial moves nothing up close), for camLap
-  // (PLAN 18e-7; plateTransmit.ts says why).
+  // path alone, whole, its stand-in index at 0.015 (no dial moves it), for
+  // camLap (PLAN 18e-7; plateTransmit.ts says why).
   if (isCamera) {
     var path = 0.0;
-    if (closeup) { path = calcOpl(decodeDensity(tex2(src, in.uv).a), vec3f(0.0, 0.03, 0.0), 0.0, 0.25); }
+    if (closeup) { path = calcOpl(decodeDensity(tex2(src, in.uv).a) * 0.015, vec3f(0.0, 0.03, 0.0), 0.0); }
     return vec4f(sobelGrad(src, airSrc, in.uv), 0.0, path);
   }
 
   let cell = 1.0 / U.logicalGrid;
-  let dyeGain = max(1.0, U.boundaryContrast * 3.0);
 
   // Every density here is the mean of its whole cell, the bubbles' air held
   // at the middle's own (cellDensity, PLAN 31s-8: one read per cell at 768
   // saw one texel in four and drew the flower again).
   let hasAir = textureDimensions(airSrc).x > 1u;
-  let dC = cellDensity(src, airSrc, in.uv, 0.0, false);
+  let cC = cellDye(src, airSrc, in.uv, vec2f(0.0), false);
+  let dC = cC.x;
   let vC = viewProps(in.uv);
-  let oC = calcOpl(dC, vC, pouredDn(in.uv), dyeGain);
+  let oC = calcOpl(cC.y, vC, pouredDn(in.uv));
 
   // Each tap's own view and poured index wherever either can differ from
   // the middle's: oil, a film, or any liquid poured (the species is 1×1
@@ -1297,9 +1268,8 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
   // The slope and the optical path's gradient from the same taps, at one
   // cell apart with Gaussian weights, each the mean of its cell (sobelGrad
   // says why: taps that see only part of the plate copy every narrow drop
-  // to where they stand, eight times round it). The path gradient is
-  // computed with dyeGain = 1.0 so Boundary Contrast does not move pixels
-  // in focus (PLAN 18e-2), while .w (oC) keeps dyeGain for defocusShadow.
+  // to where they stand, eight times round it). No dial is in the path
+  // (38u-10): Boundary Contrast is defocusShadow's gain, not an index.
   var gs = vec2f(0.0);
   var go = vec2f(0.0);
   var m2 = 0.0;
@@ -1310,9 +1280,10 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
       let w = slopeWeight(r2);
       let k = vec2f(f32(i), f32(j));
       let uv = in.uv + k * cell;
-      let d = cellDensity(src, airSrc, uv, dC, hasAir);
+      let c = cellDye(src, airSrc, uv, cC, hasAir);
+      let d = c.x;
       var o: f32;
-      if (perTap) { o = oplAt(d, uv, 1.0); } else { o = calcOpl(d, vC, 0.0, 1.0); }
+      if (perTap) { o = oplAt(c.y, uv); } else { o = calcOpl(c.y, vC, 0.0); }
       gs += k * (w * d);
       go += k * (w * o);
       m2 += f32(i * i) * w;
@@ -1323,7 +1294,7 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
   let g = gs * (3.0 / m2) * dyeHere;
   let oplGrad = length(go * (3.0 / m2) * dyeHere);
 
-  return vec4f(g, oplGrad, oC);
+  return vec4f(g, oplGrad, oC - N_CLEAR);
 }
 `;
 
@@ -1416,6 +1387,13 @@ fn mixBlendOf(v: f32) -> i32 { return i32(v + 0.5); }
 
 const MIX_KEY_LO = 0.18;
 
+/*
+  A row's named blend (the Mixer's Blend picker: Screen, Add, Multiply, Key)
+  stays the operation it is named, on display values, as the second plate's
+  Blend Mode does (PLAN 38p-2): it is a chosen operation, not two lights.
+  A row's own way (mode 0, in mixSourcesAt and mixLamp) is the physics, and
+  that is done on light (plateLight.ts).
+*/
 fn blendRowKeyed(c: vec3f, s: vec3f, a: f32, mode: i32, keyLo: f32) -> vec3f {
   if (mode == 1) { return mix(c, 1.0 - (1.0 - c) * (1.0 - clamp(s, vec3f(0.0), vec3f(1.0))), a); }
   if (mode == 2) { return c + s * a; }
@@ -1423,7 +1401,6 @@ fn blendRowKeyed(c: vec3f, s: vec3f, a: f32, mode: i32, keyLo: f32) -> vec3f {
   if (mode == 4) { return mix(c, s, a * smoothstep(keyLo, keyLo + 0.18, dot(s, vec3f(0.299, 0.587, 0.114)))); }
   return mix(c, s, a);
 }
-
 fn blendRow(c: vec3f, s: vec3f, a: f32, mode: i32) -> vec3f { return blendRowKeyed(c, s, a, mode, MIX_KEY_LO); }
 
 /*
@@ -1781,8 +1758,7 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
      poured species. A second term stood beside it until 18e-5, a deflection at a hue-gated
      two-dye boundary (PLAN 33a): two dyes in one liquid have no index step between them and no
      surface to slope, so it is gone (the comment where boundaryDiff was, above).
-  2. dyeGain = max(1, boundaryContrast * 3) is an artistic contrast multiplier on the OPL step
-     in .w (the out-of-focus shadowgraph).
+  2. (Boundary Contrast scaled the dye's index until 38u-10; it is defocusShadow's gain now.)
   3. Pupil overlap is approximated by a smoothstep with a 0.15 extinction floor (0.85 max loss),
      weighted by reliefK (Edge Relief × plateAmt) on the path slope.
   4. (The shadowgraph, once here and masked to the dye's edges, is defocusShadow's.)
@@ -1794,9 +1770,9 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
      the 90th-percentile thin-dye rim in mixer's mid-grey contrast check (129.5 → 136.4
      without it, 130.9 → 134.7 with it). Tracked in PLAN 18e-1 (with 31a) to replace once
      the two dishes sit at separate heights in the projector's focal cone.
-  6. The dye's index, d · 0.06 · dyeGain in calcOpl (0.35 / (DISH_REST_GAP · logicalGrid), retuned
-     in 18e-2 so a dye's in-focus rim through oplPupilLoss matches main), is still a stand-in:
-     dilute dye moves water's index by far less, and nothing in the shelf's table gives a dye one.
+  6. The dye's index is tartrazine's measured dn/dc times each dye's absorbance (dyeDn, PLAN
+     38u-10) times Dye Index Boost: at 1, real, a dye-only look's rims, in focus and out, are
+     too faint to see, as a real dilute dye's are. One dn/dc and one wavelength: 38u-19.
      Poured liquids' indices are real (PLAN 18d-9): glycerine reads 1.4746 from the shelf, and
      npm run derive measures it.
   7. Clear pours (glycerine into water, no dye) and clear oil drops now deflect by |∇OPL| in
@@ -1841,10 +1817,10 @@ struct FsOut {
   the picture does not change.
 */
 fn mixLevelled(under: vec3f, over: vec3f, level: f32) -> vec3f {
-  // Not mix(a, b, 1): a compiler is free to write that as a + (b - a) * 1,
-  // which is not b in the last bit.
-  if (level >= 1.0) { return over; }
-  return mix(under, over, level);
+  // A fader of light, its level a dimmer's (levelShare), exact at both ends
+  // (plateLight.ts): mix(a, b, 1) may be written a + (b - a) * 1, which is
+  // not b in the last bit.
+  return mixLight(under, over, levelShare(level));
 }
 
 /** The LED platform's light at uv: its wheel of colour, graded, and the bevel toward its rim. */
@@ -1889,10 +1865,8 @@ fn lumiaLight(uv: vec2f) -> vec3f {
 ${FILM_FRAME_WGSL}
 ${LAMP_MIX_WGSL}
 
-/** Light laid over light: screened, so it adds and cannot clip past white. */
-fn screenOver(c: vec3f, light: vec3f) -> vec3f {
-  return 1.0 - (1.0 - c) * (1.0 - clamp(light, vec3f(0.0), vec3f(1.0)));
-}
+/** A beam over the plate, k of its light: it adds, as light (plateLight.ts). */
+fn screenOver(c: vec3f, light: vec3f, k: f32) -> vec3f { return displayOf(lightOf(c) + lightOf(light) * levelShare(k)); }
 
 /**
  * The movers whose place is in [lo, hi), laid over color bottom first. Only
@@ -1910,7 +1884,7 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
     if (fp < lo || fp >= hi) { continue; }
     if (U.ledPlatform != 0 && U.mixPos.x == fp) {
       let m = mixBlendOf(U.mixBlend.x);
-      if (m == 0) { c = screenOver(c, ledLight(uv) * U.mixLevel.x); } else { c = blendRow(c, ledLight(uv), U.mixLevel.x, m); }
+      if (m == 0) { c = screenOver(c, ledLight(uv), U.mixLevel.x); } else { c = blendRow(c, ledLight(uv), U.mixLevel.x, m); }
     }
     if (U.gelWheel > 0.001 && U.mixPos2.x == fp) {
       let m = mixBlendOf(U.mixBlend.y);
@@ -1918,7 +1892,7 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
     }
     if (U.lumia > 0.001 && U.mixPos2.y == fp) {
       let m = mixBlendOf(U.mixBlend.z);
-      if (m == 0) { c = screenOver(c, lumiaLight(uv) * U.lumia); } else { c = blendRow(c, lumiaLight(uv), U.lumia, m); }
+      if (m == 0) { c = screenOver(c, lumiaLight(uv), U.lumia); } else { c = blendRow(c, lumiaLight(uv), U.lumia, m); }
     }
     /*
       The film lands on the front plate's dye, tinted by it and bent by its

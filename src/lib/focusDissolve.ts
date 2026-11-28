@@ -50,15 +50,40 @@ export function rackShare(p: number): number {
   return s * s;
 }
 
-/** Each projector's rack, A's then B's: its share this frame, when it began on the show clock, and how long it runs (0 at rest). */
+/*
+ * A deck dissolve's two halves (PLAN 51c-2, lib/deckDissolve.ts). The
+ * projector leaving the wall racks out over the first half, as 51c's does,
+ * and stays melted while the crossfade takes its light. The one arriving
+ * racks out over the first quarter, twice as fast, while the crossfade has
+ * not yet begun to lift it (dark, at a deck's rest, so unseen), holds the
+ * melt to the middle and racks in over the second half as its light comes
+ * up. Each is sharp again only where its light is nothing: the one leaving
+ * at the end, the crossfade landed a quarter of the fade before.
+ */
+/** Out and back (51c's), out and held, out fast, held and in. */
+export const RACK_ROUND = 0;
+export const RACK_OUT = 1;
+export const RACK_IN = 2;
+
+/** A rack's share at `p` of the way through by its kind; `from` is where on a rack out it took over (0 sharp to ½ melted). */
+export function kindShare(kind: number, p: number, from = 0): number {
+  if (!(p >= 0 && p < 1)) return 0;
+  if (kind === RACK_OUT) return rackShare(Math.min(0.5, from + p));
+  if (kind === RACK_IN) return p < LOOK_FROM ? rackShare(from + (0.5 - from) * (p / LOOK_FROM)) : p < 0.5 ? 1 : rackShare(p);
+  return rackShare(p);
+}
+
+/** Each projector's rack, A's then B's: its share this frame, when it began on the show clock, how long it runs (0 at rest), its kind and a rack out's start. */
 export interface RackClock {
   share: Float32Array;
   start: Float64Array;
   ms: Float64Array;
+  kind: Uint8Array;
+  from: Float32Array;
 }
 
 export function rackClock(): RackClock {
-  return { share: new Float32Array(2), start: new Float64Array(2), ms: new Float64Array(2) };
+  return { share: new Float32Array(2), start: new Float64Array(2), ms: new Float64Array(2), kind: new Uint8Array(2), from: new Float32Array(2) };
 }
 
 /** Each frame, on the show clock: every running rack's share, and a finished one back at rest. */
@@ -67,7 +92,28 @@ export function walkRack(c: RackClock, now: number): void {
     if (!(c.ms[i] > 0)) { c.share[i] = 0; continue; }
     const p = (now - c.start[i]) / c.ms[i];
     if (p >= 1) { c.ms[i] = 0; c.share[i] = 0; continue; }
-    c.share[i] = rackShare(p);
+    c.share[i] = kindShare(c.kind[i], p, c.from[i]);
+  }
+}
+
+/** Where on a rack out a projector at `share` stands: ½ for a melt. */
+const outAt = (share: number): number => (share > 0 ? Math.asin(Math.sqrt(Math.min(1, share))) / Math.PI : 0);
+
+/**
+ * Start a deck dissolve of `seconds` at `now` to projector `to` (0 A, 1 B):
+ * each from the blur it is at, so a second Go mid-dissolve snaps nothing.
+ */
+export function startDeckRack(c: RackClock, now: number, seconds: number, to: 0 | 1): void {
+  const ms = Math.max(0, seconds) * 1000;
+  walkRack(c, now);
+  for (let i = 0; i < 2; i++) {
+    if (!(ms > 0)) { c.ms[i] = 0; c.share[i] = 0; continue; }
+    const arriving = i === to;
+    c.from[i] = Math.min(0.5, outAt(c.share[i]));
+    c.kind[i] = arriving ? RACK_IN : RACK_OUT;
+    c.start[i] = now;
+    c.ms[i] = ms;
+    c.share[i] = kindShare(c.kind[i], 0, c.from[i]);
   }
 }
 
@@ -86,9 +132,11 @@ export function startRack(c: RackClock, now: number, seconds: number, a: boolean
     if (!(i === 0 ? a : b) || !(ms > 0)) continue;
     // From the share it is at, on the way out.
     walkRack(c, now);
-    const p0 = c.share[i] > 0 ? Math.asin(Math.sqrt(Math.min(1, c.share[i]))) / Math.PI : 0;
+    const p0 = outAt(c.share[i]);
     c.start[i] = now - p0 * ms;
     c.ms[i] = ms;
+    c.kind[i] = RACK_ROUND;
+    c.from[i] = 0;
     if (lead < 0) lead = p0;
   }
   if (lead < 0) return { delayMs: 0, seconds };

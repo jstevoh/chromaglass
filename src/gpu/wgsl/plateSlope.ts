@@ -59,15 +59,38 @@ fn slopeWeight(r2: i32) -> f32 { return exp(-f32(r2) / (2.0 * SLOPE_SIGMA * SLOP
   either way. Until 31s-8 the display flattened the normal instead, by the
   most air it found at eight points 4.5 cells round the pixel (airNear), and
   those eight points were a second flower round every bubble. AIR_HELD is
-  the share held; scripts/holeline.mjs sets it to 0 for its control, which
-  must find the old glow round the holes again.
+  the share held (of airShare's, below); scripts/holeline.mjs sets it to 0
+  for its control, which must find the old glow round the holes again.
 */
 const AIR_HELD: f32 = 1.0;
+
+/*
+  How much of a texel's air makes it the hole (PLAN 33b-5, found landing
+  38u-10, 2026-11-28). The share held was the air itself, so a texel on the
+  air's soft rim (a smoothstep a texel and a half wide, wgsl/air.ts) held
+  only that share. But the solver does not take the dye out by that share:
+  airExclude (fluid/gap.ts) multiplies the dye by 1 - air every step, so a
+  texel at air 0.1 keeps 0.9^60, 0.2%, of its dye after a second. The dye's
+  hole reaches the air's outer edge, and the held reads left the ramp across
+  that rim half in: a pool's edge again, lit at every hole. Unseen while the
+  dye's index was a stand-in, since holeline threw before its 33b lines
+  (the stand-in's rim in focus widened the holes past RIM_SLACK); read with
+  that step passed on main, the mask let 3.46 levels through within 3 cells
+  of a 14-cell hole (bar 1), and 15.4 at the stronger index 38u-10's boost
+  reaches. Held as a share of air times AIR_WALL, clamped, the leak was 2.56
+  levels at 3, 0.83 at 6 and 0.30 at 12, the pool's own rim beside a hole
+  kept the same at each (27.69 levels, the control's). 12 holds every texel
+  whose dye the solver has emptied within a second (air from 1/12 up: a
+  0.5% remainder). The bubble's wall itself is the bubble pass's to draw.
+*/
+const AIR_WALL: f32 = 12.0;
+
+fn airShare(a: f32) -> f32 { return clamp(a * AIR_WALL, 0.0, 1.0) * AIR_HELD; }
 
 fn heldAt(t: texture_2d<f32>, air: texture_2d<f32>, uv: vec2f, dC: f32, hasAir: bool) -> f32 {
   let d = decodeDensity(tex2(t, uv).a);
   if (!hasAir) { return d; }
-  return mix(d, dC, clamp(tex2(air, uv).r, 0.0, 1.0) * AIR_HELD);
+  return mix(d, dC, airShare(tex2(air, uv).r));
 }
 
 /*
@@ -105,7 +128,7 @@ fn cellDensity(t: texture_2d<f32>, air: texture_2d<f32>, uv: vec2f, dC: f32, has
 // The air the pixel itself stands in, 0 with no bubbles bound (the 1x1 blank).
 fn airAt(air: texture_2d<f32>, uv: vec2f) -> f32 {
   if (textureDimensions(air).x <= 1u) { return 0.0; }
-  return clamp(tex2(air, uv).r, 0.0, 1.0) * AIR_HELD;
+  return airShare(tex2(air, uv).r);
 }
 
 fn sobelGrad(t: texture_2d<f32>, air: texture_2d<f32>, fuv: vec2f) -> vec2f {

@@ -282,6 +282,19 @@
       ]
     },
     {
+      "name": "The guide names only what the app has",
+      "shard": "logic",
+      "run": "npm run guidenames",
+      "why": [
+        "PLAN 49l-guard (scripts/guidenames.mjs): every Settings path docs/guide.md and",
+        "the in-app guide give is walked against lib/settingsMap.ts (a group on the",
+        "rail, a section in that group, a control the settings markup draws), every",
+        "phone More row against the phone's words, and the buttons 49l found retired",
+        "are not named as things to press. A made-up guide must fail on its stale",
+        "steps first. Reads source only, about a second."
+      ]
+    },
+    {
       "name": "Buttons say their state",
       "shard": "logic",
       "run": "npm run states",
@@ -2434,7 +2447,7 @@
       "run": "npm run looksgrid -- --owed=preview",
       "why": [
         "PLAN 34b written ahead of its build (scripts/looksgrid.mjs): every shipped",
-        "look's card on the Perform desk's grid, the narrow window's look menu and the",
+        "look's card on the Perform desk's grid, the folded desk's at 900 px and the",
         "phone's Looks sheet draws one lazy still of its own, a small WebP from the",
         "built site, the same file on all three, none flat and no two alike (34b-1);",
         "and only the hovered or held card holds a preview canvas, one at a time,",
@@ -2467,6 +2480,20 @@
         "most of the screen, each sheet opening and closing, and Tilt's",
         "arithmetic. The fingers on the plate need WebGPU and are asked on the",
         "open shard below."
+      ]
+    },
+    {
+      "name": "Readable in a dark room",
+      "shard": "browser",
+      "run": "node scripts/readable.mjs",
+      "why": [
+        "PLAN 49i-guard (scripts/readable.mjs): 49i's floor kept. Every desk tab, the",
+        "header's sheets and every settings section at 1440 x 900, the phone's dock sheets",
+        "and More tiles and the remote at 390 x 844: no words under 12 px, nothing to read",
+        "or press under 60% effective opacity (its own times its ancestors', times its",
+        "text colour's alpha). A made-up page must fail first. On the tree before 49i",
+        "(#972) it fails 8,110 small and 2,458 faint. No GPU; the site the steps above",
+        "built. About two minutes."
       ]
     },
     {
@@ -3777,6 +3804,19 @@
       ]
     },
     {
+      "name": "Light summed where it is light",
+      "shard": "open",
+      "run": "npm run linearlight",
+      "why": [
+        "PLAN 38p / 18k-linear: the plate is drawn in display values, and every",
+        "place it adds or fades light does the sum as light (wgsl/plateLight.ts).",
+        "The functions run in a compute shader on the adapter: a fade exact at its",
+        "ends, halfway from black to white 0.730, two half lights 0.685, Spectral",
+        "Mix's six bands summed as light; then a read of the source that each",
+        "site is wired. Under a minute; lamp line 6 reads the fade off the plate."
+      ]
+    },
+    {
       "name": "The lamp through the dye",
       "shard": "open",
       "run": "npm run lamp",
@@ -3827,6 +3867,20 @@
         "within 1%; with two projectors B goes soft while A stays sharp, and the",
         "crossfade's middle is half of each in light. Sharp is the plate to the",
         "byte. Beside `projectors` in the open shard, about a minute."
+      ]
+    },
+    {
+      "name": "The A/B deck dissolve",
+      "shard": "open",
+      "run": "npm run decks",
+      "why": [
+        "Decks (PLAN 51c-2): a Go goes to the dark projector, its dish changes",
+        "there, the crossfade carries the light over the middle half and the",
+        "racks take the lit one out and the dark one in. On a made-up clock:",
+        "nothing lit changes sharp, a rack jumps only in the dark, a second Go",
+        "carries on from its blur. Through the real pass: the light kept within",
+        "1%, a dark deck off the wall to the byte (and its melt not drawn), the",
+        "ends the plain A and B. Beside `focus` in the open shard."
       ]
     },
     {

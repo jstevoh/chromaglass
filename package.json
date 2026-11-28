@@ -201,6 +201,8 @@
     "rules": "node scripts/syncrules.mjs",
     "checkguard": "node scripts/checkguard.mjs",
     "readmes": "node scripts/readmedrift.mjs",
+    "guidenames": "node scripts/guidenames.mjs",
+    "readable": "npm run build && node scripts/readable.mjs",
     "mutate": "node scripts/mutate.mjs",
     "reach": "node scripts/reach.mjs",
     "macqueue": "node scripts/macqueue.mjs",
@@ -324,6 +326,7 @@
     "lampfield": "node scripts/lampfield.mjs",
     "projectors": "node scripts/projectors.mjs",
     "focus": "node scripts/focus.mjs",
+    "decks": "node scripts/decks.mjs",
     "litstage": "node scripts/litstage.mjs",
     "milk": "node scripts/milk.mjs",
     "colours": "node scripts/colours.mjs",
@@ -410,7 +413,8 @@
     "loopseam": "node --experimental-strip-types scripts/loopseam.mjs",
     "tvloops": "node --experimental-strip-types scripts/tvloops.mjs",
     "tvvideo": "node scripts/tvvideo.mjs",
-    "glow": "PW_WEBGPU=1 node scripts/glow.mjs"
+    "glow": "PW_WEBGPU=1 node scripts/glow.mjs",
+    "linearlight": "node scripts/linearlight.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

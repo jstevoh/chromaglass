@@ -4,9 +4,9 @@ import type { VisualizerSettings } from '../types';
 /**
  * The shipped looks and their plate stills (PLAN 34b-1).
  *
- * One list and one path builder shared by all three look pickers:
- * - the desk's Looks grid (`LooksGrid`, `looks-grid-<id>`),
- * - the narrow window's preset menu (`PresetMenu`, `preset-menu-<id>`),
+ * One list and one path builder shared by both look pickers:
+ * - the desk's Looks grid (`LooksGrid`, `looks-grid-<id>`), folded or not
+ *   (the narrow window's old `PresetMenu` went with the overlay, 49c-2),
  * - the phone's Looks sheet (`PhoneStage`, `phone-look-<id>`).
  *
  * Every shipped look has a real WebP still of its plate at

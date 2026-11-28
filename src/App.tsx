@@ -2,25 +2,21 @@ import { useState, useEffect, useCallback, useMemo, useRef, type ComponentProps,
 import { useAudioAnalyzer, type AudioData } from './hooks/useAudioAnalyzer';
 import { useLookDocument } from './app/useLookDocument';
 import type { EarView } from './hooks/useEarView';
-import { EarMeters, EarPercent } from './components/EarLeaves';
+import { EarPercent } from './components/EarLeaves';
 import { RenderPanel } from './components/RenderPanel';
 import { RecordPanel } from './components/RecordPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { followLine } from './lib/followedPlace';
 import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, macroKey, shotLabel } from './lib/macroCamera';
-import { RailZoom } from './components/RailZoom';
 import { SettingsPanel } from './components/SettingsPanel';
 import { resolveSection } from './lib/settingsMap';
 import { CommandAndShortcuts } from './components/ShortcutSheet';
-import { CueBar } from './components/CueBar';
-import { Info } from './components/Info';
-import { CastNetworkItems, TvAsks } from './components/CastNetworkItems';
+import { TvAsks } from './components/CastNetworkItems';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { Desk } from './components/desk/Desk';
 import type { Cue } from './components/desk/deskProps';
 import { closePanel, isSectionPanel, openPanel, openPanels, whereIs } from './lib/deskLayout';
-import { travelOfKey, valueOfKey } from './lib/deskPins';
 import { SlowEvolve, type EvolveEar } from './lib/slowEvolve';
 import { unhandled } from './lib/unhandled';
 import { SoundPanel } from './components/SoundPanel';
@@ -28,17 +24,14 @@ import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import { targetLook, LaterWrites, RIG_KEYS, lookOf } from './lib/lookFade';
 import { SettingRide } from './lib/ride';
-import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw, User, LogIn } from 'lucide-react';
+import { Crosshair, Play, Pause, X, Microscope, Projector, Film } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { sanitizePatch } from './lib/sanitizeSettings';
 import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
-import { bottleSwatch, isClearLiquid, isNatural } from './lib/liquidColour';
 import { clampAmount } from './lib/toolAmount';
-import { ToolAmount } from './components/ToolAmount';
 import { PRESETS, findPreset, NEW_LOOK } from './presets';
 import { useCastSender } from './hooks/useCastSession';
-import { relayInfo, type RelayInfo } from './lib/remoteProtocol';
 import { formatTimecode } from './lib/timecode';
 import { BenchOverlay } from './components/BenchOverlay';
 import { RunLocallyCard } from './components/RunLocallyCard';
@@ -59,7 +52,6 @@ import { useFilmSense } from './hooks/useFilmSense';
 import { type SimulatedMusic } from './lib/simulatedMusic';
 import { useWakeLock } from './hooks/useWakeLock';
 import type { MidiAction, MidiMap } from './lib/midi';
-import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
 import { downloadText, parsePresetFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
 import type { ShowSequence } from './lib/sequencer';
@@ -67,15 +59,12 @@ import { sameSong, songRefFromTrack, songLabel, type SongRef } from './lib/songR
 import { useShowSequencer } from './hooks/useShowSequencer';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
 import { clockText } from './lib/performanceTake';
-import { makesText, runningText } from './lib/recordChoice';
+import { runningText } from './lib/recordChoice';
 import { MusicSettings } from './lib/musicTypes';
-import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, DROPPER_COLORS } from './constants';
+import { COLOR_HARMONIES, PALETTE, DROPPER_COLORS } from './constants';
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
-import { getEffectiveTier } from './lib/tierGates';
 import { syncServerLicense } from './lib/licenseKey';
-import { LOCKUP_URL } from './brand';
-import { AlphaBadge } from './components/AlphaBadge';
 import { CrashReportButton, QuickReportDot } from './components/CrashReportButton';
 import { PanelGuard } from './components/PanelGuard';
 import { LIBRARY, librarySeconds, clock, nextTrack, credits } from './lib/musicLibrary';
@@ -95,8 +84,8 @@ const DRIFT_STEP_MS = 500;
 const RIDE_VIEW_MS = 100;
 
 import AccountSheet from './components/AccountSheet';
-import { LIT, LIVE } from './components/ui';
-import { ACCOUNTS_ON, useSignedIn } from './lib/useSignedIn';
+import { LIT } from './components/ui';
+import { ACCOUNTS_ON } from './lib/useSignedIn';
 import { isSignedInCached, onAuthFlagChange } from './lib/authFlag';
 import { syncAccountLicense } from './lib/accountLicense';
 import { useOutput } from './app/useOutput';
@@ -145,10 +134,6 @@ import { SCENE_ON_KEY, ArmedLook, OPENING_LOOK, MUSIC_SETTINGS_KEY, loadMusicSet
 export default function App() {
   const [isActive, setIsActive] = useState(true);
   const [showAccount, setShowAccount] = useState(() => hasAccountOrLicenseUI && isProfileRoute());
-  // Signed out with the show up: every account button turns into a lit
-  // "Sign in" that opens the sheet's sign-in (the owner, 2026-10-24).
-  const signedIn = useSignedIn();
-  const signedOut = ACCOUNTS_ON && !signedIn;
 
   const openProfileSheet = useCallback(() => {
     if (!hasAccountOrLicenseUI) return;
@@ -320,7 +305,6 @@ export default function App() {
     setLiquidTypes(prev => prev.map(t => t.id === id ? { ...t, color } : t));
   }, []);
   const [isAutomated, setIsAutomated] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
   /**
    * Clean screen: nothing on top of the liquid at all — no logo, no chips, no
    * cursor. For a projected show. Esc (or holding a finger on a touch screen)
@@ -583,8 +567,6 @@ export default function App() {
   const [showTrackPanel, setShowTrackPanel] = useState(false);
   const [showSequencer, setShowSequencer] = useState(false);
   const [showMidi, setShowMidi] = useState(false);
-  const [presetMenu, setPresetMenu] = useState<'none' | 'title'>('none');
-  const [castMenu, setCastMenu] = useState(false);
   // ── The user's own presets: a library in the browser, files on disk ──
   const userPresets = useUserPresets();
   const allPresets = useMemo(() => [...PRESETS, ...userPresets.presets.map(asPreset)], [userPresets.presets]);
@@ -612,8 +594,6 @@ export default function App() {
   /** Network displays connected through the relay, and where they can reach it. */
   const [mirrorCount, setMirrorCount] = useState(0);
   const [phoneCount, setPhoneCount] = useState(0);
-  const [relay, setRelay] = useState<RelayInfo | null>(null);
-  useEffect(() => { if (castMenu) void relayInfo().then(setRelay); }, [castMenu]);
   const [musicSettings, setMusicSettings] = useState<MusicSettings>(loadMusicSettings);
   const updateMusicSettings = useCallback((partial: Partial<MusicSettings>) => {
     setMusicSettings(prev => {
@@ -967,10 +947,6 @@ export default function App() {
   };
   /** The song playing now, as a file would remember it. */
   const currentSong = useMemo<SongRef | null>(() => (musicIntel.state.track ? songRefFromTrack(musicIntel.state.track) : null), [musicIntel.state.track]);
-  const loadPresetFile = async (file: File) => {
-    const p = await userPresets.importFile(file);
-    applyUserPreset(p);
-  };
   const exportSequence = (seq: ShowSequence) => {
     const used = userPresets.presets.filter(p => seq.stages.some(st => st.presetId === p.id));
     downloadText(sequenceFileName(seq), serializeSequence(seq, used));
@@ -1248,7 +1224,7 @@ export default function App() {
   const previousLook = useRef<{ id: string | null; settings: VisualizerSettings } | null>(null);
 
   const {
-    phone, setPhone, phoneScreenUp, choosePhoneScreen, performing, designing, deskUp, overlayUp,
+    phone, setPhone, phoneScreenUp, choosePhoneScreen, performing, designing, deskUp,
   } = usePhoneLayout({
     deskLayout,
   });
@@ -1348,12 +1324,8 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // The stage look's place in each list, for the slide tray's click (PLAN 35g):
-  // the desk's is among all the presets, the phone's among its grouped list.
-  const deskLookSlot = useMemo(() => {
-    const i = pinnedPresetId ? allPresets.findIndex(p => p.id === pinnedPresetId) : -1;
-    return i < 0 ? null : i;
-  }, [allPresets, pinnedPresetId]);
+  // The stage look's place in the phone's grouped list, for the slide tray's
+  // click (PLAN 35g).
   const phoneLookSlot = useMemo(() => {
     const i = pinnedPresetId ? phoneLooks.findIndex(l => l.id === pinnedPresetId) : -1;
     return i < 0 ? null : i;
@@ -1815,18 +1787,12 @@ export default function App() {
   /** The save sheet, opened from the bench and from ⌘S. */
   const [showSave, setShowSave] = useState(false);
 
-  /** The lamps in both desks' headers, and the line along the bottom. */
-  /**
-   * Whether the cue bar is occupying the bottom centre of a narrow screen.
-   * The minimise chips live there too and have to give way to it.
-   */
-  const cueBarUp = overlayUp && !!(cued || fading > 0 || previousLook.current);
-
   const livePhoneCount = remoteLink.status === 'connected' ? phoneCount : 0;
   useEffect(() => {
     if (remoteLink.status !== 'connected') setPhoneCount(0);
   }, [remoteLink.status]);
 
+  /** The lamps in both desks' headers, and the line along the bottom. */
   const deskDots = useMemo(() => ({
     sound: audioSource !== 'none',
     // The film under the dye, which is what the dot opens (Film, in Settings).
@@ -2052,7 +2018,6 @@ export default function App() {
   // A section as a panel.
   const sectionPanel = (id: string) => settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {} });
 
-  const evolveAt = travelOfKey('automateRate', settings.automateRate);
   return (
     // On a phone the height is the dynamic viewport's: 100vh there is the
     // height with the browser's bars hidden, which put the dock under them.
@@ -2367,504 +2332,6 @@ export default function App() {
       {/* Everything below is an overlay on the liquid; clean screen removes it all. */}
       <div hidden={!overlaysVisible} className="contents">
 
-      {/* ── UI Overlay ─────────────────────────────────────────── */}
-      {/*
-        Not while the desk is up. The desk is a control surface in its own
-        right; drawing the bottle rail and the toolbar over it as well was
-        what put Sound Drive on screen twice, and a control that exists in
-        two places is a control you cannot trust.
-      */}
-      <AnimatePresence>
-        {showControls && !showSettings && overlayUp && (
-          <>
-            {/* ── Left Controls ───────────────────────────────── */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className={`absolute top-1/2 -translate-y-1/2 left-4 z-10 flex max-w-[55vw] flex-col items-start gap-4 transition-all duration-300 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${cueBarUp ? 'max-h-[calc(100vh-340px)]' : 'max-h-[calc(100vh-260px)]'} ${isMinimized ? '-translate-x-[150%] opacity-0' : ''}`}
-            >
-              <div className="flex flex-col items-center gap-3 bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-3 py-4 shadow-2xl">
-
-                {/*
-                  The bottles, in two groups — always visible.
-
-                  They used to be one flat list of nine coloured chips, which
-                  made Soap look like a pale green dye and Milk like an off-
-                  white one. Four of the nine are not colours at all: they
-                  write into a field the plate carries and go on acting for
-                  half a minute, and nothing in a flat list said so. The
-                  split, and the line of what the selected one does, are the
-                  whole difference between a menu and an instrument.
-                */}
-                {([
-                  ['Dye', liquidTypes.filter(l => !l.behaviour)],
-                  ['Changes the plate', liquidTypes.filter(l => l.behaviour)],
-                ] as const).map(([groupLabel, group]) => group.length === 0 ? null : (
-                  <div key={groupLabel} className="flex flex-col gap-1.5 w-full">
-                    <span className="text-[11px] uppercase tracking-widest font-bold text-white/60">{groupLabel}</span>
-                    {/*
-                      Two up. Nine bottles in a single column ran the bench past
-                      the bottom of the screen on a laptop, which put the four
-                      that change the plate — the interesting ones — below the
-                      fold. Paired, the whole bench is in view at once.
-                    */}
-                    <div className="grid grid-cols-1 min-[440px]:grid-cols-2 gap-1">
-                    {group.map((liq) => {
-                      const isSelected = liq.id === selectedLiquidId;
-                      return (
-                        <button
-                          aria-pressed={isSelected}
-                          key={liq.id}
-                          onClick={() => { setSelectedLiquidId(liq.id); }}
-                          title={liq.description}
-                          data-testid={`liquid-${liq.id}`}
-                          className={`flex items-center gap-2 w-full px-2 py-2.5 rounded-xl border-2 transition-all text-left ${
-                            isSelected ? LIT : 'border-transparent text-white/50 hover:text-white hover:bg-white/5'
-                          }`}
-
-                        >
-                          <span
-                            className="w-4 h-4 rounded-full flex-shrink-0 border-2 border-white/30"
-                            style={bottleSwatch(liq)}
-                          />
-                          <span className="text-[11px] font-bold uppercase tracking-wider flex-1">{liq.name}</span>
-                          {isSelected && (
-                            <label className="relative cursor-pointer flex-shrink-0" onClick={e => e.stopPropagation()} title="Change color">
-                              <span className="flex h-6 w-6 items-center justify-center text-[11px] text-white/40 hover:text-white transition-colors">&#9679;</span>
-                              <input
-                                type="color"
-                                value={liq.color}
-                                onChange={(e) => updateLiquidColor(liq.id, e.target.value)}
-                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                              />
-                            </label>
-                          )}
-                        </button>
-                      );
-                    })}
-                    </div>
-                  </div>
-                ))}
-                {selectedLiquid?.description && (
-                  <p className="text-[11px] leading-snug text-white/40 w-full -mt-1" data-testid="liquid-description">
-                    {selectedLiquid.description}
-                  </p>
-                )}
-
-                {/* Quick color swatches — one click recolors the selected liquid */}
-                <div className="flex flex-col gap-1.5 w-full">
-                  <span className="text-[11px] uppercase tracking-widest font-bold text-white/60">Dye Color</span>
-                  <div className="grid grid-cols-5 min-[440px]:grid-cols-8 gap-1">
-                    {/*
-                      The liquid's own colour, with no dye in it (lib/liquidColour.ts):
-                      what every bottle the shelf ships pours until a dye is
-                      picked, and the way back to it after one was.
-                    */}
-                    {selectedLiquid?.own && (
-                      <button
-                        onClick={() => updateLiquidColor(selectedLiquidId, selectedLiquid.own!)}
-                        data-testid="dye-natural"
-                        aria-pressed={isNatural(selectedLiquid)}
-                        className={`w-[26px] h-[26px] rounded-full border-2 border-dashed transition-transform hover:scale-110 ${
-                          isNatural(selectedLiquid) ? 'border-white scale-110 shadow-[0_0_6px_rgba(255,255,255,0.6)]' : 'border-white/40'
-                        }`}
-                        style={isClearLiquid(selectedLiquid) ? { backgroundColor: 'transparent' } : { backgroundColor: selectedLiquid.own }}
-                        title={`Natural: ${selectedLiquid.name.toLowerCase()} as it is, ${isClearLiquid(selectedLiquid) ? 'clear' : 'its own colour'}, no dye`}
-                      />
-                    )}
-                    {DROPPER_COLORS.map(hex => {
-                      const isCurrent = !isNatural(selectedLiquid) && selectedLiquid?.color.toLowerCase() === hex.toLowerCase();
-                      return (
-                        <button
-                          aria-pressed={isCurrent}
-                          key={hex}
-                          onClick={() => updateLiquidColor(selectedLiquidId, hex)}
-                          className={`w-[26px] h-[26px] rounded-full border transition-transform hover:scale-110 ${
-                            isCurrent ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/20'
-                          }`}
-                          style={{ backgroundColor: hex }}
-                          title={PALETTE.find(p => p.hex === hex)?.name ?? hex}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="h-px w-full bg-white/10"></div>
-
-                {/* Palette lock — pins the ambient/auto/music color harmony */}
-                <div className="flex flex-col gap-1.5 w-full">
-                  <span className="text-[11px] uppercase tracking-widest font-bold text-white/60">Palette</span>
-                  <div className="flex flex-col gap-1 max-h-40 overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
-                    <button
-                      aria-pressed={paletteLock == null}
-                      onClick={() => selectPalette(null)}
-                      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border text-left transition-all ${
-                        paletteLock == null ? LIT : 'border-white/10 bg-white/5 text-white/50 hover:text-white'
-                      }`}
-                    >
-                      <span className="text-[11px] font-bold uppercase tracking-wider flex-1">Auto</span>
-                      <span className="text-[8px] opacity-50">the music picks</span>
-                    </button>
-                    {COLOR_HARMONIES.map((harmony, idx) => (
-                      <button
-                        aria-pressed={paletteLock === idx}
-                        key={idx}
-                        onClick={() => selectPalette(idx)}
-                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border text-left transition-all ${
-                          paletteLock === idx ? LIT : 'border-white/10 bg-white/5 text-white/50 hover:text-white'
-                        }`}
-                        title={COLOR_HARMONY_NAMES[idx]}
-                      >
-                        <span className="flex gap-0.5">
-                          {harmony.slice(0, 4).map((pi, i) => (
-                            <span key={i} className="w-3 h-3 rounded-full border border-black/30" style={{ backgroundColor: PALETTE[pi].hex }} />
-                          ))}
-                        </span>
-                        <span className="text-[11px] font-bold uppercase tracking-wider truncate">{COLOR_HARMONY_NAMES[idx]}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="h-px w-full bg-white/10"></div>
-
-                {/* Tools */}
-                <div className="flex flex-col gap-1 w-full">
-                  <span className="text-[11px] uppercase tracking-widest font-bold text-white/60">Tools</span>
-                  <div className="grid grid-cols-3 gap-1 w-full">
-                    {([
-                      { id: 'dropper' as const, icon: Droplet, label: 'Drop' },
-                      { id: 'spray' as const, icon: SprayCan, label: 'Spray' },
-                      { id: 'splatter' as const, icon: Paintbrush, label: 'Splat' },
-                      { id: 'pour' as const, icon: FlaskConical, label: 'Pour' },
-                      { id: 'streak' as const, icon: Slash, label: 'Streak' },
-                      { id: 'blow' as const, icon: Wind, label: 'Blow' },
-                      { id: 'press' as const, icon: Hand, label: 'Press' },
-                      { id: 'finger' as const, icon: Fingerprint, label: 'Finger' },
-                      { id: 'magnet' as const, icon: Magnet, label: 'Magnet' },
-                      { id: 'spin' as const, icon: RotateCw, label: 'Spin' },
-                    ]).map(({ id, icon: Icon, label }) => (
-                      <button
-                        aria-pressed={activeTool === id}
-                        key={id}
-                        onClick={() => setActiveTool(id)}
-                        className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg border transition-all ${
-                          activeTool === id
-                            ? LIT
-                            : 'border-white/10 bg-white/5 text-white/40 hover:text-white'
-                        }`}
-                      >
-                        <Icon size={11} />
-                        <span className="text-[7px] uppercase font-bold tracking-wider">{label}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <ToolAmount tool={activeTool} value={toolAmount} onChange={(v) => setToolAmount(activeTool, v)} className="mt-1 text-white/80" />
-                </div>
-
-                <div className="h-px w-full bg-white/10"></div>
-
-                {/* Image Upload */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageUpload}
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl border border-white/10 bg-white/5 text-white/50 hover:text-white hover:bg-white/12 hover:border-white/25 transition-all active:scale-95"
-                  title="Upload an image as colored dye — it will dissolve into the fluid"
-                >
-                  <ImagePlus size={12} />
-                  <span className="text-[8px] uppercase font-bold tracking-wider">Image Dye</span>
-                </button>
-
-              </div>
-            </motion.div>
-
-            {/* ── Right Controls ──────────────────────────────── */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className={`absolute top-1/2 -translate-y-1/2 right-4 z-10 max-w-[40vw] transition-all duration-300 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] ${cueBarUp ? 'max-h-[calc(100vh-340px)]' : 'max-h-[calc(100vh-260px)]'} ${isMinimized ? 'translate-x-[150%] opacity-0' : ''}`}
-            >
-              <div className="flex flex-col items-center gap-3 bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-3 py-4 shadow-2xl">
-
-                {/* Play/Pause */}
-                <button
-                  aria-pressed={!isActive}
-                  onClick={() => setIsActive(!isActive)}
-                  className={`p-3 rounded-full transition-all duration-300 ${
-                    !isActive
-                      ? `border ${LIT}`
-                      : 'border border-transparent bg-white/15 hover:bg-white/25 text-white'
-                  }`}
-                  title={isActive ? "Pause" : "Play"}
-                >
-                  {isActive ? <Pause size={20} /> : <Play size={20} fill="currentColor" />}
-                </button>
-
-                {/*
-                  In Perform these three are on the desk's faders, larger and
-                  in one place. Drawing them here as well would put Sound Drive
-                  and Evolve Speed on screen twice, which is exactly the thing
-                  a user caught in the sound picker.
-                */}
-                {!performing && <>
-                <div className="w-full h-px bg-white/10" />
-
-                {/* Sound Drive */}
-                <div className="flex flex-col items-center gap-2 w-full">
-                  <div className="flex items-center justify-between w-full">
-                    <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Sound Drive</span>
-                    <span className="text-[8px] font-bold text-white/50">{Math.round(settings.audioImpact * 100)}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={settings.audioImpact}
-                    onChange={e => updateSettings({ audioImpact: parseFloat(e.target.value) })}
-                    className="w-full h-6 appearance-none rounded-full cursor-pointer accent-purple-400"
-                    style={{ background: `linear-gradient(to right, rgb(192,132,252) ${settings.audioImpact * 100}%, rgba(255,255,255,0.1) ${settings.audioImpact * 100}%)` }}
-                    title="Controls how strongly sound impacts the visuals"
-                  />
-                </div>
-
-                <div className="w-full h-px bg-white/10" />
-
-                {/* Evolve */}
-                <div className="flex flex-col items-center gap-1.5 w-full">
-                  <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Evolve</span>
-                  <button
-                    role="switch"
-                    aria-checked={isAutomated}
-                    onClick={() => setIsAutomated(!isAutomated)}
-                    data-testid="evolve-toggle"
-                    className={`relative w-[52px] h-[26px] rounded-full transition-colors duration-300 ${isAutomated ? 'bg-accent' : 'bg-track'}`}
-                    title="Works the plate on its own: drops and air from the music, dye lifted off again, a finger drawn through it, and the dials wandering slowly around the look"
-                  >
-                    <motion.div
-                      className="absolute top-[3px] left-[3px] w-5 h-5 bg-white rounded-full shadow-md"
-                      animate={{ x: isAutomated ? 26 : 0 }}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    />
-                  </button>
-                  {/* How busy Evolve is: a drop a second at left, a frenzy at right */}
-                  <div className={`flex flex-col gap-1 w-full mt-1 transition-opacity ${isAutomated ? '' : 'opacity-40'}`}>
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Evolve Speed</span>
-                      <span className="text-[8px] font-bold text-white/50">{Math.round((settings.automateRate ?? 0) * 100)}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.001"
-                      value={evolveAt}
-                      onChange={e => updateSettings({ automateRate: valueOfKey('automateRate', +e.target.value) })}
-                      className="w-full h-6 appearance-none rounded-full cursor-pointer accent-purple-400"
-                      style={{ background: `linear-gradient(to right, rgb(192,132,252) ${evolveAt * 100}%, rgba(255,255,255,0.1) ${evolveAt * 100}%)` }}
-                      title="How busy Evolve is: how often it pours, thins and strokes"
-                      data-testid="evolve-speed"
-                    />
-                  </div>
-                </div>
-                </>}
-
-                <div className="w-full h-px bg-white/10" />
-
-                {/* The Macro button became the zoom itself (PLAN QA-32c). */}
-                <RailZoom zoom={settings.macroZoom ?? 1} onZoom={pinchZoom} />
-
-                {/* Settings */}
-                <button
-                  aria-pressed={showSettings}
-                  onClick={() => { setSettingsSection(null); setShowSettings(!showSettings); setShowHelp(false); }}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    showSettings ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
-                  }`}
-                  title="Open settings"
-                >
-                  <Settings size={16} className={showSettings ? '' : 'opacity-60 group-hover:opacity-100'} />
-                  <span className="text-[7px] font-bold uppercase tracking-widest">Settings</span>
-                </button>
-
-                {/*
-                  The desk's tab, for when the window is wide enough for the
-                  desk again: it was Perform or Design, and is now whichever
-                  of the owner's tabs is next. Not a toggle, so not lit: it
-                  names the tab the desk will open on.
-                */}
-                <button
-                  onClick={() => { const t = deskTabs.tabs; const i = t.findIndex(x => x.id === deskTab); setDeskTab(t[(i + 1) % t.length].id); }}
-                  className="flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full bg-white/5 hover:bg-white/10 border-white/10"
-                  title={`The desk opens on ${deskTabs.tabs.find(t => t.id === deskTab)?.name ?? ''} once the window is wide enough. Click for the next tab.`}
-                  data-testid="desk-mode-button"
-                >
-                  <LayoutGrid size={16} className="opacity-60 group-hover:opacity-100" />
-                  <span className="max-w-full truncate text-[7px] font-bold uppercase tracking-widest">{deskTabs.tabs.find(t => t.id === deskTab)?.name}</span>
-                </button>
-
-                {/* Songs: a look for each song and what happens while it plays */}
-                <button
-                  aria-pressed={showSongs || songRuntime.status.showId !== null || sequencer.status.running}
-                  onClick={() => { setShowSongs(!showSongs); setShowTrackPanel(false); }}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    showSongs || songRuntime.status.showId !== null || sequencer.status.running ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
-                  }`}
-                  title="Songs — a look for each song, and what happens while it plays"
-                  data-testid="songs-button"
-                >
-                  <Clapperboard size={16} className={showSongs || songRuntime.status.showId !== null ? '' : 'opacity-60 group-hover:opacity-100'} />
-                  <span className="text-[7px] font-bold uppercase tracking-widest">Songs</span>
-                </button>
-
-                {/* MIDI controller */}
-                <button
-                  aria-pressed={showMidi}
-                  onClick={() => { setShowMidi(!showMidi); setShowSequencer(false); setShowTrackPanel(false); }}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    showMidi ? LIT : midi.enabled ? 'border-ok/50 text-ok' : 'bg-white/5 hover:bg-white/10 border-white/10'
-                  }`}
-                  title={midi.enabled ? `MIDI on${midi.activeInputName ? `: ${midi.activeInputName}` : ''}${gamepad.connected ? ` · gamepad: ${gamepad.connected}` : ''}` : 'MIDI controller — faders, pads and buttons for the show'}
-                  data-testid="midi-button"
-                >
-                  <Sliders size={16} className={showMidi || midi.enabled ? '' : 'opacity-60 group-hover:opacity-100'} />
-                  <span className="text-[7px] font-bold uppercase tracking-widest">MIDI</span>
-                </button>
-
-                {/* Randomize */}
-                <button
-                  onClick={luckyPlate}
-                  data-testid="lucky-button"
-                  className="flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full bg-white/5 hover:bg-white/10 border-white/10"
-                  title="Randomize all settings — undo toast brings the plate and settings back"
-                >
-                  <Shuffle size={16} className="text-yellow-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-[7px] font-bold uppercase tracking-widest">Random</span>
-                </button>
-
-                <div className="w-full h-px bg-white/10" />
-
-                {/* Layers */}
-                <div className="flex flex-col items-center gap-2 w-full">
-                  <div className="flex items-center gap-1.5">
-                    <Layers size={11} className="text-white/40" />
-                    <span className="text-[8px] uppercase tracking-widest font-bold opacity-40">Layers</span>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    {Array.from({ length: stageLayers }).map((_, idx) => (
-                      <button
-                        aria-pressed={activeLayer === idx}
-                        key={idx}
-                        onClick={() => setActiveLayer(idx)}
-                        className={`w-7 h-7 rounded-full border-2 transition-all flex items-center justify-center text-[11px] font-bold ${
-                          activeLayer === idx ? `${LIT} scale-110` : 'border-white/20 text-white/50 hover:border-white/50'
-                        }`}
-                      >
-                        {idx + 1}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    onClick={drainPlate}
-                    className="py-1.5 px-2 rounded-lg text-[11px] uppercase tracking-widest font-bold opacity-70 hover:opacity-100 transition-opacity text-red-400 hover:text-red-300"
-                    title="Drain — swirls all dye down the drain"
-                  >
-                    Drain
-                  </button>
-                </div>
-
-                <div className="w-full h-px bg-white/10" />
-
-                {/* Audio Sources */}
-                <div className="flex flex-col items-center gap-1.5 w-full">
-                  <span className="text-[7px] uppercase tracking-widest font-bold opacity-30">Audio</span>
-                  <button
-                    aria-pressed={audioSource === 'microphone'}
-                    onClick={() => handleSourceChange(audioSource === 'microphone' ? 'none' : 'microphone')}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
-                      audioSource === 'microphone'
-                        ? `border ${LIT}`
-                        : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
-                    }`}
-                    title={audioSource === 'microphone' ? "Mic is active — click to mute" : "Enable microphone input"}
-                  >
-                    {audioSource === 'microphone' ? <Mic size={14} /> : <MicOff size={14} />}
-                    <span>Mic</span>
-                  </button>
-                  <button
-                    aria-pressed={audioSource === 'system'}
-                    onClick={() => handleSourceChange(audioSource === 'system' ? 'none' : 'system')}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
-                      audioSource === 'system'
-                        ? `border ${LIT}`
-                        : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
-                    }`}
-                    title={audioSource === 'system' ? "System audio active — click to stop" : "Capture system/tab audio"}
-                  >
-                    <Monitor size={14} />
-                    <span>System</span>
-                  </button>
-                  <button
-                    aria-pressed={audioSource === 'file'}
-                    onClick={() => musicInputRef.current?.click()}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
-                      audioSource === 'file'
-                        ? `border ${LIT}`
-                        : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
-                    }`}
-                    title="Play a music file here and drive the show from it — no microphone, no loopback"
-                    data-testid="music-file-button"
-                  >
-                    <FileAudio size={14} />
-                    <span>File</span>
-                  </button>
-                  <button
-                    aria-pressed={!!musicFile?.track}
-                    onClick={() => setLibraryOpen(v => !v)}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
-                      musicFile?.track
-                        ? `border ${LIT}`
-                        : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
-                    }`}
-                    title={`Ambient music that ships with the show — ${clock(librarySeconds())} of it, licensed for a room like this one, and played from this tab so a shared tab carries the sound too`}
-                    data-testid="music-library-button"
-                  >
-                    <Music size={14} />
-                    <span>Shelf</span>
-                  </button>
-                  <button
-                    aria-pressed={audioSource === 'simulated'}
-                    onClick={() => handleSourceChange(audioSource === 'simulated' ? 'none' : 'simulated')}
-                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
-                      audioSource === 'simulated'
-                        ? `border ${LIT}`
-                        : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
-                    }`}
-                    title="A synthesised band, played silently into the show: kick, snare, hats, bass and a pad, in verses and choruses. No microphone, no permission, nothing to be asked for"
-                    data-testid="simulated-audio-button"
-                  >
-                    <Music size={14} />
-                    <span>Band</span>
-                  </button>
-                  <input ref={musicInputRef} type="file" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" className="hidden" data-testid="music-file-input"
-                    onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) playMusicFile(f); }} />
-                </div>
-
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
       {/* ── The phone (components/phone/PhoneStage.tsx) ─────────── */}
       {phone && showControls && (() => {
         const phoneSave = {
@@ -3090,7 +2557,7 @@ export default function App() {
           without one both read as "", and React warned on every frame the
           pair was up. The components here take no `key` in their props type. */}
       <AnimatePresence>
-        {showControls && !showSettings && !isMinimized && !phone && <RunLocallyCard status={engineStatus} />}
+        {showControls && !showSettings && !phone && <RunLocallyCard status={engineStatus} />}
       </AnimatePresence>
       <AnimatePresence>
         <PanelGuard name="The bench" onClose={() => setBench(b => ({ ...b, text: null }))}>
@@ -3104,40 +2571,6 @@ export default function App() {
         />
         </PanelGuard>
       </AnimatePresence>
-
-      {/* ── Minimize / clean-screen chips ──────────────────────── */}
-      {/*
-        These share the bottom centre with the cue bar, which is the one thing
-        that turns up there unannounced: `fixed bottom-6 left-1/2` on both, and
-        the cue bar's higher z-index, so cueing a look on a narrow screen
-        painted it straight over Hide UI and Clean Screen and neither could be
-        pressed. Nobody saw it because it needs a cued look to happen at all —
-        which is why the check that found it runs after the suite has used the
-        app rather than on a page that has just loaded.
-
-        So they step up out of its way while it is there, rather than fight it
-        for the same six pixels.
-      */}
-      {overlayUp && (
-      <div className={`absolute left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 transition-all duration-200 ${cueBarUp ? 'bottom-24' : 'bottom-6'}`}>
-        <button
-          onClick={() => setIsMinimized(!isMinimized)}
-          className="flex items-center gap-2 px-4 py-2 bg-black/50 hover:bg-black/70 backdrop-blur-xl border border-white/10 rounded-full transition-all shadow-2xl text-[11px] uppercase tracking-widest font-bold text-white/50 hover:text-white/80"
-          title={isMinimized ? 'Bring the side panels back' : 'Slide the side panels out of the way. Clean Screen next to it hides everything, including the cursor.'}
-        >
-          {isMinimized ? <Eye size={14} /> : <EyeOff size={14} />}
-          {isMinimized ? 'Show UI' : 'Hide UI'}
-        </button>
-        <button
-          onClick={hideOverlays}
-          className="flex items-center gap-2 px-4 py-2 bg-black/50 hover:bg-black/70 backdrop-blur-xl border border-white/10 rounded-full transition-all shadow-2xl text-[11px] uppercase tracking-widest font-bold text-white/50 hover:text-white/80"
-          title="Clean screen: hide every overlay and the cursor. Esc brings them back."
-        >
-          <MonitorOff size={14} />
-          Clean Screen
-        </button>
-      </div>
-      )}
 
       {/* ── Settings Panel ─────────────────────────────────────── */}
       <AnimatePresence>
@@ -3268,162 +2701,6 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* ── Top Bar ────────────────────────────────────────────── */}
-      {overlayUp && (
-      <div className="absolute top-6 left-6 right-6 flex justify-between items-start z-50 pointer-events-none">
-        <div className="relative flex flex-col pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-2.5 shadow-2xl">
-          {/*
-            The mark and the name, drawn by `npm run brand`. Smaller on a
-            phone: the card shares the row with the button pill, and at 375
-            wide 24px tall is what fits — any taller and the image is only
-            letterboxed into the same width with empty bands above and below.
-            The Alpha label sits beside the name from 640 up. On a phone it is a
-            tab on the card's top edge instead: beside the name at 420 wide it
-            ran out of the card and under the button pill (`npm run layout`,
-            "covered; over record-button"), and under the name it made the card
-            20px taller, over the bottle rail's heading.
-          */}
-          <span className="absolute -top-2.5 right-3 rounded bg-black sm:hidden">
-            <AlphaBadge />
-          </span>
-          <h1 className="flex items-center gap-2">
-            <img src={LOCKUP_URL} alt="ChromaGlass" className="block h-6 w-auto sm:h-10" draggable={false} />
-            <AlphaBadge className="hidden sm:inline-block" />
-          </h1>
-          {/* The look's menu, one click from the top. */}
-          <button
-            onClick={() => setPresetMenu(presetMenu === 'title' ? 'none' : 'title')}
-            className="flex items-center gap-2 mt-0.5 py-1.5 -mx-1 px-1 rounded-lg group"
-            title="Choose a look"
-            aria-haspopup="menu"
-            aria-expanded={presetMenu === 'title'}
-            data-testid="preset-title-button"
-          >
-            <p className="text-[11px] uppercase tracking-widest opacity-40 group-hover:opacity-80 transition-opacity">
-              {activePresetName ? activePresetName : 'Custom'}
-            </p>
-            <span className="text-[8px] px-1.5 py-0.5 rounded bg-white/10 text-white/50 uppercase tracking-wider font-bold flex items-center gap-1 group-hover:bg-white/20 transition-colors">
-              Look <ChevronDown size={9} />
-            </span>
-          </button>
-          {presetMenu === 'title' && (
-            <PanelGuard name="The look menu" onClose={() => setPresetMenu('none')}>
-            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onCuePreset={cueLook} swatchOf={swatchOf} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={deleteSavedLook} currentSong={currentSong} align="left" />
-            </PanelGuard>
-          )}
-        </div>
-
-        <div className="flex gap-2 pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-full p-1.5 shadow-2xl">
-          <button
-            onClick={() => { setShowTrackPanel(!showTrackPanel); setShowSequencer(false); }}
-            aria-pressed={showTrackPanel}
-            data-testid="track-panel-button"
-            className={`relative p-2 rounded-full transition-all ${
-              showTrackPanel ? 'bg-accent text-white' : 'hover:bg-white/10 text-white/60'
-            }`}
-            title={musicIntel.state.track ? `${musicIntel.state.track.title} — ${musicIntel.state.track.artist}` : 'Track intelligence'}
-          >
-            <Music size={14} />
-            {musicIntel.state.track && !showTrackPanel && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-400" />
-            )}
-          </button>
-          <button
-            aria-pressed={recordingAny}
-            onClick={toggleRecording}
-            className={`p-2 rounded-full transition-all flex items-center gap-1 ${recordingAny ? LIVE : 'hover:bg-white/10 text-white/60'}`}
-            title={recordingAny ? 'Stop recording and keep it' : `Record: ${makesText(recordChoice)} (R)`}
-            data-testid="record-button"
-          >
-            {recordingAny ? <Square size={12} fill="currentColor" /> : <Circle size={14} />}
-            {recordingAny && <span className="text-[11px] font-mono" data-testid="record-time">{clockText(recordSeconds)}</span>}
-          </button>
-          <div className="relative">
-            <button
-              onClick={() => { if (isCasting) { stopCast(); setCastMenu(false); } else setCastMenu(!castMenu); }}
-              className={`p-2 rounded-full transition-all ${
-                isCasting ? 'bg-ok text-bg' : castMenu ? LIT : 'hover:bg-white/10 text-white/60'
-              }`}
-              title={isCasting ? "Stop casting" : "Cast to display"}
-              aria-pressed={isCasting}
-              aria-haspopup="menu"
-              aria-expanded={castMenu}
-              data-testid="cast-button"
-            >
-              <Cast size={14} />
-            </button>
-            {castMenu && !isCasting && (
-              <div
-                className="absolute right-0 top-full mt-2 w-72 rounded-2xl border border-white/10 bg-[#0b0b10]/95 backdrop-blur-xl p-2 shadow-2xl z-[60] pointer-events-auto"
-                style={{ animation: 'chromaglass-menu-in 0.15s ease-out' }}
-                role="menu"
-                data-testid="cast-menu"
-              >
-                {/*
-                  A line each, and the explanation behind an ⓘ. This menu is
-                  opened while a room waits: three paragraphs of prose is a
-                  thing to read, not a thing to pick from. The one piece of
-                  text that is not prose — the address a projector types in —
-                  stays where it can be copied.
-                */}
-                <div className="flex items-start gap-1">
-                  <button
-                    role="menuitem"
-                    onClick={() => { setCastMenu(false); startCast('window'); }}
-                    className="flex-1 text-left px-3 py-2.5 rounded-lg hover:bg-white/10"
-                    data-testid="cast-window"
-                  >
-                    <div className="text-xs font-semibold">Second display</div>
-                    <div className="text-[11px] opacity-50 leading-snug mt-0.5">A projector on HDMI.</div>
-                  </button>
-                  <div className="pt-2 pr-1">
-                    <Info label="">
-                      Opens a window on the second screen showing this very canvas, rendered at
-                      the projector's own pixels, filling that screen with no title bar (with the
-                      permission; else the next click here fills it). This window keeps the
-                      controls and a scaled copy.
-                    </Info>
-                  </div>
-                </div>
-
-                <CastNetworkItems relay={relay} mirrorCount={mirrorCount} tv={tv} />
-
-                <div className="flex items-start gap-1">
-                  <button
-                    role="menuitem"
-                    onClick={() => { setCastMenu(false); startCast('device'); }}
-                    className="flex-1 text-left px-3 py-2.5 rounded-lg hover:bg-white/10"
-                    data-testid="cast-device"
-                  >
-                    <div className="text-xs font-semibold">Chromecast</div>
-                    <div className="text-[11px] opacity-50 leading-snug mt-0.5">Chrome's device picker.</div>
-                  </button>
-                  <div className="pt-2 pr-1">
-                    <Info label="">
-                      Nest displays take the show directly. A Google TV that does not appear or
-                      connect here: open Second display, then Chrome's menu → Cast → the TV →
-                      Cast tab, on that window.
-                    </Info>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-          <button
-            aria-pressed={showHelp}
-            onClick={() => setShowHelp(!showHelp)}
-            className={`min-w-[34px] min-h-[34px] rounded-full transition-all text-[12px] font-bold ${
-              showHelp ? LIT : 'hover:bg-white/10 text-white/60'
-            }`}
-            title="About ChromaGlass — getting started, every control, and how they interact (?)"
-            data-testid="guide-button"
-          >
-            ?
-          </button>
-        </div>
-      </div>
-      )}
 
       {/* ── The desk ───────────────────────────────────────────── */}
       {/*
@@ -3650,51 +2927,6 @@ export default function App() {
         helpFocus={helpFocus}
         onCloseHelp={() => { setShowHelp(false); setHelpFocus(null); }}
       />
-
-      {/* ── The cued look, and the button that sends it ────────── */}
-      <AnimatePresence>
-        {overlayUp && (cued || fading > 0 || previousLook.current) && (
-          <PanelGuard name="The cue bar" onClose={() => setCued(null)} closeLabel="Clear the cue">
-          <CueBar
-            cued={cued}
-            liveName={liveLookName}
-            liveSwatch={swatchOf(activePresetId ?? (fading > 0 ? pinnedPresetId : null) ?? undefined)}
-            cuedSwatch={cued ? swatchOf(cued.id) : undefined}
-            liveAt={deskLookSlot}
-            fading={fading}
-            fadeSeconds={fadeSeconds}
-            onFadeSeconds={setFadeSeconds}
-            onGo={() => goLook()}
-            onCancel={() => setCued(null)}
-            onRevert={previousLook.current ? revertLook : null}
-          />
-          </PanelGuard>
-        )}
-      </AnimatePresence>
-
-      {/* ── Bottom-left Profile & Store pill (when overlayUp) ──── */}
-      {overlayUp && !isMinimized && showControls && openAccount && (
-        <button
-          type="button"
-          data-cg-account-open=""
-          onClick={openAccount}
-          data-cg-account-signin={signedOut ? '' : undefined}
-          data-cg-tier={getEffectiveTier()}
-          title={signedOut ? 'Sign in' : 'Account, licence and store'}
-          aria-label={signedOut ? 'Sign in' : 'Account'}
-          className={`fixed bottom-6 left-6 z-30 flex min-h-[36px] items-center gap-2 rounded-full px-3.5 py-1.5 text-[12px] font-medium shadow-xl backdrop-blur-xl transition-all ${
-            signedOut
-              ? 'bg-primary text-on-primary hover:opacity-90'
-              : 'border border-border-strong bg-black/75 text-text-2 hover:bg-black/90 hover:text-text'
-          }`}
-        >
-          {signedOut ? <LogIn size={14} className="shrink-0" /> : <User size={14} className="shrink-0 text-muted" />}
-          <span>{signedOut ? 'Sign in' : 'Account'}</span>
-        </button>
-      )}
-
-      {/* ── Audio Meters (bottom-left, out of the way) ─────────── */}
-      {isActive && !isMinimized && overlayUp && <EarMeters view={earView} />}
 
       {/* ── Background Glow ────────────────────────────────────── */}
       <div className="fixed inset-0 pointer-events-none z-0">

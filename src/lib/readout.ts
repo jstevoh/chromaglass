@@ -21,6 +21,7 @@ import { kelvinLabel } from './lampKelvin';
 import { lampLabel } from './projectorBank';
 import { focusLabel } from './projectorFocus';
 import { rackLabel } from './focusDissolve';
+import { deckLabel } from './deckDissolve';
 import { curveOf, travelOf } from './midi';
 import { MIX_CONTROLS, MIX_FADE_KEYS } from './mixer';
 import { ENVELOPE_TRIGGERS, formatLfoBars, LFO_SHAPES, LFO_TRIGGERS } from './modulators';
@@ -45,6 +46,8 @@ export const fadeBarsLabel = (v: number): string => {
 /** The settings a number reads better on than a percentage. */
 const UNITS: Record<string, (v: number) => string> = {
   macroZoom:  v => `${v.toFixed(2)}×`,
+  // How many times real: ×1 is the dye's measured index (38u-10).
+  dyeIndexBoost: v => v < 1.5 ? '×1 real' : `×${Math.round(v)}`,
   grainScale: v => `${Math.round(v)}`,
   macroHold:  v => `${v.toFixed(1)}s`,
   beatLead:   v => `${Math.round(v)} ms`,
@@ -86,6 +89,7 @@ const UNITS: Record<string, (v: number) => string> = {
   projFocusA: v => focusLabel(v),
   projFocusB: v => focusLabel(v),
   projRack:   v => rackLabel(v),
+  projDeck:   v => deckLabel(v),
   projCross:  v => (v <= 0.005 ? 'A' : v >= 0.995 ? 'B' : `A ${Math.round((1 - v) * 100)} · B ${Math.round(v * 100)}`),
   thinGap:    v => (v > 0.5 ? 'On' : 'Off'),
   liquidMl:   v => `${Math.round(v)} mL`,

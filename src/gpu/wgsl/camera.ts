@@ -20,9 +20,11 @@
  */
 
 import { CAMERA_STRUCT } from './cameraFields';
+import { LIGHT_WGSL } from './plateLight';
 
 export const CAMERA_WGSL = /* wgsl */ `
 ${CAMERA_STRUCT}
+${LIGHT_WGSL}
 @group(0) @binding(0) var<uniform> U: Camera;
 @group(0) @binding(1) var samp: sampler;
 @group(0) @binding(2) var scene: texture_2d<f32>;   // the plate, drawn
@@ -109,25 +111,28 @@ override FLIP_Y: f32 = 1.0;
   if (coc < 0.6) {
     col = vec3f(tex2(scene, uv + off + ca).r, tex2(scene, uv + off).g, tex2(scene, uv + off - ca).b);
   } else {
+    // A defocused pixel is the mean of the light round it (PLAN 38p, plateLight.ts).
     col = vec3f(0.0);
     for (var i = 0; i < 12; i++) {
       let o = DISC[i] * r * ax;
-      col += vec3f(tex2(scene, uv + off + ca + o).r, tex2(scene, uv + off + o).g, tex2(scene, uv + off - ca + o).b);
+      col += lightOf(vec3f(tex2(scene, uv + off + ca + o).r, tex2(scene, uv + off + o).g, tex2(scene, uv + off - ca + o).b));
     }
-    col /= 12.0;
+    col = displayOf(col / 12.0);
   }
 
   // ── Bloom ───────────────────────────────────────────────────────
+  // Light the lens spreads, added as light; its knee is 0.55 in display
+  // values, 0.268 of the light, so the same highlights bloom (38p).
   if (U.bloom > 0.001) {
     var glow = vec3f(0.0);
     for (var i = 0; i < 8; i++) {
       let ang = f32(i) * 0.7853981634;
       let d = vec2f(cos(ang), sin(ang)) * ax;
-      let s1 = tex2(scene, uv + d * 0.012).rgb;
-      let s2 = tex2(scene, uv + d * 0.032).rgb;
-      glow += max(s1 - 0.55, vec3f(0.0)) * 0.7 + max(s2 - 0.55, vec3f(0.0)) * 0.4;
+      let s1 = lightOf(tex2(scene, uv + d * 0.012).rgb);
+      let s2 = lightOf(tex2(scene, uv + d * 0.032).rgb);
+      glow += max(s1 - 0.268, vec3f(0.0)) * 0.7 + max(s2 - 0.268, vec3f(0.0)) * 0.4;
     }
-    col += glow * (U.bloom * 0.14);
+    col = displayOf(lightOf(col) + glow * (U.bloom * 0.14));
   }
 
   // ── The sensor ──────────────────────────────────────────────────

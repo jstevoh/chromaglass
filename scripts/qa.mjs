@@ -174,7 +174,7 @@ const errors = [];
   Starts at 900 px, and why it no longer means the overlay.
 
   Chosen for the floating overlay, which the app drew below 1024 px. Since 49b
-  (#962, 2026-11-26) there is no overlay at any width (`overlayUp` is false),
+  (#962, 2026-11-26) there is no overlay at any width (deleted in 49c-2),
   and the steps below waited sixty seconds for its Band button: main's `qa`
   ran five checks on every deploy from then on. They take the desk's ways to
   the same things now (qaDesk.mjs; the command palette for MIDI, Songs and the

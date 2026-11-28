@@ -419,7 +419,9 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   nucleates where the film is thinnest, then opens at Culick's speed, which *is* right for
   a free film). Number them in §32 when its next thread opens.
 
-- **38p. Light summed where it is light** (M, re-baseline; Medium on two projectors, beams
+- ~~**38p. Light summed where it is light**~~ (shipped 2026-11-27 with **18k-linear** and
+  **16c-linear**, `npm run linearlight`; the leftovers are **38p-1** and **38p-2** below).
+  (M, re-baseline; Medium on two projectors, beams
   and the lumia). Names the sites for **18k-linear** and **16c-linear**: the canvas is
   `bgra8unorm`, not `-srgb` (`src/gpu/stage.ts:43`), so the six-band sums
   (`plate.ts:150-153`), the two projectors' add (`:3298`), screen-over (`:2141-2143`), the beams
@@ -429,6 +431,39 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   38v (2026-11-21): two sites where it shows: `plate.ts:2755` adds the linear studio light to
   the encoded `edgeLit`, and the drop's total-reflection switch (`ferroDrop.ts:363-374`):
   29a-6.
+  Shipped 2026-11-27: `wgsl/plateLight.ts` (lightOf, displayOf, mixLight exact at both ends,
+  addLight, and the six bands of Spectral Mix summed on light). Lamp Ground's fades
+  (onGround, groundOf, chemOnGround, the closeup's liquidPart), the mixer's faders
+  (mixLevelled), the LED ring and lumia as beams (screenOver) and the lumia in the lamp, the camera's depth of
+  field and bloom (its knee 0.55 of display values, 0.268 of light) take them. A mixer level
+  is a dimmer: its share of the light is the level to the 2.2 (`levelShare`), so half a
+  fader looks half and a fader at next to nothing lays next to nothing (`npm run mixer`). The two projectors' add had
+  shipped with 51a (#1012, `wallAdd`). `npm run linearlight` 6/6 (halfway 0.730 where
+  display values read 0.5; two half lights 0.685 where they read white); `npm run lamp`
+  line 6 asks for half of each light. Saved looks are at Lamp Ground 0 or 1 and every row
+  at level 1, so the fades move none of them; what moved is the PR's table.
+  - **38p-1. The projector pass's beams add as light** (S–M; Low: only the stage's beam
+    mode). `wgsl/output.ts` lays each surface and beam by the GPU's blend
+    (`gpu/output.ts`, one / one-minus-src-alpha) into the encoded canvas, so two beams on one
+    wall add display values. The fix is an `-srgb` view of the canvas texture for that pass
+    (configure `viewFormats`), the shader decoding what it samples with the piecewise curve,
+    so a lone surface round-trips to the bit. Check: two half-white beams overlapping read
+    0.685 of display, one beam unchanged.
+  - **38p-2. What is still summed in display values on purpose** (S each; Low). Highlights
+    drawn at a size in display values: the ferro glint and the domes' rays (the `pc +=`
+    lines in `plate.ts`'s phase branch), the photo style's speculars, the thin film's sheen
+    (`plateThinFilm.ts`, 0.08), a bead's glow (`glowC`), the bubbles' six-sample rim
+    average, the film projector's row (`plateFilm.ts`), and the closeup ferro drop's
+    reflection (Fresnel's F scaling display values, and the studio light added to `edgeLit`,
+    38v's site): taken to light it moved the drop's brightest 60 pixels off the key's side
+    (`npm run ferrodrop`, -0.07, -0.93 radii), so it goes with 29a-6's switch and that
+    look's pictures. Each is a highlight whose strength
+    was set by eye on display values, so moving it re-tunes every look that has it: do each
+    with that look's pictures. The second plate's blends on the black ground (screen,
+    lighter, multiply, exclusion) and a mixer row's Blend picker (Screen, Add, Multiply,
+    Key) stay display-value operations: they are a named operation, not two lights
+    (taken to light, `npm run mixer` could no longer tell Screen from Add on its plate), and on the lamp ground the second plate is
+    already a filter (a product).
 
 - **38q. The camera's lens, not a grade** (S–M; Medium on the camera looks). Sharpens
   **31a**, **31e**. ACES on an 8-bit scene, bloom thresholded at 0.55 in encoded values, a
@@ -671,10 +706,24 @@ Shipped with this pass (the closeup, `npm run stillcloseup`):
   `platePressure` (and Moiré Ripple), and Clock Glass's kick adds 8% to dt. Drop the terms and
   retune Speed per look. Check: dt equal under kicks and in silence; `npm run quick` green.
   (S; Medium; from RS-45.)
-- **38u-10. The dye's refractive index is three times a stand-in** (S; Medium, changes the
-  Becke lines on every dye-only look). calcOpl adds d·0.015·max(1, 3·Boundary Contrast). A
-  few percent of dye raises water's index by about 1e-3 (dn/dc near 0.15 mL/g). A measured
-  dn/dc for each dye, and any boost a dial that says so. none (beside 18e-2).
+- **38u-19. Every dye bends light as tartrazine does, at one wavelength** (S; Low, found doing
+  38u-10). `DYE_DN_PER_ABSORBANCE` is tartrazine's dn/dc (0.41 mL/g, arXiv 2503.05105) over its
+  peak absorptivity, applied to every dye's summed absorbance; and the index is one number, not
+  one per channel. A dye's dn/dc follows its own absorption band (Kramers–Kronig): red light
+  is bent more beside a blue-absorbing dye's band than blue light is, a coloured fringe on a
+  defocused edge. Measured dn/dc for the palette's dyes (food dyes, ink) and an index per
+  channel carried through the derive pass (it writes one path today). Check: `derive` asks two
+  dyes of equal absorbance to step the path by their own ratio. none.
+- **38u-21. Glossiness has nothing to scale on a real dye** (S; Medium, found landing 38u-10,
+  2026-11-27). Glossiness multiplies the slope the optics read (`plateTransmit.ts`
+  reliefGain), and what a slope does to transmitted light goes as the index step across it.
+  At the dye's measured index that step is about 1500 to 3400 times under the old stand-in,
+  so on a dye-only look Glossiness at 1 darkens 0.00% of the plate (`npm run nolight` line 2, which
+  now asks its "darker" half at Dye Index Boost 3210, the level wash's old stand-in). The
+  dial is honest and nearly inert at the default. The real relief is the liquid's surface, not its dye: feed reliefGain the
+  height field's slope (31s-1) once 31s-2 traces light through it (meanwhile the dial's help
+  says that on dye alone it shows only with Dye Index Boost up, shipped with 38u-10). Check: `nolight` line 2 at Boost 1 on a plate
+  whose surface slopes darkens over 0.20%.
 - ~~**38u-11. Glass Smear slides the cover glass along a noise path, always**~~ — **Shipped
   2026-11-15** (the story is in `docs/plan-shipped.md`). Default 0; the 22 looks that slid
   carry the slide as an LFO 1 cord whose top is their old speed; `npm run glassstill`. The
