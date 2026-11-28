@@ -282,6 +282,19 @@
       ]
     },
     {
+      "name": "The guide names only what the app has",
+      "shard": "logic",
+      "run": "npm run guidenames",
+      "why": [
+        "PLAN 49l-guard (scripts/guidenames.mjs): every Settings path docs/guide.md and",
+        "the in-app guide give is walked against lib/settingsMap.ts (a group on the",
+        "rail, a section in that group, a control the settings markup draws), every",
+        "phone More row against the phone's words, and the buttons 49l found retired",
+        "are not named as things to press. A made-up guide must fail on its stale",
+        "steps first. Reads source only, about a second."
+      ]
+    },
+    {
       "name": "Buttons say their state",
       "shard": "logic",
       "run": "npm run states",
@@ -2434,7 +2447,7 @@
       "run": "npm run looksgrid -- --owed=preview",
       "why": [
         "PLAN 34b written ahead of its build (scripts/looksgrid.mjs): every shipped",
-        "look's card on the Perform desk's grid, the narrow window's look menu and the",
+        "look's card on the Perform desk's grid, the folded desk's at 900 px and the",
         "phone's Looks sheet draws one lazy still of its own, a small WebP from the",
         "built site, the same file on all three, none flat and no two alike (34b-1);",
         "and only the hovered or held card holds a preview canvas, one at a time,",
