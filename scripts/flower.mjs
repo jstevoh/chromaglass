@@ -41,8 +41,8 @@
  * flower's (PLAN 31s-9). The piled rim is what a bubble pushes aside, and
  * what the flower copied.
  *
- * For each, the slope the derive pass writes (|.xy|) and its Laplacian
- * (.z), in the band one and a half to four cells either side of the rim,
+ * For each, the slope the derive pass writes (|.xy|) and the optical
+ * path's slope from the same taps (.z, |grad OPL|; printed as "path"), in the band one and a half to four cells either side of the rim,
  * where the copies stand. A slope that is the dye seen through a smooth
  * kernel varies there over the kernel's width (1.5 cells); a comb varies
  * every texel. So the measure is what is left after a box one cell wide:
@@ -63,6 +63,21 @@ const QUICK = process.argv.includes('--quick');
 const MAX_COMB = 0.10;
 // What the point-read control must leave, at least, on the ring and the bubble.
 const CONTROL_MIN = 0.3;
+/*
+  The dye's index the path is measured at (PLAN 31s-14). .z is |grad OPL|,
+  the path's slope from the same taps, and since 38u-10 the dye's index is
+  real at Dye Index Boost 1: 1.78e-5 a unit of absorbance, so this plate's
+  path slope is about 1e-6, below what a half float holds. The owner's Mac
+  flushes it to exactly 0, the cloud lab keeps a dust of subnormals, and
+  either way there is nothing to comb. The flower in the path is what a
+  boost draws (the dial reaches 4000), so it is read where the old stand-in
+  sat: 0.06 / 1.78e-5, x3370, holeline's INDEX_LIT, within 1% of this dye's
+  own (its three channels decode to 1.01 a unit of density).
+*/
+const INDEX_LIT = 3370;
+// The least either band sum may be and still be a rim: at INDEX_LIT the faintest, the bubble's
+// path, sums to 84 (measured, 31s-14); at the real index the most was the disc's 0.1.
+const LIVE_MIN = 1;
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -88,13 +103,13 @@ const CONTROL_POINT = {
 async function measure(plugins, tag) {
   const { page, close } = await openLab({ plugins, tag });
   try {
-    return await page.evaluate(async (PROFILE) => {
+    return await page.evaluate(async ({ PROFILE, INDEX_LIT }) => {
       const N = 768, L = 192, S = N / L;
       await lab.create(N);
       const solver = lab.solver();
       const device = solver.device;
       const plate = new lab.WebGPUPlate(device, 'rgba8unorm');
-      plate.pack.set('logicalGrid', L).set('gridSize', N);
+      plate.pack.set('logicalGrid', L).set('gridSize', N).set('dyeIndexBoost', INDEX_LIT);
       const target = device.createTexture({ size: [320, 320], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT });
       const fmt = solver.dye.read.format;
       const toHalf = (v) => {
@@ -190,18 +205,18 @@ async function measure(plugins, tag) {
         });
       }
       return out;
-    }, !!process.env.FLOWER_PROFILE);
+    }, { PROFILE: !!process.env.FLOWER_PROFILE, INDEX_LIT });
   } finally {
     await close();
   }
 }
 
-const fmt = (m) => `slope ${m.slope.comb.toFixed(3)}, ∇² ${m.lap.comb.toFixed(3)}`;
+const fmt = (m) => `slope ${m.slope.comb.toFixed(3)}, path ${m.lap.comb.toFixed(3)}`;
 const build = await measure([], 'flower');
 console.log(` --   dye ${build.fmt}, ${build.cell} texels a cell, derive at ${build.ring.w}²`);
 const control = QUICK ? null : await measure([CONTROL_POINT], 'flower-point');
 if (process.env.FLOWER_PROFILE) for (const name of ['ring', 'disc', 'bubble']) {
-  console.log(`\n${name}: texels from the rim, slope, ∇² (build | control)`);
+  console.log(`\n${name}: texels from the rim, slope, path (build | control)`);
   build[name].profile.forEach((b, k) => console.log(`  ${b.join('\t')}\t|\t${control ? control[name].profile[k].slice(1).join('\t') : ''}`));
 }
 
@@ -209,9 +224,11 @@ check('the derive pass is at the dye\'s size, more than a texel a cell (else the
   build.ring.w === 768 && build.cell >= 2, `${build.ring.w}², ${build.cell} texels a cell`);
 for (const name of ['ring', 'disc', 'bubble']) {
   const b = build[name];
-  // Both measures must see the rim: a ∇² gone to zero leaves nothing to comb, and would pass.
-  const live = b.slope.tot > 0 && b.lap.tot > 0;
-  check(`${name}: the slope and its ∇² see the rim at all`, live, `sum |slope| in the band ${b.slope.tot.toFixed(1)}, sum |∇²| ${b.lap.tot.toFixed(1)}`);
+  // Both measures must see the rim: a path slope gone to zero leaves nothing to comb, and would pass.
+  // Over LIVE_MIN, not over 0: at the real index the cloud lab's path summed to 0.0 in print and
+  // passed on a dust of subnormals, which is not a rim (31s-14).
+  const live = b.slope.tot > LIVE_MIN && b.lap.tot > LIVE_MIN;
+  check(`${name}: the slope and the path's slope see the rim at all (band sums over ${LIVE_MIN})`, live, `sum |slope| in the band ${b.slope.tot.toFixed(1)}, sum |path| ${b.lap.tot.toFixed(1)}`);
   const worst = Math.max(b.slope.comb, b.lap.comb);
   check(`${name}: no copies of the rim a cell apart (what a one-cell box leaves ≤ ${MAX_COMB})`,
     live && worst <= MAX_COMB, `${fmt(b)}${control ? `; point-read control ${fmt(control[name])}` : ''}`);

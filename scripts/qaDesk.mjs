@@ -3,7 +3,7 @@
  *
  * Those steps were written against the floating overlay: its Band button, its
  * preset title menu and its toolbar. The overlay went at every width with 49b
- * (#962, 2026-11-26; `overlayUp` is false in app/usePhoneLayout.ts), and the
+ * (#962, 2026-11-26; its code deleted in 49c-2), and the
  * first of the steps, the Band, waited sixty seconds for a button no longer
  * drawn, so every deploy after it ran five of the suite's checks and stopped.
  * These are the same questions asked of the places the desk keeps the same

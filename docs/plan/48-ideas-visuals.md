@@ -265,7 +265,7 @@ sub-cell droplets. Ranked by what a person watching the wall would see against w
 
 | Rank | Item | On the wall | GPU cost | Build |
 |---|---|---|---|---|
-| 1 | 48s ouzo clouding (shipped #1007: the Ouzo bottle and the look Louche; check 48s-1, the retune 48s-6 and the middle 48s-7 shipped) | a clear pour blooms into opal clouds where it mixes | low: one carry and two per-cell passes, only with Ouzo on the plate | built and checked (`npm run ouzo`) |
+| 1 | 48s ouzo clouding (shipped #1007: the Ouzo bottle and the look Louche; check 48s-1, the retune 48s-6, the middle 48s-7 and its swells back 48s-8 shipped) | a clear pour blooms into opal clouds where it mixes | low: one carry and two per-cell passes, only with Ouzo on the plate | built and checked (`npm run ouzo`) |
 | 2 | 48t chemical gardens | a pour grows its own coloured walls, spirals and coral | medium: one reaction pass, a solid mask | Claude |
 | 3 | 48u shear-thinning gum | fingers turn from tulips into sharp cracks and lightning | low–medium: a viscosity per cell | Claude |
 | 4 | 48v electric field on the oil | a voltage pulls drops into needles that spray fine jets | medium: one potential solve, reuses the magnet's stress | Claude |

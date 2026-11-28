@@ -104,8 +104,23 @@ const split = (target: VisualizerSettings, now: VisualizerSettings, pick: (k: st
 /** The look's dish over the plate as it is: its solver settings (`PER_LAYER`, what a plate owns), everything else `now`'s. */
 export const dishOf = (target: VisualizerSettings, now: VisualizerSettings): VisualizerSettings => split(target, now, k => !PER_LAYER.has(k));
 
-/** The rest of the look over the plate's dish as it is: everything but the solver settings, those `now`'s. */
-export const drawingOf = (target: VisualizerSettings, now: VisualizerSettings): VisualizerSettings => split(target, now, k => PER_LAYER.has(k));
+/*
+ * What the decks stand on, which a deck Go never changes: whether the wall
+ * is two projectors' light added (lib/projectorBank.ts bankHasTwo reads
+ * Two Projectors, the plate count, the lamp ground through the render style,
+ * and the back row's blend) and the two plates' own levels, which with the
+ * crossfade are the two decks' light. Every house look carries Two
+ * Projectors off and most a lamp ground of 0 (lookFade's lookOf), so the
+ * first build's deck Go, filmed on the owner's Mac, faded the second
+ * projector out halfway through its own dissolve: the wall fell back to one
+ * lamp through both plates, the old dish showed under the new one, and the
+ * next Go was a plain one that changed the lit plate. In a deck show these
+ * are the operator's, as the crossfade is.
+ */
+export const DECK_RIG: ReadonlySet<string> = new Set(['twoProjectors', 'layerCount', 'lampGround', 'renderStyle', 'backBlend', 'frontLevel', 'backLevel']);
+
+/** The rest of the look over the plate's dish as it is: everything but the solver settings and what the decks stand on (`DECK_RIG`), those `now`'s. */
+export const drawingOf = (target: VisualizerSettings, now: VisualizerSettings): VisualizerSettings => split(target, now, k => PER_LAYER.has(k) || DECK_RIG.has(k));
 
 /** The switch's readout. */
 export const deckLabel = (v: number): string => (v > 0.5 ? 'Go to the dark projector' : 'Off');

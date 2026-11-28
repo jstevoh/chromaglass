@@ -342,11 +342,6 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     Buoyancy buys nothing. The honest way further is substeps for the current when its force
     asks more than a step can carry, as the slump and the ferrofluid have; measure where the
     cap binds on Lava Lamp first.
-  - **27h-2c, open. Dye Weight past 1 on a deep 1024² pool.** At 6 mm and 1024² the slump asks
-    27 substeps at Dye Weight 2 against `SLUMP_SUBSTEPS`' 20, and the face guard holds it:
-    stable, the front a little under its Froude speed. 38r part 2's 2 mm gap takes this back
-    under 20 (about 16); if it does not land, raise the cap (a SHOUTING_CASE number: name it
-    under Check changes).
   - **27h-2d, open. `widedials` Heat Spread total on Metal.** Written on SwiftShader (`Measure`
     `lab3`), where Heat Spread at 0, 1, 2 keeps the heat within 1%; on a Mac's Metal (`rgba16float`
     over 60 steps of Jacobi diffusion into the Gaussian tail) `npm run widedials` reads totals

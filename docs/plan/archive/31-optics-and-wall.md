@@ -27,3 +27,7 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
 
 ~~**31p-3** Dish Stress: the moulded dish's own stress in series with the liquid~~ (shipped;
 story in `docs/plan-shipped.md` §31p-3; `npm run polar`).
+
+## 31s. The surface is drawn from the dye, not traced from the liquid (2026-11-22)
+
+- **31s-14. ~~Every film refused: the flower gate's control and its path measure went blind with 38u-10~~** shipped 2026-11-28. Found filming 51c-2 on main c9cfd74: `npm run flower` read the path (.z) at exactly 0 on the owner's Mac and the point-read control no worse than the build, so `flowergate` refused every film. Two faults, both from 38u-10 (#1037). The projector's derive pass reads cells through `cellDye` (wgsl/dyeIndex.ts), which kept its own copy of the cell's footprint, so the control's one cut in `cellDensity` reached only the camera's reader (control slope 0.058, the build's, against 0.3 needed); and the dye's index is real at Dye Index Boost 1, a path slope near 1e-6 that a half float flushes to 0 on the Mac and keeps as dust in the cloud lab (band sums 0.0 to 0.1). Now one `cellSide` (plateSlope.ts) serves both readers, the path is measured at x3370 (holeline's INDEX_LIT, the old stand-in), and the "sees the rim" line needs band sums over 1, not over 0. `npm run flower` 2 FAIL (cloud) -> 9/9: control slope 0.348 ring, 0.339 bubble; build path comb 0.058 ring, 0.050 disc and bubble.
