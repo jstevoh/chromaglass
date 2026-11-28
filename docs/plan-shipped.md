@@ -13657,6 +13657,50 @@ Measured, Lava Lamp in the lab at 6 s (`lavasplit`, quartic against deep): 192²
 4/4: clear 79%, colour in the bodies 67% (31% Oil Bodies off), centre 0.608 (0.129 no heat,
 0.468 no swelling).
 
+## 38d-1. The ferrofluid labyrinth's period from the magnetic Bond number (2026-11-13)
+
+*Asked:* the owner, 2026-11-13, "Go ahead" on the looks-against-references fixes: Ferro
+Paint's forms spanned 1.6% of the width against 5 to 11 in Colored I and II (64 forms a
+frame against 21), Magnet Garden's 2.8% against 6 in the thin-cell film and 15 in the
+labyrinth photo (31 forms against 3). The maze's period was one constant, 0.045 of the
+plate, at every field and gap, and Maze Detail could only make it finer.
+
+*Built:* `src/gpu/fluid/mazeBond.ts`. Straight stripes in a layer of thickness h cost
+2σh/λ for their interfaces and save the Fourier magnetisation's demagnetising energy
+(μ0/2)h Σ|Mₙ|²(1 − f(kₙh)); the minimum, worked numerically, is λ/h = 1.906·e^{4π/N} − 0.5
+with N = μ0M²h/σ (within 4% for N 2–20). M is EFH1's Langevin curve of the inner field
+B0/μ0 − M, σ the spikes' 3.3 mN/m, h the 2 mm gap. Labyrinth is the coil (7.5 mT at 1,
+where the period is the old 0.042, so `npm run maze` is unchanged); under about 0.47 the
+layer is below the critical Bond number and a pool stays a pool. The period is read from
+the field's mean square over 4 s (`mazeFelt`), because the frame loop plays the coil on
+every kick and α ∝ k⁴ would have jumped two-thousandfold a beat; the frame loop's swing is
+centred on the setting (0.75 + 0.35·energy + 0.45·kick, was 0.55), so music and silence ask
+for the same width. The first cut also moved the looks toward the onset (Magnet Garden's
+Labyrinth 0.8 → 0.58, period 0.27; Ferro Paint's 0.9 → 0.65 with Maze Detail 0.5 → 0,
+0.15; magnets eased to 0.35 and 0.25, since at the wide period the walking magnet
+gathered the maze into one blob in 40 s).
+
+*Measured* on the Mac (`npm run film`, seed 1, 60 s; `npm run watch -- <take> --vs <ref>`,
+form scale across / forms a frame): Ferro Paint 1.6% / 64 → 3.2% / 55 (Colored I 10.9 / 21,
+Colored II 5.3 / 30: from 6.8× and 3.3× finer to 3.4× and 1.6×); Magnet Garden 2.8% / 31 →
+5.3% / 3 (the labyrinth photo 15.2 / 40, the thin-cell film 3 forms). In the lab (256², the
+look's pour, Labyrinth and walking magnet, 20 s; the black's correlation length and its
+separate forms): Ferro Paint 1.83% / 55 → 2.4% / 14, Magnet Garden 2.36% / 27 → 5.8% / 4.
+`npm run bondmaze` 5/5. Left: luminance (Ferro Paint 0.14 against 0.51–0.56) is 9ag;
+Magnet Garden's black now stands in wide pools on a joined gold sheet rather than
+stripes, the near-onset look of the thin cell rather than the labyrinth photo, which is
+the owner's call (judging).
+
+*The owner's call* (2026-11-13, on those pictures): "The reference images have much thinner
+and more complex fingers." Near onset the instability gives a few fat blobs; the photos'
+thin, branched fingers are the same instability far above it, over pools much wider than
+the period. So the physics shipped and the wide retune did not: both looks at Labyrinth 1
+(N 14, period 0.042 against the old 0.045; Ferro Paint over √3 by Maze Detail 0.5, 0.024
+against 0.026), their magnets as before (0.9 and 0.6: the blob was the wide period's, and
+on main's period those magnets were fine). `npm run bondmaze` check 4 now asks the looks
+for periods no wider than the old ones. The thin, branched look (38d-1b, big pools, high N;
+38d-3) is open.
+
 ## 38r. The rest gap: a real 2 mm glass sandwich (#613, #641, 2026-10-31)
 
 *Asked:* the owner, 2026-10-30: "Put the glass sandwich like it's supposed to be." The rest gap had
@@ -16323,6 +16367,41 @@ bubbles, macro camera, `liquidPhase`, and every pour/seed/GPU handoff path.
   `project`, `advect`, `advectMacCormack`, `setBoundary`, `applyCurlTurbulence`,
   `s`/`sR`/`sG`/`sB`/`vx0`/`vy0`/`mcA`/`mcB`, and `TURB_SPEED`) for
   `scripts/musicstir.mjs`.
+
+## 9t-2 + 38k-7. The pull under the domes, and the plate on the liquid's own onset (#662)
+
+Built over #625, #640, #645 and #657, landed as one PR (#662), brought onto main's 2 mm gap
+before it merged. Until it the plate ran on the lab's
+onset, 22 mT (0.18 of the hand's field), where the liquid's own, Cowley and Rosensweig for
+EFH1 under water, is 4.0 mT (38k, #630); and under the standing film's window nothing pulled
+the ferrofluid toward the magnet (`PULL_SHARE` 0), so #625's try at the real onset left a
+dragged drop 7.4 R behind.
+
+- **The pull under the window** (`phaseForce` in `wgsl/fluid/phaseForces.ts`): the plate's
+  Kelvin pull acts there as everywhere, on each cell's own share. A first cut on the
+  layer's mean over a dome's box spread a drop's force over its rim and left it 2.65 R
+  behind. The flux step's payback (`phaseCompress`) runs under the window too, and the
+  window carries each cell's share at the layer's mean speed (`boxVel`/`boxFlux` in
+  `wgsl/fluid/phase.ts`) where it carried a blurred mean that smeared a moving drop.
+  Mac: ferrodrag's lag 1.68 R (bar 2 R).
+- **The onset** (`spikes.ts`): `SPIKE_ONSET` is the liquid's, 0.0326 of the reference
+  field; `SPIKE_FULL` keeps the old ramp's 1.94 × it. `Opening.standing` builds the film's
+  pipelines at the opening when a look's own magnet is past it, so `startup` does not
+  wait on them mid-show. Magnet Garden's magnet is 4.6 × the onset and Ferro Paint's 3.0 ×.
+- **Checks re-aimed to what the field now does** (each at length in its comment): past
+  the real onset a drop under a magnet stands up as a cone and a pool gathers into a heap
+  with its domes on top, which is the physics. `ferrodrag` 2 holds a dragged drop's
+  footprint to the same drop held still under the same magnet; `ferrodrag` 5 reads the
+  stale-velocity control on either half of line 4; `standing` 4 counts tops past 1.05, not
+  cells (the field's own smooth heap); `spikes` 1 asks for domes standing past full at the
+  layer's own pitch instead of separate pieces (they stand on a common gathered base),
+  and 5 for domes a second finger stands up past full; `ferrohold` reads the ferrofluid in
+  the drop's half-full cells, not their count (a slumping cone covers as many cells as a
+  standing one), beside main's 2 mm two-drag scene and its cells over three quarters; `ferropour` 5 measures Ferro Paint's channels against the ring's drops as
+  poured, since the ring now stands into domes under the look's own field. `disc`'s
+  "every look's own magnet raises none" turned to "is past it".
+- Found along the way: `startup` 1b's red on GitHub's Macs is the intro's 1.5 s frame cap,
+  not this change (19aa-7, fixed on main by 19aa-7a).
 ### 38e-1: oil's surface tension in newtons a metre, from each bottle (2026-11-27, from PR #624)
 
 The thin gap's capillary pull was a 0–1 dial times `OIL_TENSION_GAP`, the lab's 4e-4 at 6 mm
