@@ -54,6 +54,7 @@
  *
  *   node mcp/youtube-mcp.js setup             which setup step is done, and the fix for the first that is not
  *   node mcp/youtube-mcp.js login             sign in once (opens the browser)
+ *   node mcp/youtube-mcp.js login --add analytics   also ask for the read-only analytics scope (44i-2d)
  *   node mcp/youtube-mcp.js whoami            which channel the saved sign-in is
  *   node mcp/youtube-mcp.js logout            revoke the sign-in and forget it
  *   node mcp/youtube-mcp.js drain             upload queued jobs whose wait has passed
@@ -71,6 +72,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { ANALYTICS_OFF, ANALYTICS_SCOPE, analyticsFix, channelReport, granted, OPT_IN, parseRange, scopesFor, videoReport } from './youtube/analytics.js';
 import { CAPTION, CAPTION_UNITS, captionRequest, readCaptionFile } from './youtube/captions.js';
 import { checkTitle, composeDescription, composeLocalizations, creditsLine, isoSeconds, parseChapters, validLanguage } from './youtube/describe.js';
 import { filmsIn, titleFromName } from './youtube/folder.js';
@@ -150,11 +152,11 @@ function readKeyFile(file) {
 */
 function endpoints() {
   const o = env('GOOGLE');
-  if (!o) return { auth: 'https://accounts.google.com/o/oauth2/v2/auth', token: 'https://oauth2.googleapis.com/token', revoke: 'https://oauth2.googleapis.com/revoke', api: 'https://www.googleapis.com/youtube/v3', upload: 'https://www.googleapis.com/upload/youtube/v3' };
+  if (!o) return { auth: 'https://accounts.google.com/o/oauth2/v2/auth', token: 'https://oauth2.googleapis.com/token', revoke: 'https://oauth2.googleapis.com/revoke', api: 'https://www.googleapis.com/youtube/v3', upload: 'https://www.googleapis.com/upload/youtube/v3', analytics: 'https://youtubeanalytics.googleapis.com/v2' };
   const u = new URL(o);
   if (u.protocol !== 'http:' || u.hostname !== '127.0.0.1') throw new Error(`The GOOGLE override may only name a stand-in on http://127.0.0.1, not ${u.origin}`);
   const b = o.replace(/\/$/, '');
-  return { auth: `${b}/auth`, token: `${b}/token`, revoke: `${b}/revoke`, api: `${b}/youtube/v3`, upload: `${b}/upload/youtube/v3` };
+  return { auth: `${b}/auth`, token: `${b}/token`, revoke: `${b}/revoke`, api: `${b}/youtube/v3`, upload: `${b}/upload/youtube/v3`, analytics: `${b}/youtubeanalytics/v2` };
 }
 let G;
 try { G = endpoints(); } catch (e) { log(e.message); process.exit(2); }
@@ -215,9 +217,14 @@ async function accessToken(force = false) {
   process holds), and `state` refuses an answer this window did not ask for.
   `access_type=offline` and `prompt=consent` are what make Google hand over a
   refresh key, every time, so a second login always ends with one.
+  `add` names opt-in scopes (44i-2d: `analytics`); the scopes asked for are the
+  server's own, every opt-in the saved key already has, and those, so signing in
+  again never drops one (youtube/analytics.js says why each is asked for apart).
 */
-async function login() {
+async function login(add = []) {
   const c = client();
+  const prev = (() => { try { return loadToken(); } catch { return null; } })();
+  const scopes = scopesFor(SCOPE, prev?.scope, add);
   const verifier = b64url(randomBytes(48));
   const challenge = b64url(createHash('sha256').update(verifier).digest());
   const state = b64url(randomBytes(16));
@@ -225,7 +232,7 @@ async function login() {
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
   const redirect = `http://127.0.0.1:${srv.address().port}/`;
   const url = new URL(G.auth);
-  for (const [k, v] of Object.entries({ client_id: c.id, redirect_uri: redirect, response_type: 'code', scope: SCOPE, access_type: 'offline', prompt: 'consent', code_challenge: challenge, code_challenge_method: 'S256', state })) url.searchParams.set(k, v);
+  for (const [k, v] of Object.entries({ client_id: c.id, redirect_uri: redirect, response_type: 'code', scope: scopes.join(' '), include_granted_scopes: 'true', access_type: 'offline', prompt: 'consent', code_challenge: challenge, code_challenge_method: 'S256', state })) url.searchParams.set(k, v);
   log(`Sign in with the Google account that owns the channel (pick the channel if it asks). The page should open by itself; if not, open:\n${url}`);
   if (!env('NO_BROWSER')) {
     const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
@@ -249,6 +256,13 @@ async function login() {
   writePrivate(TOKEN_FILE, JSON.stringify(token, null, 2));
   const ch = await channel();
   log(`Signed in as the channel "${ch.title}" (${ch.url}). The key is saved in ${TOKEN_FILE}, readable by you alone.`);
+  /* Google's page lets a person untick an opt-in: say which one is off, and end with a failure
+     when it was the one this login was run to add, rather than a quiet "signed in". */
+  const missing = Object.entries(OPT_IN).filter(([, sc]) => scopes.includes(sc) && granted(token, sc) === false).map(([n]) => n);
+  if (missing.length) {
+    log(`Not granted on Google's page: ${missing.join(', ')}. Run login --add ${missing.join(' --add ')} again and tick it, if you want it.`);
+    if (missing.some((n) => add.includes(n))) process.exitCode = 1;
+  }
 }
 
 async function logout() {
@@ -1070,6 +1084,44 @@ function uninstallAgent() {
 
 // ── The tools ──────────────────────────────────────────────────────────
 
+// ── Analytics (44i-2d) ─────────────────────────────────────────────────
+
+/* Asked for only after `login --add analytics`: a key that lists its scopes and lacks this one is
+   refused here, before any request, with the command that fixes it (youtube/analytics.js). */
+async function analytics(a) {
+  const run = 'node mcp/youtube-mcp.js';
+  if (granted(loadToken(), ANALYTICS_SCOPE) === false) throw new Setup(ANALYTICS_OFF(run));
+  const range = parseRange(a, nowMs());
+  const ask = async (query) => {
+    try { return (await api('GET', 'reports', { query: { ids: 'channel==MINE', ...query }, base: G.analytics })).j; } catch (e) {
+      const fix = analyticsFix(e, run);
+      throw fix ? new Setup(fix) : e;
+    }
+  };
+  let id = a.video_id === undefined ? null : String(a.video_id);
+  const m = readManifest();
+  if (a.key !== undefined) {
+    if (id) throw new Error('Pass video_id or key, not both.');
+    const e = m.videos.find((v) => v.key === String(a.key) && v.status !== 'replaced' && v.status !== 'removed');
+    if (!e) throw new Error(`No live video with key "${a.key}" in the manifest.`);
+    id = e.videoId;
+  }
+  if (id) {
+    const [v] = await videos([id]);
+    // videos.list answers for any public video; the reports cover this channel's alone, so a film of another's is refused here, in words (1 more unit).
+    if (!v || v.snippet?.channelId !== (await channel()).id) throw new Error(`No video ${id} on this channel.`);
+    const key = m.videos.find((e) => e.videoId === id)?.key;
+    return videoReport({ ask, range, detail: Boolean(a.detail), video: { id, key, title: v.snippet?.title ?? '', durationSec: isoSeconds(v.contentDetails?.duration) } });
+  }
+  const lookup = async (ids) => {
+    const names = new Map(m.videos.filter((e) => ids.includes(e.videoId)).map((e) => [e.videoId, { key: e.key, title: e.title }]));
+    const rest = ids.filter((x) => !names.get(x)?.title);
+    for (let i = 0; i < rest.length; i += 50) for (const v of await videos(rest.slice(i, i + 50))) names.set(v.id, { ...names.get(v.id), title: v.snippet?.title ?? '' });
+    return names;
+  };
+  return channelReport({ ask, lookup, range, limit: a.limit });
+}
+
 const GUIDE = `You manage the owner's YouTube channel. Nothing here needs the light show running.
 
 - Uploads go up PRIVATE unless you pass privacy. Make a video unlisted or public, or schedule it (publish_at), or run release_plan, only when the owner said so in this conversation. A scheduled video is private until its time; YouTube only schedules a private video.
@@ -1086,6 +1138,7 @@ const GUIDE = `You manage the owner's YouTube channel. Nothing here needs the li
 - Use queue_upload to line up several films without uploading them immediately, and replace_video to queue a re-rendered file carrying the old video's title, description, tags, category and playlists (without deleting or changing the old video; deleting stays in YouTube Studio).
 - Use manifest (with sync: true to pull all pages from the channel, 1 quota unit a page, including views and likes) and mark_video to track which videos are ok, need rerecord, are queued, replaced or removed.
 - YouTube processes a video for a few minutes after the upload; its upload_status in list_videos says when it is "processed".
+- analytics: watch time, average view, retention (who is still watching at each tenth of the film and the steepest drop) and traffic sources for one video (video_id or key, plus the search terms that found it), or the channel's videos by watch time. Dates are YouTube's, in Pacific time, the last 28 days by default; numbers arrive a day or three late. It needs the owner to have run login --add analytics once; if it says so, pass that on, do not retry.
 - Deleting is not here on purpose: tell the owner to delete in YouTube Studio.
 - Quota: 100 uploads a day; an update, thumbnail or playlist change costs 50 of 10,000 a day (release_plan costs 50 per live video updated, 0 per queued job — state the cost first); reading (and each manifest sync page or playlist scan) costs 1.`;
 
@@ -1117,6 +1170,20 @@ const uploadProps = {
   captions: { type: 'array', description: 'Caption files to add once it is up (400 quota units each): a path, or { file, language, name, draft }. language defaults to the upload\'s.', items: { anyOf: [str, { type: 'object', required: ['file'], properties: { file: str, language: str, name: str, draft: { type: 'boolean' } } }] } },
 };
 const TOOLS = [
+  {
+    name: 'analytics',
+    description: "How videos are watched (YouTube Analytics, after login --add analytics): for one video (video_id or the manifest's key) its views, watch minutes, average view, share watched, retention at each tenth of the film with the steepest drop, traffic sources and the search terms that found it; with no video, the channel's totals, its videos by watch time and its traffic sources. Dates in Pacific time, as YouTube counts them: the last 28 days unless days or start/end say otherwise. Read-only; costs 1 Data API unit for a named video's title and length.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        video_id: str, key: { type: 'string', description: "A manifest key in place of video_id." },
+        days: { type: 'integer', minimum: 1, description: 'Days ending today (or end), 28 by default.' },
+        start: { type: 'string', description: 'First day, YYYY-MM-DD (Pacific).' }, end: { type: 'string', description: 'Last day, YYYY-MM-DD (Pacific), today by default.' },
+        limit: { type: 'integer', minimum: 1, maximum: 200, description: "The channel's top videos by watch time, 25 by default." },
+        detail: { type: 'boolean', description: 'All 100 retention points, not eleven.' },
+      },
+    },
+  },
   { name: 'channel', description: 'The signed-in channel: its name, link, subscribers, views and video count.', inputSchema: { type: 'object', properties: {} } },
   { name: 'list_videos', description: "The channel's latest uploads, newest first: id, link, title, privacy, schedule, processing state, views.", inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 50, description: 'How many (default 10).' } } } },
   {
@@ -1216,6 +1283,7 @@ const fail = (m) => ({ content: [{ type: 'text', text: m }], isError: true });
 
 async function call(name, a = {}, onProgress = null) {
   switch (name) {
+    case 'analytics': return text(await analytics(a));
     case 'channel': { const { uploads, ...c } = await channel(); return text(c); }
     case 'list_videos': return text(await listVideos(Number(a.limit ?? 10)));
     case 'upload_video': return text(await uploadVideo(a, onProgress));
@@ -1304,7 +1372,16 @@ if (command === 'setup') {
   process.exit(r.ok ? 0 : 1);
 } else if (command === 'login' || command === 'logout' || command === 'whoami' || command === 'drain' || command === 'install-agent' || command === 'uninstall-agent' || command === 'manifest') {
   try {
-    if (command === 'login') await login();
+    if (command === 'login') {
+      // `login --add analytics` (44i-2d): an opt-in scope on top of what the saved sign-in has.
+      const args = process.argv.slice(3);
+      const add = [];
+      for (let i = 0; i < args.length; i++) {
+        if (args[i] !== '--add' || !args[i + 1]) throw new Error(`login takes --add ${Object.keys(OPT_IN).join('|')}, not ${JSON.stringify(args.slice(i).join(' '))}.`);
+        add.push(args[++i]);
+      }
+      await login(add);
+    }
     else if (command === 'logout') await logout();
     else if (command === 'whoami') { const { uploads, ...c } = await channel(); log(JSON.stringify(c)); }
     else if (command === 'drain') await drain();
@@ -1321,7 +1398,7 @@ if (command === 'setup') {
       if (mdFile) { writeFileSync(mdFile, `${table}\n`); log(`wrote ${mdFile}`); }
       else process.stdout.write(`${table}\n`);
     }
-    process.exit(0);
+    process.exit(process.exitCode ?? 0); // a login whose opt-in was unticked has set 1 (44i-2d)
   } catch (e) { log(e instanceof Setup ? e.message : `failed: ${e?.message ?? e}`); process.exit(1); }
 } else {
   const lines = createInterface({ input: process.stdin });

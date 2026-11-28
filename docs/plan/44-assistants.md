@@ -223,8 +223,25 @@ through cords and preset patches, and the plate shader is untouched.
     `youtube/`), then 2d beside it.
   - **44i-2c-3.** AVI and other kinds are not read, so a Short in one is refused ("export it
     as MP4"), and its chapters are not held to its length.
-  - **44i-2d.** Analytics (YouTube Analytics API, its own read-only scope asked only when
-    wanted): watch time, retention, traffic sources per video.
+  - **44i-2d. Analytics.** **Built 2026-11-28** (`npm run youtube`,
+    `scripts/youtubeAnalytics.mjs`): the `analytics` tool reads the YouTube Analytics API after
+    `login --add analytics`, which asks for `yt-analytics.readonly` on top of the saved sign-in's
+    scopes (a later plain `login` asks for it again, so it is never dropped; unticked on Google's
+    page, the login fails and says so). For one video (`video_id` or manifest `key`, a replaced
+    video's key refused): views, watch minutes, average view, share watched, likes, comments,
+    shares, subscribers; retention at the start and each tenth as clock times with the steepest
+    drop (`detail` for all 100 points; "no curve yet" in words for a thin video); traffic sources
+    in Studio's words with shares; the YouTube search terms that found it. With none: the
+    channel's totals, its videos by watch time (25, at most 200, named by manifest key) and its
+    sources. Dates are YouTube's Pacific days, 28 ending today by default; an end after today or
+    a start after the end refused. Refused before any request when the key lacks the scope; the
+    API turned off names the console page. `setup` says whether it is on. Module
+    `mcp/youtube/analytics.js`.
+  - **44i-2d-1.** Analytics per look: the manifest's keys name films, not looks. A look's name in
+    the card (or the manifest) would let the channel report sum watch time by look, which is
+    the owner's own question; wants the owner's word on where the look name lives.
+  - **44i-2d-2.** Retention by audience (`audienceType` ORGANIC vs ads) and by day (`day`
+    dimension) are supported by the API and not asked for yet.
   - **44i-2e.** Comments: list and reply (its own scope, also asked only when wanted).
   - **44i-2g.** Vimeo: upload (tus, resumable), edit, privacy, showcases, on a personal
     access token (no app review).

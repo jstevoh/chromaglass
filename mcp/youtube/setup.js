@@ -19,6 +19,7 @@
  * checks here can never drift from what the server does.
  */
 import { existsSync, statSync } from 'node:fs';
+import { ANALYTICS_SCOPE, granted } from './analytics.js';
 
 const CONSOLE = {
   project: 'https://console.cloud.google.com/projectcreate',
@@ -76,6 +77,9 @@ export async function runSetup(deps) {
     try {
       const c = await deps.channel();
       pass('YouTube channel', `${c.title} (${c.url})`);
+      /* An opt-in (44i-2d), so never a TODO: read from the saved key's own list, which costs nothing. */
+      const on = granted(deps.loadToken(), ANALYTICS_SCOPE);
+      lines.push({ ok: true, what: 'Analytics', detail: on ? 'on (watch time, retention, traffic sources)' : on === false ? `optional, off: "${run} login --add analytics" turns it on` : 'this sign-in keeps no scope list: ask for analytics to find out' });
     } catch (e) {
       fail('YouTube channel', apiFix(e) ?? e.message);
     }
