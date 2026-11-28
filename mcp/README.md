@@ -48,11 +48,17 @@ Mac app, and not named on any page a visitor or customer reads.
   refused unless YouTube would make chapters of them: from 0:00, three or more, ten
   seconds each), `music` and `credits` (the settings line, a line of its own, or `false`),
   `captions` (`.srt`/`.vtt` files sent once the video is up, each looked at before the job is
-  made), `localizations` (`{"es": {title, description}}`, needs `language`); resumes a dropped connection, an expired key, and a closed app from
+  made), `localizations` (`{"es": {title, description}}`, needs `language`), `short` (44i-2c:
+  refused unless the file itself reads 3:00 or less and square or vertical, `#Shorts` added
+  to the description once; a short tall film not marked says YouTube will make it a Short
+  anyway; an upload's chapters are now held to the film's length too); resumes a dropped connection, an expired key, and a closed app from
   `uploads.json`; emits MCP `notifications/progress` when `progressToken` is sent;
   queues the job with `notBefore` on `uploadLimitExceeded` or `quotaExceeded` instead of
   failing), `queue_upload` (saves a job in state `queued` with optional `key` and
-  `replaces` without uploading yet), `replace_video` (reads an old video's snippet,
+  `replaces` without uploading yet), `queue_folder` (44i-2c: every film directly in a folder,
+  in name order, each card winning over the shared fields; one refused film queues nothing
+  unless `skip_refused`; `dry_run`; `title_from_name`; films already queued or up left
+  alone; at most 100), `replace_video` (reads an old video's snippet,
   status and playlists via manifest playlist memory or paged `playlists`/`playlistItems`
   search, then queues a private replacement upload via `queue_upload` carrying the old
   metadata, playlists/positions, `replaces` and manifest `key`; never deletes or edits
@@ -115,7 +121,11 @@ Mac app, and not named on any page a visitor or customer reads.
   `composeDescription`, `creditsLine`, `composeLocalizations`, `checkTitle`, `validLanguage`,
   `isoSeconds`, `parseTime`, `formatTime`, `chapterBlock`: the description's parts and
   YouTube's limits, pure) and `captions.js` (`CAPTION`, `CAPTION_UNITS`, `readCaptionFile`,
-  `captionRequest`: which caption files count and the multipart body). They import only
+  `captionRequest`: which caption files count and the multipart body), and 44i-2c's
+  `probe.js` (`probeVideo`: length and shown size from an MP4/MOV/M4V's boxes or a
+  WebM/MKV's EBML, `null` when not known; `clock`), `shorts.js` (`SHORT_MAX_SEC`,
+  `SHORTS_TAG`, `wouldBeShort`, `checkShort`, `tagShort`, `shortsNote`) and `folder.js`
+  (`FOLDER_MAX`, `filmsIn`, `titleFromName`). They import only
   Node's modules and each other.
 - `youtube-mcp.js` imports nothing from the repo but `youtube/` (the two move to a
   repository of their own, 44i-2), uploads private unless told otherwise (Google's own default is public

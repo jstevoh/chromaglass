@@ -73,9 +73,12 @@ import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { CAPTION, CAPTION_UNITS, captionRequest, readCaptionFile } from './youtube/captions.js';
 import { checkTitle, composeDescription, composeLocalizations, creditsLine, isoSeconds, parseChapters, validLanguage } from './youtube/describe.js';
+import { filmsIn, titleFromName } from './youtube/folder.js';
 import { notifyCommand, schedulePlan } from './youtube/platform.js';
 import { configDir, env, readSettings } from './youtube/settings.js';
 import { formatSetup, runSetup } from './youtube/setup.js';
+import { probeVideo } from './youtube/probe.js';
+import { checkShort, shortsNote, tagShort } from './youtube/shorts.js';
 import { formatZone, nextQuotaResetPlus10m, zoneWallToMs } from './youtube/zone.js';
 
 const DIR = configDir();
@@ -468,7 +471,8 @@ async function listCaptions(videoId) {
 function wordsFor(a, durationSec) {
   const chapters = parseChapters(a.chapters, durationSec);
   const credits = creditsLine(SETTINGS.credits, a.credits, a.music, a.description);
-  const description = composeDescription(a.description ?? '', chapters, credits);
+  /* A Short's #Shorts ends the description's own text, before the chapters and the credits (44i-2c, youtube/shorts.js). */
+  const description = composeDescription(a.short ? tagShort(a.title, a.description) : a.description ?? '', chapters, credits);
   const localizations = composeLocalizations(a.localizations, { language: a.language, chapters, credits, fallbackDescription: description });
   return { description, localizations };
 }
@@ -559,6 +563,7 @@ function jobView(job) {
     ...(job.meta?.status?.publishAt ? { publish_at: job.meta.status.publishAt } : {}),
     ...(job.notBefore ? { not_before: formatLocal(Date.parse(job.notBefore)), not_before_iso: job.notBefore } : {}),
     ...(job.note ? { note: job.note } : {}),
+    ...(job.shorts ? { shorts: job.shorts } : {}),
     ...(job.video_id ? { video_id: job.video_id, url: watchUrl(job.video_id) } : {}),
     ...(job.playlists?.length ? { playlists: job.playlists } : {}),
     ...(job.after?.length ? { then: job.after } : {}), ...(job.error ? { error: job.error } : {}),
@@ -839,7 +844,7 @@ function run(job, onProgress) {
 }
 
 const PRIVACY = ['private', 'unlisted', 'public'];
-const SIDECAR_FIELDS = new Set(['title', 'description', 'tags', 'playlist', 'thumbnail', 'key', 'replaces', 'publish_at', 'privacy', 'language', 'chapters', 'music', 'credits', 'captions', 'localizations']);
+const SIDECAR_FIELDS = new Set(['title', 'description', 'tags', 'playlist', 'thumbnail', 'key', 'replaces', 'publish_at', 'privacy', 'language', 'chapters', 'music', 'credits', 'captions', 'localizations', 'short']);
 function readUploadCard(videoPath) {
   const ext = extname(videoPath);
   const cardPath = `${ext ? videoPath.slice(0, -ext.length) : videoPath}.youtube.json`;
@@ -886,6 +891,7 @@ function readUploadCard(videoPath) {
   if (raw.music !== undefined) out.music = String(raw.music);
   if (raw.credits !== undefined) out.credits = raw.credits === false ? false : String(raw.credits);
   if (raw.localizations !== undefined) out.localizations = raw.localizations;
+  if (raw.short !== undefined) out.short = raw.short; // judged with the call's own, in validateUploadArgs
   if (raw.captions !== undefined) {
     const here = (f) => resolve(dir, String(f ?? '').trim().replace(/^~(?=$|\/)/, homedir()));
     out.captions = (Array.isArray(raw.captions) ? raw.captions : [raw.captions]).map((c) => (typeof c === 'string' ? here(c) : c && typeof c === 'object' ? { ...c, file: here(c.file) } : c));
@@ -907,8 +913,13 @@ function validateUploadArgs(a, resolvedFile) {
   if (!a.title) throw new Error('A title is needed.');
   if (String(a.title).length > 100) throw new Error('YouTube takes a title of at most 100 characters.');
   checkTitle(a.title);
+  /* A Short is held to YouTube's rule from the file itself, and the film's own length now holds an
+     upload's chapters to its end as an update's already were (44i-2c, closing 44i-2b-2; youtube/probe.js). */
+  if (a.short !== undefined && typeof a.short !== 'boolean') throw new Error('short is true or false.');
+  const shape = probeVideo(file);
+  if (a.short) checkShort(shape, basename(file));
   /* The words and the captions are judged here, before a job exists, so a bad chapter list or caption file is refused at the call and never fails later in the drain (44i-2b). */
-  wordsFor(a);
+  wordsFor(a, shape?.durationSec);
   captionsFor(a);
   if (a.privacy !== undefined && !PRIVACY.includes(a.privacy)) throw new Error(`privacy is one of ${PRIVACY.join(', ')}.`);
   if (a.publish_at && a.privacy && a.privacy !== 'private') throw new Error('A scheduled video goes up private and turns public at publish_at; leave privacy out or private.');
@@ -919,8 +930,10 @@ function buildJob(a, file, st) {
   const playlists = Array.isArray(a.playlists)
     ? a.playlists.map((p) => (typeof p === 'string' ? { id: p } : { id: String(p.id), ...(Number.isInteger(p.position) ? { position: p.position } : {}) }))
     : a.playlist_id ? [{ id: String(a.playlist_id) }] : undefined;
-  const words = wordsFor(a);
+  const shape = probeVideo(file);
+  const words = wordsFor(a, shape?.durationSec);
   const captions = captionsFor(a);
+  const shorts = shortsNote(shape, a.short);
   return {
     id: b64url(randomBytes(6)), file, size: st.size, mtime: st.mtimeMs, mime: MIME[extname(file).toLowerCase()],
     meta: {
@@ -934,6 +947,7 @@ function buildJob(a, file, st) {
     thumbnail: a.thumbnail ? resolve(a.thumbnail) : undefined,
     ...(a.key ? { key: String(a.key) } : {}),
     ...(a.replaces ? { replaces: String(a.replaces) } : {}),
+    ...(a.short ? { short: true } : {}), ...(shorts ? { shorts } : {}),
     sent: 0, started: new Date(nowMs()).toISOString(),
   };
 }
@@ -988,6 +1002,49 @@ function queueUpload(a) {
   const merged = mergeArgsWithCard(a, readUploadCard(resolvedFile));
   const { file, st } = validateUploadArgs(merged, resolvedFile);
   return queueUploadCore(merged, file, st);
+}
+
+/*
+  A whole folder queued at once (44i-2c, youtube/folder.js). Every film is
+  judged as queue_upload would judge it, its card winning over the folder's
+  shared fields (the card was written for that film), and only then is
+  anything queued: one refused film queues nothing unless skip_refused says
+  to queue the rest, so a release is never half in. A film already queued or
+  up under the same title is left alone, so asking again after adding films
+  queues the new ones.
+*/
+const FOLDER_SHARED = ['description', 'tags', 'privacy', 'category_id', 'made_for_kids', 'language', 'playlist_id', 'music', 'credits', 'short'];
+function queueFolder(a) {
+  const { folder, films } = filmsIn(a.folder, { home: homedir(), kinds: MIME, uploadable: (p) => uploadable(p, MIME, 'A video') });
+  if (!films.length) throw new Error(`${folder} holds no film (${Object.keys(MIME).join(' ')}).`);
+  const shared = Object.fromEntries(FOLDER_SHARED.filter((k) => a[k] !== undefined).map((k) => [k, a[k]]));
+  const { jobs } = readStore();
+  const plan = films.map(({ path, refused }) => {
+    const row = { file: basename(path) };
+    if (refused) return { ...row, state: 'refused', reason: refused };
+    try {
+      const m = mergeArgsWithCard(readUploadCard(path), shared);
+      if (!m.title && a.title_from_name) m.title = titleFromName(path);
+      if (!m.title) throw new Error(`no title: give it a card (${basename(path, extname(path))}.youtube.json) or pass title_from_name: true.`);
+      const { file, st } = validateUploadArgs(m, path);
+      const same = (j) => j.file === file && j.size === st.size && j.mtime === st.mtimeMs && j.meta.snippet.title === m.title;
+      const done = jobs.find((j) => same(j) && j.state === 'done');
+      if (done) return { ...row, title: m.title, state: 'already up', url: watchUrl(done.video_id) };
+      const pending = jobs.find((j) => same(j) && (j.state === 'queued' || j.state === 'uploading'));
+      if (pending) return { ...row, title: m.title, state: 'already queued', job: pending.id };
+      const shorts = shortsNote(probeVideo(file), m.short);
+      return { ...row, title: m.title, privacy: m.privacy ?? 'private', state: 'ready', ...(shorts ? { shorts } : {}), go: () => queueUploadCore(m, file, st) };
+    } catch (e) { return { ...row, state: 'refused', reason: e.message }; }
+  });
+  const refused = plan.filter((r) => r.state === 'refused').length;
+  const ready = plan.filter((r) => r.state === 'ready');
+  const go = !a.dry_run && (!refused || a.skip_refused === true);
+  if (go) for (const r of ready) { r.job = r.go().job; r.state = 'queued'; }
+  const files = plan.map(({ go: _, ...r }) => (r.state === 'ready' ? { ...r, state: a.dry_run ? 'would queue' : 'not queued' } : r));
+  const note = a.dry_run ? `Dry run, nothing queued: ${ready.length} would be${refused ? `, ${refused} refused` : ''}.`
+    : !go ? `Nothing queued: ${refused} refused. Fix ${refused > 1 ? 'them' : 'it'}, or pass skip_refused: true to queue the other ${ready.length}.`
+    : `${ready.length} queued${refused ? `, ${refused} refused and left out` : ''}; this computer uploads them on its own passes (100 a day).`;
+  return { folder, note, files };
 }
 
 async function findVideoPlaylists(videoId) {
@@ -1323,6 +1380,8 @@ const GUIDE = `You manage the owner's YouTube channel. Nothing here needs the li
 - If a file has a sidecar card beside it (<file without extension>.youtube.json), upload_video, queue_upload and replace_video read it for any field the call leaves out (call wins); unknown fields in the card are refused.
 - upload_video answers within about 45 seconds: a short film is done by then; a long one answers "uploading" and carries on. Check it with upload_status. If an upload stops (the computer slept, the app closed), ask upload_video again with the same file and title: it carries on where it stopped and never makes a second copy unless you pass again: true.
 - A job in state "queued" (from queue_upload, replace_video, or from upload_video hitting YouTube's daily upload limit or quota) is NOT a failure: this computer's hourly drain finishes it on its own after not_before (shown in the settings time zone) and shows a notification when done or failed. Do not retry it by hand.
+- Shorts: pass short: true (or "short": true in the card) and the film is held to YouTube's rule, measured from the file: 3:00 or less, square or vertical (a landscape film, such as most best.mp4 clips from reelreader, is refused: cut a 9:16 copy first); #Shorts is added to the description unless the title or description has it. A short, tall film uploaded without short: true is still a Short on YouTube; its job says so under shorts. A Short over a minute with a Content ID claim on its music is blocked everywhere, so say so when the music is not the owner's or CC.
+- queue_folder queues every film directly in a folder (each one's card wins over the call's shared fields; title_from_name makes a title from a file name with no card). Run it with dry_run: true first and show the owner the list. One refused film queues nothing unless skip_refused: true; films already queued or up are left alone. Then release_plan can space them out.
 - Use queue_upload to line up several films without uploading them immediately, and replace_video to queue a re-rendered file carrying the old video's title, description, tags, category and playlists (without deleting or changing the old video; deleting stays in YouTube Studio).
 - Use manifest (with sync: true to pull all pages from the channel, 1 quota unit a page, including views and likes) and mark_video to track which videos are ok, need rerecord, are queued, replaced or removed.
 - YouTube processes a video for a few minutes after the upload; its upload_status in list_videos says when it is "processed".
@@ -1352,6 +1411,7 @@ const uploadProps = {
   key: { ...str, description: 'Optional short film id (e.g. "hymn-to-the-dawn") recorded in the channel manifest.' },
   replaces: { ...str, description: 'Optional existing video id this upload replaces in the manifest.' },
   again: { type: 'boolean', description: 'Upload a second copy of a file already up with this title.' },
+  short: { type: 'boolean', description: 'A YouTube Short: refused unless the file is 3:00 or less and square or vertical (measured from it); #Shorts added to the description.' },
   ...wordProps,
   captions: { type: 'array', description: 'Caption files to add once it is up (400 quota units each): a path, or { file, language, name, draft }. language defaults to the upload\'s.', items: { anyOf: [str, { type: 'object', required: ['file'], properties: { file: str, language: str, name: str, draft: { type: 'boolean' } } }] } },
 };
@@ -1367,6 +1427,20 @@ const TOOLS = [
     name: 'queue_upload',
     description: 'Save a video upload job in state "queued" without uploading yet (reads <file>.youtube.json sidecar for omitted fields; call wins); this computer drains the queue on its own. Refuses if the same file and title is already queued or up.',
     inputSchema: { type: 'object', required: ['file'], properties: uploadProps },
+  },
+  {
+    name: 'queue_folder',
+    description: 'Queue every film directly in a folder (MP4, MOV, WebM...; not its subfolders), in name order, each judged as queue_upload would. Each film\'s <file>.youtube.json card wins over the shared fields given here. If any film is refused nothing is queued, unless skip_refused. Films already queued or up with the same title are left alone. Run with dry_run first.',
+    inputSchema: {
+      type: 'object', required: ['folder'],
+      properties: {
+        folder: { ...str, description: 'Full path to the folder on this computer.' },
+        dry_run: { type: 'boolean', description: 'List what would be queued and what is refused, queue nothing.' },
+        skip_refused: { type: 'boolean', description: 'Queue the films that pass even when others are refused.' },
+        title_from_name: { type: 'boolean', description: 'A film with no title in its card is titled from its file name ("hymn-to-the-dawn.mp4" -> "Hymn to the dawn").' },
+        ...Object.fromEntries(FOLDER_SHARED.map((k) => [k, uploadProps[k]])),
+      },
+    },
   },
   {
     name: 'replace_video',
@@ -1445,6 +1519,7 @@ async function call(name, a = {}, onProgress = null) {
     case 'list_videos': return text(await listVideos(Number(a.limit ?? 10)));
     case 'upload_video': return text(await uploadVideo(a, onProgress));
     case 'queue_upload': return text(queueUpload(a));
+    case 'queue_folder': return text(queueFolder(a));
     case 'replace_video': return text(await replaceVideo(a));
     case 'upload_status': {
       const { jobs } = readStore();
