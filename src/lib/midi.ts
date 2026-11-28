@@ -602,6 +602,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'particles',       label: 'Dye Particles',    min: 0, max: 1 },
   { key: 'particleMix',     label: 'Particle Colour',  min: 0, max: 1 },
   { key: 'granulation',     label: 'Granulation',      min: 0, max: 1 },
+  // A cube on the travel: 1 to 4000 is three and a half decades, real (1)
+  // to the first stand-in's 300 to 600 in the bottom half, and 18e-2's
+  // retuned stand-in (about 1500 to 3400, by the dye's colours: dyeIndex.ts)
+  // in the top third.
+  { key: 'dyeIndexBoost',   label: 'Dye Index Boost',  min: 1, max: 4000, curve: 3 },
   { key: 'glassSmear',      label: 'Glass Smear',      min: 0, max: 3, wanderSpan: 1 },
   { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16, curve: 2 },
   { key: 'macroSync',       label: 'Macro Music Sync', min: 0, max: 1 },

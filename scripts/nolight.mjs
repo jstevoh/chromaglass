@@ -212,7 +212,29 @@ try {
       }
       out.dropletsBig = { over, dark: dark / (a.length / 4) };
     }
-    out.gloss = await shot({ glossiness: 1 });
+    /*
+      Glossiness scales the slope the optics read (plateTransmit.ts), and what
+      a slope does to transmitted light goes as the index step across it.
+      Since 38u-10 the dye's index is its measured one, 1.78e-5 a unit of
+      each channel's absorbance, where the stand-in this line was written on
+      was 0.06 a unit of the dye's density: so at the real default the dye's
+      relief bends nothing past the pupil and Glossiness at 1 darkened 0.00% of
+      the plate (it read 18.55% on main). The dial is not dead, the dye is
+      real: so the line's "darker" half is asked where the level wash's index
+      is the old stand-in's, on a baseline at the same boost, and its "never
+      brighter" half is asked there and at the real default both. The wash's
+      three channels sum to 1.05 a unit of density (0.35 each), so its
+      stand-in is 0.06 / (1.78e-5 x 1.05), x3210. The pools sum to 1.9 and
+      2.2, so at that boost they bend about twice what they did on main
+      (21% of the plate darker against 18.55%): the "darker" half is the
+      easier for it, and the level half is asked at main's own index. At
+      x3370, the figure first written here (0.06 / 1.78e-5, as if a dye's
+      channels summed to 1), the wash moved 2 levels against main's 1.
+    */
+    const WASH_STAND_IN = Math.round(0.06 / (1.78e-5 * 3 * 0.35));
+    out.plainLit = await shot({ dyeIndexBoost: WASH_STAND_IN });
+    out.gloss = await shot({ glossiness: 1, dyeIndexBoost: WASH_STAND_IN });
+    out.glossReal = await shot({ glossiness: 1 });
     out.gel = await shot({ gelWheel: 1 });
     out.dish = await shot({ dishVignette: 1 });
     out.dishOff = plain;
@@ -401,14 +423,15 @@ const lamp = top(r.empty);
     lamp < 250 && d.over <= SLACK && d.dark > DOES, `brightest by ${d.over} levels; ${pct(d.dark)} darker; the plate's brightest ${lamp}`);
 }
 for (const [i, key, name, off] of [
-  [2, 'gloss', 'Glossiness at 1', 'plain'],
+  [2, 'gloss', 'Glossiness at 1 (Dye Index Boost 3210, the wash\'s old stand-in; and at the real dye, never brighter)', 'plainLit'],
   [3, 'gel', 'the gel at 1', 'plain'],
 ]) {
   const d = compare(r[key], r[off]);
   const f = key === 'gloss' ? levelMoved(r[key], r[off]) : null;
+  const real = key === 'gloss' ? compare(r.glossReal, r.plain) : null;
   check(`${i}. ${name}: no pixel brighter than without it (by over ${SLACK}), and over ${pct(DOES)} of the plate darker by ${DARK}+${f ? `, the level wash not moved (by over ${SLACK})` : ''}`,
-    lamp < 250 && d.over <= SLACK && d.dark > DOES && (!f || (f.n > 0.02 * P && f.most <= SLACK)),
-    `brightest by ${d.over} levels; ${pct(d.dark)} darker; the plate's brightest ${lamp}${f ? `; the level wash (${pct(f.n / P)}) moved by at most ${f.most}` : ''}`);
+    lamp < 250 && d.over <= SLACK && d.dark > DOES && (!f || (f.n > 0.02 * P && f.most <= SLACK)) && (!real || real.over <= SLACK),
+    `brightest by ${d.over} levels; ${pct(d.dark)} darker; the plate's brightest ${lamp}${f ? `; the level wash (${pct(f.n / P)}) moved by at most ${f.most}` : ''}${real ? `; at the real dye brightest by ${real.over}, ${pct(real.dark)} darker` : ''}`);
 }
 {
   /*
