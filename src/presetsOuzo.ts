@@ -25,31 +25,47 @@ import type { Preset } from './presets';
  * white is the brightest thing on the glass and reads as it does in a glass
  * held against a dark room: by the light it scatters back.
  *
- * The dish (presetPlate.ts PRESET_LIQUIDS) is water, Ouzo and Alcohol, one
- * of them with each of the automation's drops, so the three things the
- * curve does all happen on the glass. Worked from it for a drop at the
- * automation's dose (AUTO_DOSE, 0.35 of a column at the middle of its disc):
+ * The dish (presetPlate.ts PRESET_LIQUIDS) is Ouzo twice, water and
+ * Alcohol, one of them with each of the automation's drops, so half the
+ * drops are cloud and the three things the curve does all happen on the
+ * glass. Worked from it for a drop at the automation's dose (AUTO_DOSE,
+ * 0.35 of a column at the middle of its disc), with the bottle at 1% oil:
  *
- *   Ouzo into water. The column there is then a quarter Ouzo: 19% alcohol
- *   and 0.78% oil, and that much alcohol holds 0.035%. So 96% of the oil is
- *   out as droplets, a reduced scattering of 1.6 per millimetre: a dense
- *   white bloom the shape of the drop, at once, as in the glass.
- *   Alcohol onto a bloom. 40% alcohol, which holds 0.24% of the 0.58% oil
- *   left there: the droplets are halved and the bloom thins. A second drop
- *   takes it to 56%, which holds 1.3%, and the bloom is a clear window.
+ *   Ouzo into water. The column there is then a third Ouzo: 26% alcohol
+ *   and 0.35% oil, and that much alcohol holds 0.06%. So 83% of the oil is
+ *   out as droplets, a reduced scattering of 0.6 per millimetre: a bloom
+ *   the shape of the drop, at once, as in the glass, and thin enough over
+ *   the dish's 2 mm that what lies under it shows through.
+ *   Alcohol onto a bloom. More alcohol there, and the solubility climbs
+ *   steeply with it: the bloom thins, and a second drop clears a window.
  *   Water onto a bloom. It dilutes the oil and the alcohol alike; the
  *   droplets stay (water holds 0.008%) and are carried where the drop
  *   pushes them, so the bloom opens into a ring.
  *
  * Nothing is seeded or timed: each cell is white exactly as far as its own
- * water and alcohol leave its oil undissolved. Measured in the lab on the
- * solver (a scratch script, not a check: 90 drops at the automation's dose,
- * two steps apart, at seeded places): with these three bottles 26% of the
- * dish holds droplets and the dish as a whole is 6% alcohol, so there is
- * clear water for the next drop to bloom in for a long show; with water
- * and Ouzo alone it is 37% and nothing ever clears.
- * On this look's own settings a bloom's middle reads 228 of 255 against a
- * ground of 0, 208 after one drop of Alcohol and 0 after two.
+ * water and alcohol leave its oil undissolved (`npm run ouzo` holds it).
+ *
+ * Retuned so the cloud leads (PLAN 48s-6, 2026-11-27). The first film of the
+ * look on the owner's Mac showed dye over 40 to 60% of the dish and the
+ * white arriving after twenty seconds as one or two flat lumps, a tenth of
+ * the frame. Three causes, each measured or read:
+ *  - The dye was the five wide pools every look without a seed of its own
+ *    opens on, and the automation holds the dye at what the seed laid; the
+ *    seed is now three small drops (presetPlate.ts plainSeed).
+ *  - The cloud came only with the automation's own drops, about one in
+ *    eleven seconds at a rate of 0.12 with nothing playing, a quarter of
+ *    them a breath and two thirds of the rest not Ouzo: one cloud in about
+ *    forty-five seconds. The dose the look lays when it opens does not reach a solver
+ *    that is not there yet when the look is the page's first (PLAN 27f-9o),
+ *    so on an opened page those drops were all there was. Evolve is now
+ *    0.36, three times as often, and half the drops are Ouzo: a cloud every
+ *    ten seconds with nothing playing and every five with music, anywhere
+ *    on the dish.
+ *  - The white was paint: at the extract's 3% a drop a tenth of the column
+ *    read 198 of 255 and every bigger one 210 to 240, one flat white. The
+ *    bottle is now 1% (bottles.ts says why that is still a real spirit) and
+ *    its drop half as wide again, so a drop reads 130 to 150, a laid dose
+ *    about 205, and a strong pour keeps a clear middle in a white ring.
  *
  * The music reaches it the way a hand would: the kick presses the top glass
  * (platePressure, as Night Sea's and Foam Cells' kick does), which pushes
@@ -60,13 +76,13 @@ import type { Preset } from './presets';
  * Every other number is a dark, slow plate, as Night Sea's is: no beads and
  * no bubbles (the owner, 2026-11-26: too many bubbles in the looks), a low
  * dye budget of deep blues so the white has something to lie over without
- * being tinted by it, and thin water's viscosity, which the dish, nine
- * tenths water, has.
+ * being tinted by it, and thin water's viscosity, which the dish, mostly
+ * water, has.
  */
 export const LOUCHE: Preset = {
   id: 'louche',
   name: 'Louche',
-  description: 'A dark dish of water under a dropper of clear anise spirit: each drop blooms opal white the moment the water reaches it, a drop of alcohol on a bloom thins it, and a second opens a clear window.',
+  description: 'A dark dish of water under a dropper of clear anise spirit: drop after drop blooms a thin opal white the moment the water reaches it, a drop of alcohol on a bloom thins it, and a second opens a clear window.',
   settings: {
     globalSpeed: 0.0126,
     surge: 0.3,
@@ -88,7 +104,7 @@ export const LOUCHE: Preset = {
     advection: 0.4,
     damping: 0.99,
     heatDecay: 0.995,
-    automateRate: 0.12,
+    automateRate: 0.36,
     platePressure: 0.2,
     glassSmear: 0,
     rainDrip: 0,

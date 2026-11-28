@@ -25,8 +25,8 @@ with the frame. At 120 Hz a frame has 8.3 ms; the 11-13 audit measured one desk 
 
 - **50a** *Clear the hitches already found* (rank 1, S to M each, Antigravity; §46's items,
   not new ones). In order of what the eye sees: **46m** Tank and the lamp's boil compile 13
-  pipelines on the frame that turns them on, a two to six second stop; **46o** Song ID
-  resamples and matches on the page's thread every six seconds; **46h** a MIDI fader or a Go
+  pipelines on the frame that turns them on, a two to six second stop; ~~**46o**~~ (gone with Song ID, retired
+  2026-11-27); **46h** a MIDI fader or a Go
   fade renders every desk panel, ten to thirty times a second; **46p** the remote's whole
   snapshot is serialised every 80 ms with no phone connected; **46j** the frame's own
   garbage. Each already names its check or the check Claude writes first. The cheapest
@@ -167,9 +167,36 @@ with the frame. At 120 Hz a frame has 8.3 ms; the 11-13 audit measured one desk 
   `FOREMAN_RECEIPTS=0` in the foreman's launchd environment.
 
 
-Parked by the owner's turn (2026-11-27), not dropped: a weekly mutation run proving checks
-can fail, the scorecard as a script, a README drift check (the parity run, failures grouped
-by fingerprint and the foreman's receipts were taken up as 50i, 50j and 50k).
-They came from the write-up of an agent-built service port (traffic mirrored to the old and
-new systems, mismatches grouped by shape, human corrections written down as tests) and suit a
-system that already works; take them up when the plate does.
+The last three from the parked list, taken up the same day (the owner, 2026-11-27 14:45Z:
+"Let's get all of these going. You can leave the MacBook Pro one until I get that
+computer"). They came from the write-up of an agent-built service port (mismatches grouped
+by shape, human corrections written down as tests); here they serve the agents' speed, not
+more gates: a check that can no longer fail is worse than none, because it reads as safety.
+
+- **50l** *A weekly mutation run: proof the checks can still fail* (S, Claude; **shipped**,
+  `npm run mutate`). `scripts/mutants.json` holds faults this repository has really had,
+  each the one line a merged fix changed, written back the old way in today's code;
+  `scripts/mutate.mjs` puts each back alone in a worktree of its own, runs the checks that
+  read its file (as `npm run quick` selects them), re-runs a red one on the clean tree so a
+  check already red is no catch, and reports CAUGHT (by which), MISSED, NO CHECK, STALE (the
+  code moved: rewrite the fault) or BROKEN (it only broke the typecheck). Weekly on the
+  owner's Mac, Sundays 03:30, through the film queue (`scripts/mutate-weekly.sh`, installed
+  by `scripts/mutate-install.sh`; report `~/cg-scratch/mutate/latest.md`, off switch `rm ~/cg-scratch/mutate/LIVE`, skipped on battery); never a gate.
+  Its own test, `--self`, is a check in `logic`. Open: **50l-1** every MISSED or NO CHECK
+  line of the first run becomes a check (Claude), one PR per area; **50l-2** a fault per
+  area the list does not yet reach (the desks, the phone, the server) as their fixes land;
+  **50l-3** the app's checks (`--app`) in the weekly run once a run's length is known.
+- **50m** *The scorecard as a script* (S, Claude). `/mnt/project-files/workflow/scorecard.md`
+  is written by hand; a script that reads the merged PRs, main's deploy runs and the plan's
+  status writes it, weekly, beside the mutation report.
+- **50n** *Every folder's README names what its code exports* (S, Claude; **shipped**,
+  `npm run readmes`, an always-run check in `logic`). CLAUDE.md's rule, held: a name a PR
+  newly exports under `src/` or `server/` is named in that folder's README, one it removes
+  is not still named there as live, and no README names a code name no code has. Its first
+  run found two: `src/gpu/README.md` described `gateDisplayWgsl` and `leanConstants`, names
+  #870's lean display never shipped; fixed in the same PR.
+- **50o** *The owner's corrections become checks* (rule, Claude; **shipped** in
+  `docs/handoff.md`). A correction's fix PR adds a check red on what the owner saw and the
+  fault itself to `scripts/mutants.json` with that check as `expect`, so the weekly run
+  proves it every week; one no check can see goes to `docs/judging.md` and still into the
+  list, where it shows as a hole until a check exists.

@@ -20,7 +20,7 @@ import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_STRENGTH 
 import { VisualizerSettings } from '../types';
 import { lookTarget as dyeLookTarget } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
-import { plateLook } from '../presetPlate';
+import { plateLook, plainSeed } from '../presetPlate';
 import { layCrowd, layLavaLamp, layOilShare, layFoamCells } from '../lib/oilLay';
 import { plateAreas, areaFamily, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { magnetDepth } from '../lib/magnetSize';
@@ -605,7 +605,7 @@ export class FluidSimulation {
     this.mcB = new Float32Array(GRID_AREA);
   }
 
-  // ── GPU solver lifecycle ───────────────────────────────────────────
+  // ── GPU solver lifecycle ──
 
   /** Move the simulation onto the GPU. Whatever the CPU arrays hold becomes the opening state. */
   attachGpu(gpu: PlateSolver) {
@@ -1971,9 +1971,10 @@ export class FluidSimulation {
       }
 
       default: {
-        for (let i = 0; i < 5; i++) {
+        const [n, rad, amt] = plainSeed(presetId);
+        for (let i = 0; i < n; i++) {
           const c = col(i);
-          this.splatBlob(10 + this.rng.float() * (S - 20), 10 + this.rng.float() * (S - 20), 15, 2.0, c.r, c.g, c.b);
+          this.splatBlob(10 + this.rng.float() * (S - 20), 10 + this.rng.float() * (S - 20), rad, amt, c.r, c.g, c.b);
         }
         break;
       }

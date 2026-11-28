@@ -40,3 +40,44 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   remote phone's rock path, eased and turned into the dish (`lib/handTilt.ts`); MIDI,
   Tilt & Rock, the desks, the remote and the phone's Motion sheet. `npm run handtilt`.
   Story in `docs/plan-shipped.md` §18a-13m. 18a-13n (a full knob past the phone, archived) shipped; open: 18a-13o.
+- **18a-8, a staggered grid (shipped 2026-11-27, with 18a-8b).** Cell velocities are rebuilt from the face fluxes,
+  which leaves a small checkerboard at a floored dent's edge; the advections'
+  Rhie–Chow faces were given c·P, exact only where the drag is even (on a thin gap
+  the colour's and the oil's carries and carryCourant now cross the solve's own
+  faces, `THIN_FACE`, as the ferrofluid's did: a Finger's solid is where the drag is
+  least even, 15b; off a thin gap the carries keep their Rhie–Chow faces, exact on
+  the old plate's even projection); and the face fluxes' upwinding squares off a ring under a fast
+  radial flow (the pressed rings in the picture). A staggered grid takes all three,
+  and `dampGrid`'s job.
+  **The third, shipped** (2026-11-27): the squaring was the carry's corner, not the
+  grid's storage. The faces moved each axis's share from the same old colour at once,
+  so a diagonal flow spread colour across itself as well as along (½|u_x|Δx along x
+  plus ½|u_y|Δx along y). The thin gap's carries now take Colella's corner transport
+  (`ACROSS` in `wgsl/fluid/carry.ts`, `cornered` in `wgsl/fluid.ts`); the old plate
+  keeps its faces. `npm run gridiso` (lab, 128², a thin ring turned by a solid swirl):
+  the fourfold part of the width it gained 0.331 → 0.218, the width gained 0.353 →
+  0.273 cells, colour +0.088% from the half-float floor on that fast ring (0.000% at
+  `dyeedge`'s speed). **The first, the checkerboard, shipped** (2026-11-27): the cell
+  kept its own predicted velocity (hsGradient wrote c·u*_cell − M∇p/h) and the faces saw
+  only the mean of two cells' u*, so a checkerboard in the flow was a mode the solve
+  never saw. The thin solve's faces are now the flow's state (Harlow and Welch's
+  staggered grid, `wgsl/thinFlow.ts`): hsGradient keeps each face's velocity in
+  `hsFlow`, hsDivergence predicts each face from its own last velocity plus the mean of
+  what the step's forces asked of its two cells, a cell's velocity is the mean of its
+  faces, and `thinFaceVel` reads the face (with the ridden flow's slosh, drift and
+  ferrofluid drop laid on as the cells' change). `npm run gridnull` (lab, 128²): a
+  checkerboard laid in water kept 0.93 of itself after a step on main (0.46 in the oil),
+  4e-8 now; an eight-cell wave keeps its inertia (0.983 of a long wave's, main 0.981);
+  a floored dent's rim under a push 0.0303 → 0.0108 sharp in the oil, 0.0115 → 0.0083
+  in water; `gridiso`'s drop window rounder (0.0092 → 0.0061). The [1 2 1] rebuild (tried first) damped
+  the eight-cell wave 0.85 a step. **18a-8b, `dampGrid` retired on the thin gap,
+  shipped** (2026-11-27): with the faces as the flow's state the thin gap's colour grows
+  no checkerboard for the pass to take. Grating's pressed plate (ten seconds of pushes
+  and presses) on a thin gap: the dye's band within 0.2π of the checkerboard reads
+  2.94e-3 of the dye with no pass and 2.85e-3 with it forced on (1.03; the old plate
+  0.64, and 6.33e-3 with none); texture four cells across keeps 0.986 of itself over a
+  second with no pass, 0.817 with it. So the step runs no pass on a thin gap
+  (`p.gridDamp ?? (thin ? 0 : GRID_DAMP)`, the reasons at `GRID_DAMP`), and the old
+  plate keeps it. `npm run grating` section 7 holds both (with the forced pass as the
+  control). Saves the `dye grid` stage on every look (3 to 9% of a layer's step on
+  Metal at 18m-5, twice with oil bodies).

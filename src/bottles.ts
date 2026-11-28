@@ -64,18 +64,29 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
     clouds in a ring where it meets the plate's water, and clears again
     under a pour of Alcohol.
 
-    Its strength is a kitchen's anise extract, 3% oil of anise by volume in
-    about 75% alcohol, not the drink's: an ouzo or a pastis holds about 2 g
-    of the oil a litre, 0.2%, and its louche is opaque in a glass 5 cm deep
-    and only a haze in a dish's 2 mm (μs′ about 0.15 per mm at its whitest).
-    The extract clouds once a fifth of the column is water and is whitest,
-    about 3 per mm and so a little past whole milk's 2, near three parts of
-    it to two of water. 75% alcohol by volume: 2.4 mPa·s, 0.87 g/cm³,
-    26 mN/m, n 1.364, so nearly three times water by the measure the gap's
-    drag takes, as watered alcohol is (it is thickest near half and half).
+    Its strength: 1% oil of anise by volume in about 75% alcohol, five times
+    the drink's and a third of a kitchen extract's. An ouzo or a pastis holds
+    about 2 g of the oil a litre, 0.2%, and its louche is opaque in a glass
+    5 cm deep and only a haze in a dish's 2 mm (μs′ about 0.15 per mm at its
+    whitest). The bottle first shipped at the extract's 3% (PLAN 48s), and
+    filmed on the owner's Mac its cloud read as flat white paint: in the lab
+    on Louche's plate a drop of the automation's size (a tenth of the
+    column) read 198 of 255 at 3% and every larger one 210 to 240, so the
+    whole cloud was one white with no depth in it. At 1% the same drop reads
+    131, a laid dose 205, and the dish under a thin cloud shows through it,
+    which is how a louche looks in a shallow glass (PLAN 48s-6, `npm run ouzo`).
+    It clouds once a third of the column is water; poured nearly neat it
+    keeps a clear middle inside a white ring, as the real one does. 75%
+    alcohol by volume: 2.4 mPa·s, 0.87 g/cm³, 26 mN/m, n 1.364, so nearly
+    three times water by the measure the gap's drag takes, as watered
+    alcohol is (it is thickest near half and half).
+
+    Its drop is half as wide again as the other bottles' (injectRadius 6,
+    not 4): a weaker spirit in a bigger drop, so the cloud reaches more of
+    the dish from each drop while staying thin enough to see through.
   */
-  { id: 'ouzo',    name: 'Ouzo',    color: '#ffffff', own: '#ffffff', description: 'Anise oil in alcohol: clear in the bottle, opal white wherever it meets water, and clear again under Alcohol',  injectRadius: 4, injectAmount: 0.3, heatAmount: 0.0,
-    behaviour: { weight: -0.13, polarity: -0.15, solvent: 0.75, viscosity: 2.4, density: 0.87, tension: 26, index: 1.364, ethanol: 0.75, anise: 0.03 } },
+  { id: 'ouzo',    name: 'Ouzo',    color: '#ffffff', own: '#ffffff', description: 'Anise oil in alcohol: clear in the bottle, opal white wherever it meets water, and clear again under Alcohol',  injectRadius: 6, injectAmount: 0.3, heatAmount: 0.0,
+    behaviour: { weight: -0.13, polarity: -0.15, solvent: 0.75, viscosity: 2.4, density: 0.87, tension: 26, index: 1.364, ethanol: 0.75, anise: 0.01 } },
   { id: 'ink',     name: 'Ink',     color: '#cc44ff', description: 'Spreads wide and diffuses slowly',     injectRadius: 5, injectAmount: 0.3, heatAmount: 0.0,
     behaviour: { weight: 0.02, polarity: 0.2 } },
   // The heavy one, and it is sugar in water, so it is polar: it sinks through

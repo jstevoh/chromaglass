@@ -682,6 +682,25 @@ export const VISC_ITERS = 4;
   anything along the grid all of it. Stronger clears faster and softens
   those more; this clears what a look already has before an audience
   notices it going.
+
+  The old plate's only (PLAN 18a-8b). The pass was written for a checkerboard
+  the flow kept laying: the thin solve's cells held a velocity mode its
+  pressure never saw, and the carries rode it into the colour. Since 18a-8
+  (#1022) the faces are the thin flow's state and that mode is gone (`npm run
+  gridnull`: 0.93 of a laid checkerboard kept after a step, now 4e-8), so on a
+  thin gap, where every look opens, the step runs no pass. Asked on grating's
+  pressed plate with Thin Gap on (`npm run grating`, section 7), the dye's band
+  within 0.2π of the checkerboard after ten seconds of pushes and presses reads
+  2.94e-3 of the dye with no pass and 2.85e-3 with this one forced on: 1.03,
+  the moving fronts' own edges either way, where the old plate reads 0.64 and
+  grows 6.33e-3 with none. What the pass still cost there was the liquid's
+  finest diagonals (texture four cells across kept 0.82 of itself over a
+  second, 0.99 without) and three full-grid passes a step on the dye, three
+  more on the oil's (`npm run stages`' `dye grid`, 3 to 9% of a layer's step on
+  Metal at 18m-5). The colour on a thin gap now loses its fine pattern only to
+  its own diffusion, as a real liquid's does. The old plate's collocated
+  projection still lays the checkerboard (gridnull's control keeps 0.84 of
+  it), so the pass stays there.
 */
 export const GRID_DAMP = 0.05;
 /** The CPU solver's hard speed limit, in plate units per unit time. */

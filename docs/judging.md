@@ -275,8 +275,14 @@ Red Cabbage at 2.8x drew a fine blue and white lattice over the violet: a
 checkerboard one grid cell across, seen along its diagonal, which the dye kept
 because a look with no diffusion had nothing to take it out and the closeup
 stretches thin dye's contrast about ten times. The dye now loses that one
-pattern (`dampGrid`, 5% of it left after a second) in every look whose
-diffusion does not already remove it. Measured only in the lab (`npm run
+pattern (`dampGrid`, 5% of it left after a second) on the old plate (Thin Gap
+off). On a thin gap, where every look opens, the pass is retired (PLAN 18a-8b,
+2026-11-27): since 18a-8 the thin flow's faces are its state, so the flow lays
+no checkerboard to ride into the colour, and on the lab's pressed plate the
+band reads the same with the pass forced on or off (`npm run grating`
+section 7). What to look at there is the same: no lattice at 2.8x, and the
+finest diagonal wisps a touch crisper than before (texture four cells across
+now keeps 99% over a second, not 82%). Measured only in the lab (`npm run
 grating`), which never drew the lattice itself: the app's frames cannot be
 read on software WebGPU. Two things to look at, on Red Cabbage and one other
 look with no diffusion (Diffusion Rate at 0), at 2.8x and above:
@@ -3157,11 +3163,15 @@ crosses the solubility curve, the oil is conserved); how it looks in a show is t
 4. On a lamp ground the cloud is a warm grey shadow, as milk's is, not white.
 5. A plate that never sees the bottle looks exactly as before.
 6. The look **Louche** (the bottle's own, added because `npm run plate` holds that every
-   bottle with physics is poured by some look). Good: a dark dish; about one drop in three
-   blooms white as it lands and drifts with the flow, some blooms thin or open a clear
-   window where a later drop of Alcohol lands, the blues of the other drops stay deep. Bad:
-   the whole plate white inside a few minutes, blooms that are hard-edged discs for as long
-   as they last, a grey veil over the dark ground.
+   bottle with physics is poured by some look). Retuned so the cloud leads (PLAN 48s-6):
+   three small deep drops of colour, half the drops Ouzo, three times as often, and the
+   bottle at 1% oil so the white is thin. Good: a dark dish with a few small blue accents;
+   within the first ten seconds a bloom, then one every five to ten seconds across the
+   dish, a thin opal white the dye shows through where they overlap, drifting and folding
+   with the flow; some blooms thin or open a clear window where a later drop of Alcohol
+   lands. Bad: dye over a large part of the dish, a minute with no white, flat opaque discs
+   like paint, the whole plate a grey veil inside a few minutes. Judged from the Mac's film
+   of the retune (the thread's page), not by loading the app.
 
 ## 151. Oil threads pinch into beads (PLAN 38w-27)
 

@@ -16,17 +16,21 @@ import { publishListen, setDetectorDoor, setListenDoor } from './earNow';
 
 /**
  * Listen, in the Songs panel (PLAN 28h-8, `lib/songDesign.ts`): one press
- * names the song playing, adds it to the list with what the song ID knows of
- * it, and designs its show (a stage sequence made for it and cues on its
- * show) once the show has heard it through.
+ * and a name put the song playing in the list and design its show (a stage
+ * sequence made for it and cues on its show) once the show has heard it
+ * through.
  *
  * The press makes sure the show can hear (the microphone when nothing is
- * chosen, the song ID on, Follow songs on so the show it designs plays) and
- * asks the song ID to try now. The rest is `listenStep`, run on every change
- * of what the ear knows, with its answers carried out here: a song show added
- * for the song (taking the look that is up, and not fading to it), and the
- * design written into it and into the sequencer. Nothing here recognises or
- * maps anything: that is `useMusicIntelligence`'s, as it always was.
+ * chosen, the music layer on, Follow songs on so the show it designs plays)
+ * and waits for the name: the Title and Artist typed, then Name it, which
+ * tags the song as the Track panel's tag does. Until 2026-11-27 the press
+ * asked the song ID to try at once and the name was the person's only when
+ * it missed; the song ID is retired now (archive/song-id/). The rest is
+ * `listenStep`, run on every change of what the ear knows, with its answers
+ * carried out here: a song show added for the song (taking the look that is
+ * up, and not fading to it), and the design written into it and into the
+ * sequencer. Nothing here maps anything: that is `useMusicIntelligence`'s,
+ * as it always was.
  */
 
 interface ListenDeps {
@@ -55,14 +59,6 @@ export function useListen(d: ListenDeps): ListenControl {
   // A sequence written this render is in the sequencer's list on the next:
   // started then, if its song is the one playing (`startSongSequence`).
   const pendingStart = useRef<{ id: string; firstStage: string } | null>(null);
-
-  // The give-up needs a clock while nothing else changes.
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    if (state.phase !== 'listening') return;
-    const t = window.setInterval(() => setTick((n) => n + 1), 1000);
-    return () => window.clearInterval(t);
-  }, [state.phase]);
 
   const { track, songMap, heardMap, analyzing } = d.musicIntel.state;
   useEffect(() => {
@@ -105,7 +101,7 @@ export function useListen(d: ListenDeps): ListenControl {
     }
     if (shows !== shows0) x.setSongShows(shows);
     if (next !== state) setState(next);
-  }, [state, track, songMap, heardMap, analyzing, tick]);
+  }, [state, track, songMap, heardMap, analyzing]);
 
   useEffect(() => {
     const p = pendingStart.current;
@@ -121,7 +117,6 @@ export function useListen(d: ListenDeps): ListenControl {
     if (x.audioSource === 'none') void x.handleSourceChange('microphone');
     if (!x.musicEnabled) x.updateMusicSettings({ enabled: true });
     if (!x.followSongs) x.setFollowSongs(true);
-    x.musicIntel.listenNow();
     setShowId(null);
     setState(startListening(performance.now()));
   }, []);
@@ -132,7 +127,7 @@ export function useListen(d: ListenDeps): ListenControl {
     dRef.current.musicIntel.manualTag(artist.trim(), title.trim());
   }, []);
 
-  const line = listenLine(state, d.musicIntel.state.fingerprintEnabled);
+  const line = listenLine(state);
   /*
     The detector and Listen for the owner's assistant (app/earNow.ts, PLAN
     44k-10): the Sound panel's Song Detection switch and this panel's own

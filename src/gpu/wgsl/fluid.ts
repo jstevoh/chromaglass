@@ -16,6 +16,7 @@ import { REACTION_KERNELS } from './fluid/reactions';
 import { FIELD_KERNELS } from './fluid/fields';
 import { SEAL_KERNELS } from './fluid/seal';
 import { OUZO_KERNELS } from './fluid/ouzo';
+import { SPLIT_KERNELS, monomorph, perShare } from './fluid/split';
 import { HEAD, NOISE_WGSL, PACKED, THIN_FACE, W } from './fluid/shared';
 import { thinGapKernels } from './thinGap';
 import { filmKernels } from './film';
@@ -46,6 +47,8 @@ export const KERNELS: Record<string, string> = {
   ...SEAL_KERNELS,
   // Anise oil out of solution where its alcohol is watered down (PLAN 48s): see wgsl/fluid/ouzo.ts.
   ...OUZO_KERNELS,
+  // The dye's two liquids' shares through the faces in one pass (PLAN 38w-33): see wgsl/fluid/split.ts.
+  ...SPLIT_KERNELS,
   // The plate as a Hele-Shaw cell (PLAN §18a): see wgsl/thinGap.ts.
   ...thinGapKernels(HEAD, W, NOISE_WGSL),
   // A clear film that tears (PLAN §20b): see wgsl/film.ts.
@@ -221,7 +224,8 @@ function airLiquid(src: string, name: string, frac: string): string {
   }
   // The pair carry reads either of its two textures through one mx(t, …).
   const t = src.match(outA)![2];
-  const tParam = t ? 't: texture_2d<f32>, ' : '';
+  // A texture for the pair; the split carry's share index (wgsl/fluid/split.ts), whatever type its mx takes.
+  const tParam = t ? `t: ${src.match(/fn mx\(t: ([^,]+),/)?.[1] ?? 'texture_2d<f32>'}, ` : '';
   const liquid = `@group(0) @binding(${last + 1}) var airWas: texture_2d<f32>;
 @group(0) @binding(${last + 2}) var airNow: texture_2d<f32>;
 @group(0) @binding(${last + 3}) var airGive: texture_2d<f32>;
@@ -379,6 +383,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
   textureStore(dst, p, v);
 }`;
+// And for both of the dye's shares at once (PLAN 38w-33, wgsl/fluid/split.ts): airShed floors what a dry cell keeps, so each share sheds its own.
+KERNELS.airShedSplit = perShare(KERNELS.airShed, 'airShedSplit');
 KERNELS.airGiveSub = airGiveKernel(true);
 KERNELS.airGiveThin = airGiveKernel(false);
 KERNELS.bodyAdvectSub = cornered(thinFaced(substepped('bodyAdvect'), 'bodyAdvectSub'), 'bodyAdvectSub');
@@ -516,6 +522,11 @@ KERNELS.bodyAdvectSharpSub = thinFaced(substepped('bodyAdvectSharp'), 'bodyAdvec
   differs away from the bubble, which is where the oil's edge is.
 */
 KERNELS.bodyAdvectSharpSubAir = airLiquid(KERNELS.bodyAdvectSharpSub, 'bodyAdvectSharpSubAir', 'A.a.x * sub[0]');
+// Both shares in one pass (PLAN 38w-33, wgsl/fluid/split.ts), in the same room.
+for (const name of ['bodyAdvectSplitSub', 'bodyAdvectSplitOnSub']) {
+  KERNELS[`${name}Air`] = monomorph(airLiquid(KERNELS[name], `${name}Air`, 'A.a.x * sub[0]'), `${name}Air`);
+  KERNELS[name] = monomorph(KERNELS[name], name);
+}
 
 KERNELS.bodyAdvectThin = cornered(thinFaced(KERNELS.bodyAdvect, 'bodyAdvectThin'), 'bodyAdvectThin');
 KERNELS.bodyAdvectThinAir = airLiquid(KERNELS.bodyAdvectThin, 'bodyAdvectThinAir', 'A.a.x');
