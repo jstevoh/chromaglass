@@ -21,7 +21,7 @@ and is copied into the release as it stands:
   run), `package.json` (the copy's `files` list and test line are written by the build), the
   MIT licence, the changelog, `bin/reelreader.mjs` (the npx command), `claude-plugin/` (the
   plugin and its own marketplace, `.claude-plugin/` in the copy), the `/reelreader` command,
-  `gitignore` and `github-workflows/` (its CI, and a release on a `v` tag: the skill zip on the
+  `gitignore` and `github-workflows/` (its CI, and a release run from the Actions tab or on a `v` tag: the skill zip on the
   GitHub release and the package on npm with the repository's `NPM_TOKEN`). Dotted names are
   kept undotted here so this repository's own tools never read them as their own.
 

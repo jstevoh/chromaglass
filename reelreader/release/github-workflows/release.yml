@@ -1,5 +1,8 @@
-# A tag v<version> makes a release: the skill zip for the Claude apps on the
-# GitHub release, and the package on npm.
+# A release: the skill zip for the Claude apps on the GitHub release, and the
+# package on npm. Started by hand (Actions -> release -> Run workflow, on main):
+# the release's tag v<package.json version> is made here, at the commit it ran
+# on, so nobody has to push a tag (the cloud sessions that build this repository
+# can push a branch but not a tag). A tag pushed by hand starts it too.
 #
 # npm by trusted publishing: npm trusts this workflow in this repository (set on
 # the package's npm page) and takes a short-lived token from GitHub's OIDC, so no
@@ -11,6 +14,7 @@
 # publishing needs npm 11.5.1 or later, so the step updates npm first.
 name: release
 on:
+  workflow_dispatch:
   push:
     tags: ['v*']
 permissions:
@@ -25,8 +29,12 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - name: The tag is the package's version
-        run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+      - name: The tag is the package's version, and not released before
+        run: |
+          TAG="v$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$TAG" ]; then echo "::error::tag $GITHUB_REF_NAME is not package.json's $TAG"; exit 1; fi
+          if [ "$GITHUB_REF_TYPE" != tag ] && git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then echo "::error::$TAG is already released: raise the version first"; exit 1; fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
       - name: Skill zip (the skill folder with its scripts inside)
         run: |
           mkdir -p stage/reelreader/scripts
@@ -38,8 +46,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          awk -v v="${GITHUB_REF_NAME#v}" '$0 ~ "^## "v" " {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
-          gh release create "$GITHUB_REF_NAME" reelreader-skill.zip --title "reelreader $GITHUB_REF_NAME" --notes-file notes.md
+          awk -v v="${TAG#v}" '$0 ~ "^## "v" " {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
+          gh release create "$TAG" reelreader-skill.zip --target "$GITHUB_SHA" --title "reelreader $TAG" --notes-file notes.md
       - name: npm (trusted publishing; the token only until the trust is set)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
