@@ -304,7 +304,10 @@ async function runSuite(mods, dir, clips, only = null) {
   const out = [];
   const want = id => !only || only === id;
   const rec = (id, name, ok, detail) => out.push({ id, name, ok: !!ok, detail });
-  const rw = mods.watchVideo;
+  // The report card and Settings to try are the liquid read's (PLAN 47p-3, scripts/watchmode.mjs):
+  // these clips hold them to pictures, so they are watched as liquid footage whatever the footage
+  // cues decide; that general footage gets neither is npm run watchmode.
+  const rw = (file, o) => mods.watchVideo(file, { liquid: true, ...o });
 
   // (a) letterbox: 12% bars top & bottom cropped within 1%; dark grainy ground NOT cropped
   if (want('a')) {

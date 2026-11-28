@@ -618,10 +618,13 @@ order; the README is `docs/watch.md`, the plugin's layout `docs/watch-plugin-pla
 - **47p-2** the self-test green on a stock ffmpeg: 47x-6 (A, B, D fail on ffmpeg-full 9.0.2, the
   Homebrew default has no libvorbis) and 47x-11 (two takes of one look read as changed on
   Ubuntu, quarantined to 12-06). The root cause, not the bar.
-- **47p-3** general mode by default: the physics read, the liquid-calibrated report card
-  (`REAL_SHOW_CARDS`), "Settings to try" and the wet show's words only for liquid footage or a
-  `--liquid` flag; otherwise a general read in general words, with a check that non-liquid
-  footage gets no liquid verdict.
+- **47p-3b** an app take with cuts reads general: the closeup film of 38h-7 (two hard cuts in
+  21 s) did, and a drained or frozen take fails the light or motion cue. Our own films are
+  liquid by construction: have `film.mjs`, `gig.mjs`, `moving.mjs` and the 5b/7a bad-take
+  set pass `liquid: true`, or let a take carry its own sidecar that says it is the app's.
+- **47p-3c** footage that is continuous, coloured, on a dark ground and moving by itself reads
+  liquid though it is not (a night street with neon on a tripod, a VJ loop, a fish tank).
+  A fourth cue (rigid motion: the flow's blocks moving as solid pieces) would tell them apart.
 - **47p-4** an HTML report and the best moment: one self-contained page per run (sheets,
   timeline, numbers, the words), and the strongest moment saved as a still and a 10-15 s clip.
 - **47p-5** a shot list and batch runs: cut and dissolve times, each shot's length, the average

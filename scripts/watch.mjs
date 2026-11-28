@@ -4,7 +4,7 @@
  *
  *   npm run watch -- <file or URL> [--out DIR] [--frames 24] [--from S] [--to S]
  *                                  [--at 3.5,12] [--rate 10] [--per-sheet 12] [--vs REF_OUT]
- *                                  [--crop x,y,w,h] [--keep NAME [--note TEXT]]
+ *                                  [--crop x,y,w,h] [--keep NAME [--note TEXT]] [--liquid | --general]
  *   npm run watch -- --before A --after B [--out DIR]  |  --refs  |  --selftest
  *
  * Asked for: "a skill or agent that is able to better watch video … it will make
@@ -80,10 +80,11 @@ import { describe } from './watchwords.mjs';
 import { detectAutocrop, analyseFootage, footageLines, footageOut } from './watchfootage.mjs';
 import { reportCard, loadRatings, formatSideBySideCards } from './watchcard.mjs';
 import { loadConfig, useConfig, settingsMapFor, macFetch, fetchElsewhere } from './watchconfig.mjs';
+import { readMode, cueNumbers, generalMotionLines } from './watchmode.mjs';
 
 // ─── arguments ───────────────────────────────────────────────────────────────
 
-const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', before: '', after: '', selftest: false, quiet: false, crop: null, noAutocrop: false, vs: '', keep: '', note: '', refs: false, settings: null, config: '' };
+const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', before: '', after: '', selftest: false, quiet: false, crop: null, noAutocrop: false, vs: '', keep: '', note: '', refs: false, settings: null, config: '', liquid: null };
 const opt = { ...DEFAULTS };
 
 /** A failure the caller can report: a harness catches it, the command line prints it and exits with `code`. */
@@ -115,6 +116,11 @@ function parseArgs(argv) {
     else if (a === '--crop') { const [x, y, w, h] = v().split(',').map(Number); if ([x, y, w, h].every(Number.isFinite) && w > 0 && h > 0) opt.crop = { x, y, w, h }; else fail('--crop wants x,y,w,h as fractions, e.g. 0.5,0,0.25,0.35', 2); }
     else if (a === '--no-autocrop') opt.noAutocrop = true;
     else if (a === '--settings') opt.settings = v();
+    // The liquid read (physics, report card, techniques, the wet show's words,
+    // Settings to try) or the general one, whatever the footage looks like
+    // (scripts/watchmode.mjs, PLAN 47p-3); by default the footage decides.
+    else if (a === '--liquid') opt.liquid = true;
+    else if (a === '--general') opt.liquid = false;
     // Where the reference library, the fetch folder and the settings map are
     // (scripts/watchconfig.mjs, PLAN 47p-1); by default reelreader.config.json.
     else if (a === '--config') { opt.config = v(); try { useConfig(opt.config); } catch (e) { fail(e.message, 2); } }
@@ -747,7 +753,15 @@ async function watch() {
     ps.spectrum = ps.spectrum ? { ...ps.spectrum, reliable: false } : { med: null, p10: null, p90: null, reliable: false };
   }
   ds.physics = ps;
-  const designOut = [...designLines(ds), '', ...physicsLines(ps), '', ...techniqueLines(info, ds, ps, activeCuts.length / Math.max(1 / 60, activeSpan / 60))];
+  // Liquid or general (scripts/watchmode.mjs, PLAN 47p-3): the physics read's
+  // words, the techniques, the report card, the wet show's words and Settings
+  // to try are a liquid light show's, so only liquid footage gets them.
+  const cfgMode = loadConfig().mode;
+  const [forced, how] = opt.liquid === true || opt.liquid === false ? [opt.liquid, opt.liquid ? '--liquid' : '--general']
+    : cfgMode !== 'auto' ? [cfgMode === 'liquid', `the config's mode, ${cfgMode}`] : [null, null];
+  const mode = readMode({ forced, how, info, m: cueNumbers({ rows: useRows, cuts: activeCuts, span: activeSpan, shape: sh, design: ds, physics: ps }) });
+  const liquid = mode.liquid;
+  const designOut = [...designLines(ds, { liquid }), '', ...(liquid ? [...physicsLines(ps), '', ...techniqueLines(info, ds, ps, activeCuts.length / Math.max(1 / 60, activeSpan / 60))] : generalMotionLines(ps))];
   let refWords = null, refTitle = null, refDoc = null;
   let takeSettings = null;
   if (opt.settings) {
@@ -766,13 +780,14 @@ async function watch() {
     try { ref = JSON.parse(fs.readFileSync(vf, 'utf8')); } catch { fail(`--vs: no design.json at ${opt.vs}, and no reference of that name (npm run watch -- --refs lists them; watch the reference first, with this version of the tool)`, 2); }
     refDoc = ref;
     refTitle = ref.title ?? vf;
-    refWords = ref.words?.lines?.length ? ref.words : describe({ design: ref });
+    refWords = ref.words?.lines?.length && (ref.mode?.liquid ?? true) === liquid ? ref.words : describe({ design: ref }, { liquid });
     designOut.push('', ...compareDesign(ref, ds, `the reference (${refTitle})`, 'this'));
-    if (ref.physics) designOut.push('', ...comparePhysics(ref.physics, ps, 'the reference', 'this'));
+    if (liquid && ref.physics) designOut.push('', ...comparePhysics(ref.physics, ps, 'the reference', 'this'));
     const allGaps = [...designGaps(ref, ds).rows, ...(ref.physics ? physicsGaps(ref.physics, ps).rows : [])];
     // "Settings to try" only for an app the config names a settings map for
     // (PLAN 47p-1): a gap in edge width is a dial only in an app that has one.
-    const gapSettings = await settingsMapFor(loadConfig()).catch(e => fail(e.message, 2));
+    // And only for liquid footage: the map's dials are a liquid show's.
+    const gapSettings = liquid ? await settingsMapFor(loadConfig()).catch(e => fail(e.message, 2)) : null;
     if (gapSettings) designOut.push('', ...gapSettings(allGaps, takeSettings));
   }
 
@@ -787,17 +802,17 @@ async function watch() {
 
   const ftOut = footageOut(footage);
   const readForText = { out, rows: useRows, cuts: activeCuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, sheets, tiles, picks, timeline, span: activeSpan, pr, w, h, rate };
-  const words = describe(readForText);
+  const words = describe(readForText, { liquid });
   const ov = overall({ ...readForText, words });   // the whole film's arc and feel, before the words one measure at a time (47x-8)
   const { ratings, libDirs } = loadRatings();
-  const card = reportCard({ ...readForText, overall: ov }, { ratings, libDirs });
-  if (refDoc) {
+  const card = liquid ? reportCard({ ...readForText, overall: ov }, { ratings, libDirs }) : null;
+  if (card && refDoc) {
     const refCard = refDoc.card?.canons?.length ? refDoc.card : reportCard(refDoc);
     designOut.push('', ...formatSideBySideCards(card, refCard, refTitle));
   }
-  const cardOut = { canons: card.canons, verdict: card.verdict, agreement: card.agreement, lines: card.lines };
-  const result = { out, rows, cuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, words, overall: ov, card: cardOut, sheets, tiles, picks, timeline, span, pr, w, h, rate };
-  fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds, shape: sh, overall: ov, card: cardOut, sync, footage: ftOut, words }, null, 1) + '\n');
+  const cardOut = card ? { canons: card.canons, verdict: card.verdict, agreement: card.agreement, lines: card.lines } : null;
+  const result = { out, rows, cuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, mode, words, overall: ov, card: cardOut, sheets, tiles, picks, timeline, span, pr, w, h, rate };
+  fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds, shape: sh, overall: ov, card: cardOut, sync, footage: ftOut, mode, words }, null, 1) + '\n');
   const palettePng = path.join(out, 'palette.png');
   if (ds.palette.length) writePng(palettePng, 960, 96, paletteStrip(ds.palette));
 
@@ -816,14 +831,15 @@ async function watch() {
     '',
     ...footageLines(footage),
     '',
+    '## Read as',
+    '',
+    mode.line,
+    '',
     '## Overall',
     '',
     ...result.overall.lines,
     '',
-    '## Report card',
-    '',
-    ...card.lines,
-    '',
+    ...(card ? ['## Report card', '', ...card.lines, ''] : []),
     '## In words',
     '',
     ...words.lines,
