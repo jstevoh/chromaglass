@@ -480,7 +480,9 @@ turbulence and a self-regulating dye budget. Two things are worth knowing:
   hardware, steps down within a couple of seconds if frames are being dropped,
   and climbs one rung at a time when there is sustained room. Settings → Stage →
   Simulation → Fluid Grid pins a size instead, and shows the live grid and
-  frame rate. A browser without WebGPU gets a screen saying so.
+  frame rate. The finest `1024²` setting solves 4× as many cells as `512²` (~56 ms/step vs
+  ~13 ms on an Apple Silicon Mac, ~14 fps live) and is meant for offline song renders or still
+  setups rather than a 60 fps live show; phones omit `1024²` altogether. A browser without WebGPU gets a screen saying so.
 - **Advection.** MacCormack advection (a forward and a backward semi-Lagrangian
   pass, corrected and clamped), which is what lets a thin filament of dye
   survive more than a few steps instead of blurring away.

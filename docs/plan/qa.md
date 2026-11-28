@@ -60,7 +60,12 @@ area, each fix striking its own line here.
     phone's More "Drop" does nothing; pick-one rows carry `aria-pressed` (a switch's
     role) where a radio's `aria-checked` is meant.
   - **QA-33b-6** Simulation: the finest grid drops the plate from 62 to 14 fps on the
-    owner's laptop.
+    owner's laptop. **Shipped (this PR):**
+    - Measured with `node scripts/stages.mjs --seconds 15` on `classic` (`1.0x`):
+      - `512²` (default strong-GPU rung): `16.7 ms/frame`, `29.8 steps/s`, `12.95 ms` whole solver step (`16.66 ms` split across 20 stages), `3.14 ms` drawing. Top stages: `carry heat` `2.844 ms` (17.1%), `dye grid` `2.675 ms` (16.1%), `mix` `2.417 ms` (14.5%), `advect dye` `1.907 ms` (11.4%), `thin gap` `1.683 ms` (10.1%), `bodies` `1.443 ms` (8.7%), `dye disperse` `0.866 ms` (5.2%).
+      - `1024²` (finest grid): `73.3 ms/frame` (`14.4 steps/s`, ~14 fps; `bugbash` desk tab 7 saw `16 fps, was 60` on main), `55.71 ms` whole solver step (`65.10 ms` split), `9.82 ms` drawing. Top stages grow ~4× with cell count: `dye grid` `10.836 ms` (4.05×, 16.6%), `mix` `10.638 ms` (4.40×, 16.3%), `carry heat` `9.079 ms` (3.19×, 13.9%), `advect dye` `6.650 ms` (3.49×, 10.2%), `thin gap` `6.284 ms` (3.73×, 9.7%), `bodies` `5.414 ms` (3.75×, 8.3%), `dye disperse` `3.198 ms` (3.69×, 4.9%), `thin body` `2.772 ms` (4.54×, 4.3%).
+    - The pressure solve (`thin gap`, 9.7% of the step) already uses variable-coefficient multigrid (`hsCycle` down to 4×4, `MG_CYCLES = 2`) and a Ritz-fitted 2-step warm start (`hsWarmDot`/`hsWarmFit`/`hsWarmScale`). Because every full-grid physics pass scales ~4× from `512²` (`12.95 ms`) to `1024²` (`55.71 ms`, + `9.82 ms` drawing), `1024²` cannot be brought near 30 fps without changing what the physics computes.
+    - Updated `SimulationSection` (`src/components/settings/StageSections.tsx`) and `docs/guide.md` to state the `1024²` cost clearly (`4× cells, slow live`, ~56 ms/step vs ~13 ms, ~14 fps live; meant for offline song renders or still setups, with an inline warning when selected), and omitted `1024²` (and its Pro nudge) on phones (`phone || isPhoneApp()` wired from `App.tsx` via `SettingsPanel.tsx` / `props.ts`). Note: `scripts/tiers.mjs` requires `#settings-simulation option[value="1024"]` on desktop, so desktop keeps it Pro-gated while `scripts/bugbash.mjs` tab 7 still sweeps every `<option>` in `<select>`.
 - **QA-33d** The sweep's own mistakes in the 2026-11-26 run. Rides' Drain emptied the
   plate and every later control on its tab was judged against the drained plate (about
   fifty "flat 19%→97%" findings, one number); and a row of `aria-pressed` buttons with

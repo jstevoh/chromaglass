@@ -5,6 +5,7 @@ import { Info } from '../Info';
 import { MappingPanel, OutputPanel } from '../OutputPanel';
 import { SwitchPill, Toggle, LIT } from '../ui';
 import { readEngineStatus } from '../../lib/readout';
+import { isPhoneApp } from '../../lib/appLink';
 import { isProLicenseUnlocked } from '../../lib/platform';
 import { isFreeTierGated, isTierGatingEnforced } from '../../lib/tierGates';
 import { TierLockBanner } from '../TierLock';
@@ -221,8 +222,11 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
 export const SimulationSection = ({ c }: { c: SectionCtx }) => {
   const {
     settings, onUpdate, engineStatus, focusSection, live, showFrameSplit, keep, shown, CARD, GRID,
-    TITLE,
+    TITLE, phone,
   } = c;
+  const isPhone = phone || isPhoneApp();
+  const rawSim = settings.simResolution ?? 'auto';
+  const shownSim = isPhone && rawSim === 1024 ? 'auto' : rawSim;
   return (
     <>
 
@@ -262,10 +266,10 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
             </div>
           )}
           <select
-            value={String(settings.simResolution ?? 'auto')}
+            value={String(shownSim)}
             onChange={(e) => {
               const v = e.target.value;
-              if (v === '1024' && isTierGatingEnforced() && !isProLicenseUnlocked()) return;
+              if (v === '1024' && (isPhone || (isTierGatingEnforced() && !isProLicenseUnlocked()))) return;
               onUpdate({ simResolution: (v === 'auto' ? v : Number(v)) as SimResolution });
             }}
             className="bg-white/10 border border-white/20 rounded px-2 py-1 text-sm focus:outline-none focus:border-white/50"
@@ -276,15 +280,27 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
             <option value="384">GPU · 384²</option>
             <option value="512">GPU · 512²</option>
             <option value="768">GPU · 768² (heavy)</option>
-            <option value="1024" disabled={isTierGatingEnforced() && !isProLicenseUnlocked()}>GPU · 1024² (Pro · ultra)</option>
+            {/* 1024² has 4× the cells of 512² (~56 ms/step vs ~13 ms on an Apple Silicon Mac, ~14 fps live)
+                and cannot be held near 30 fps on mobile GPUs, so the phone omits it (QA-33b-6). */}
+            {!isPhone && (
+              <option value="1024" disabled={isTierGatingEnforced() && !isProLicenseUnlocked()}>GPU · 1024² (Pro · 4× cells, slow live)</option>
+            )}
           </select>
+          {!isPhone && rawSim === 1024 && (
+            <p className="text-[12px] leading-snug text-amber-300/90" data-testid="sim-1024-cost">
+              1024² solves 4× as many cells as 512² (~56 ms/step vs ~13 ms on an Apple Silicon Mac, ~14 fps live). Use Auto or 512² for 60 fps live shows; keep 1024² for offline song renders.
+            </p>
+          )}
           <Info>
             Finer grids let the physics form the filaments and cells itself instead of the closeup synthesising them.
             Auto measures the frame rate and picks the largest grid this machine holds at 60 fps
             {engineStatus?.governed && engineStatus.steppedDown ? ' — it has stepped down on this machine.' : '.'}
+            {isPhone
+              ? ' 1024² is omitted on phones because mobile GPUs cannot hold it live.'
+              : ' 1024² solves 4× as many cells as 512² (~56 ms/step vs ~13 ms on an Apple Silicon Mac, ~14 fps live) — meant for offline song renders or still setups rather than a 60 fps live show.'}
             {engineStatus && ` Running ${engineStatus.tier === 'hosted' ? 'from the web' : engineStatus.tier === 'native' ? 'natively' : 'locally'}; ${engineStatus.gpu === 'software' ? 'software GL' : `${engineStatus.gpu} GPU`}.`}
           </Info>
-          {((engineStatus?.governed && engineStatus.steppedDown) || engineStatus?.gpuUnavailable) && !isProLicenseUnlocked() && (
+          {!isPhone && ((engineStatus?.governed && engineStatus.steppedDown) || engineStatus?.gpuUnavailable) && !isProLicenseUnlocked() && (
             <TierLockBanner
               feature="grid-1024"
               className="mt-1"

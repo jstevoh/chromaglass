@@ -169,10 +169,12 @@ export interface SettingsPanelProps {
   onGoTo?: (id: string) => void;
   /** The video loaded and its Play and Pour, for the Video section (VideoShelf, PLAN 14ag). */
   video?: VideoShelfProps;
+  /** True on the phone layout (`usePhoneLayout`): hides options a phone cannot hold (1024² grid, QA-33b-6). */
+  phone?: boolean;
 }
 
 export type SectionCtx = Pick<SettingsPanelProps, 'settings' | 'onUpdate' | 'songDetection' | 'onSongDetection' | 'earView' | 'onRecalibrate' | 'engineStatus' | 'onSceneToggle' | 'onSceneDevice' | 'scenePreviewRef' | 'onFilmFile' | 'onFilmCamera' | 'onFilmCameraDevice' | 'onFilmWindow' | 'onFilmClear' | 'mixTakes' | 'backLook' | 'onMarkFile' | 'onMarkClear' | 'onAudioSource' | 'onAudioInput' | 'onBlackout' | 'onProjectorMode' | 'output' | 'onOutput' | 'onOutputReset' | 'wakeLock' | 'wallTest' | 'onWallTest' | 'tempo' | 'onTap' | 'readTempo' | 'readEar' | 'onTempoClear' | 'onTempoBpm' | 'onLink' | 'oscOut' | 'onOscOut' | 'onLinkTransport' | 'liquids' | 'pins' | 'midi' | 'onOpenMidi' | 'soundSources' | 'onFlickPlate' | 'video'>
-  & Required<Pick<SettingsPanelProps, 'sceneOn' | 'sceneState' | 'cameras' | 'sceneDeviceId' | 'filmSource' | 'filmName' | 'filmCameraId' | 'filmCamera' | 'filmCameraLost' | 'markLoaded' | 'audioSource' | 'audioInputs' | 'audioInputId' | 'blackout' | 'projectorMode' | 'projectorName' | 'spinBpm' | 'midiClocked' | 'timecode' | 'focusSection' | 'embed'>>
+  & Required<Pick<SettingsPanelProps, 'sceneOn' | 'sceneState' | 'cameras' | 'sceneDeviceId' | 'filmSource' | 'filmName' | 'filmCameraId' | 'filmCamera' | 'filmCameraLost' | 'markLoaded' | 'audioSource' | 'audioInputs' | 'audioInputId' | 'blackout' | 'projectorMode' | 'projectorName' | 'spinBpm' | 'midiClocked' | 'timecode' | 'focusSection' | 'embed' | 'phone'>>
   & {
     filmInputRef: React.RefObject<HTMLInputElement | null>;
     markInputRef: React.RefObject<HTMLInputElement | null>;

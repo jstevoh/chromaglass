@@ -5,6 +5,8 @@ import { plateAreas, areaFamily, areaDye } from '../lib/plateAreas';
 import { PRESET_CONTRACTS } from '../presetPlate';
 import { PALETTE } from '../constants';
 import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
+import { wantsPhoneLayout } from '../lib/phone';
+import { isPhoneApp } from '../lib/appLink';
 import { Sheet } from './ui';
 import { useScrollEdges } from './ui/ScrollCue';
 import type { EngineStatus } from '../lib/platform';
@@ -48,8 +50,31 @@ const SECTION_CARD = 'mb-5 scroll-mt-4 rounded-2xl border bg-white/[0.02] px-6 p
 const SECTION_GRID = 'md:grid md:grid-cols-2 md:gap-x-7 [&>*]:md:col-span-2 [&>[data-slider]]:md:col-span-1';
 const SECTION_TITLE = 'mb-5 flex items-center gap-2.5 text-[16px] font-semibold tracking-tight text-text [&>svg]:h-7 [&>svg]:w-7 [&>svg]:shrink-0 [&>svg]:rounded-lg [&>svg]:bg-accent-bg [&>svg]:p-1.5 [&>svg]:text-accent-text';
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, earView, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, onFilmFile, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, readTempo, readEar, spinBpm = 0, onTempoClear, onTempoBpm, onLink, oscOut, onOscOut, onLinkTransport, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, soundSources, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo, video,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, earView, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, onFilmFile, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, readTempo, readEar, spinBpm = 0, onTempoClear, onTempoBpm, onLink, oscOut, onOscOut, onLinkTransport, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, soundSources, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo, video, phone: phoneProp,
 }) => {
+  const [detectedPhone, setDetectedPhone] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return isPhoneApp() || wantsPhoneLayout({
+      query: window.location.search,
+      coarse: window.matchMedia?.('(pointer: coarse)').matches ?? false,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      path: window.location.pathname,
+    });
+  });
+  useEffect(() => {
+    if (phoneProp !== undefined || typeof window === 'undefined') return;
+    const update = () => setDetectedPhone(isPhoneApp() || wantsPhoneLayout({
+      query: window.location.search,
+      coarse: window.matchMedia?.('(pointer: coarse)').matches ?? false,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      path: window.location.pathname,
+    }));
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [phoneProp]);
+  const phone = phoneProp ?? detectedPhone;
   const filmInputRef = useRef<HTMLInputElement>(null);
   /*
     The look's areas of the dish, for the patch bay's area picker (PLAN 25h),
@@ -239,7 +264,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
     onProjectorMode, projectorName, output, onOutput, onOutputReset, wakeLock, wallTest,
     onWallTest, tempo, onTap, readTempo, readEar, spinBpm, onTempoClear, onTempoBpm, onLink, oscOut, onOscOut, onLinkTransport,
     midiClocked, timecode, focusSection, liquids, pins, midi, onOpenMidi, soundSources,
-    onFlickPlate, embed, video, filmInputRef, markInputRef, lookAreas, areaColours,
+    onFlickPlate, embed, video, phone, filmInputRef, markInputRef, lookAreas, areaColours,
     canCaptureWindow, live, showFrameSplit, blendModes, keep, shown, detectedFactory, goTo,
     listens, CARD, GRID, TITLE,
   };
