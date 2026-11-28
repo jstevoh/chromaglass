@@ -73,6 +73,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { fileURLToPath } from 'node:url';
 import { physicsAcc, physicsFrame, physicsSummary, physicsLines, physicsGaps, comparePhysics, techniqueLines } from './watchphysics.mjs';
 import { designFrame, designSummary, designLines, designGaps, compareDesign, paletteAcc, paletteStrip } from './watchdesign.mjs';
 import { readSelftest, dissolveClips } from './watchreadtest.mjs';
@@ -1595,8 +1596,10 @@ export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg, pickSource, ffmpegLocation
 // Run as a command only when this file is the one node was given: a harness
 // that imports it, or bundles it (gig.mjs goes through esbuild, where
 // import.meta.url is the bundle's own path), must not start a watch.
+// The file's own path, decoded (a URL's pathname keeps a space as %20, so in a
+// folder with a space the two never matched and the command did nothing).
 const main = !!process.argv[1] && path.basename(process.argv[1]) === 'watch.mjs'
-  && path.resolve(process.argv[1]) === new URL(import.meta.url).pathname;
+  && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (main) {
   (async () => {
     try {

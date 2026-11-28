@@ -676,6 +676,28 @@ order; the README is `docs/watch.md`, the plugin's layout `docs/watch-plugin-pla
   gets four "still overlays" masked (one the left quarter of the frame) and three 0.4 s
   "title spans" dropped, with no overlay or title on the sheets.
 
+- ~~**47p-6**~~ the release build (shipped, this PR). reelreader's public repository is a build
+  of this one, never edited by hand: `scripts/reelreaderpack.mjs --out DIR [--demo] [--zip]
+  [--test]` copies every watch module but the settings map (and every file they import, so
+  watchreadtest.mjs goes too), the tests that need only node and ffmpeg, the skill as
+  `skills/reelreader/` with its helper again as `agents/`, and `reelreader/release/` (README,
+  package.json, MIT licence, `.claude-plugin/` plugin + marketplace, the `/reelreader` command, CI
+  and a tag-driven release workflow that puts the skill zip on the GitHub release and the
+  package on npm). `npm run reelpack` (14 checks, each shown failing on a wrong build) holds that
+  every import resolves, npm packs no test, clip or demo, one version everywhere, no home
+  folder, address or model name, and the command runs through a bin link as npx runs it.
+- **47p-6b** publish: the public repository jstevoh/reelreader (the owner creates it empty and
+  adds it to the project; a cloud session cannot create one), the `NPM_TOKEN` secret there (the
+  owner's npm account), then push the build and the tag `v0.1.0`; deploy the omnibrains.org card
+  and its demo report from the Mac (source /mnt/project-files/omnibrains-site/, card added
+  2026-11-28).
+- **47p-6c** community lists: submissions drafted, posted only with the owner's OK.
+- **47p-6d** native Windows untried: watch.mjs's run-as-command test compares a URL's pathname
+  with a resolved path, which differs on a drive letter. macOS, Linux and WSL work.
+- **47p-6e** the copy ships without watchmodetest (it proves "Settings to try" goes with the
+  liquid read, which needs the app's settings map); a version of its other cases with no map
+  would cover the general-versus-liquid choice in the public CI too.
+
 Later, not now: photosensitivity (flash) screening, real units (mm/s), dance and pose, "what is
 in it". The reference library stays private and ships empty (watch-plugin-plan.md, point 3).
 
@@ -685,7 +707,7 @@ in it". The reference library stays private and ships empty (watch-plugin-plan.m
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q; 47d-1 shipped), 47a, 47e (its glitter half shipped; 47e-1, 47e-2), 47f, 47k; 47b-2 and 47b-3 after 47b-1; 47g,
-47h, 47i and 47n when wanted; the release next (47p-5 shipped; the handoff's step 6), 47p-5f with the owner's ratings, 47p-4b when the watch tool next watches real films, 47p-3b and 47p-3c when the watch tool is next touched; 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
+47h, 47i and 47n when wanted; the release build shipped (47p-6), publishing next (47p-6b, waiting on the owner's empty repository and npm token), 47p-6c with the owner's OK, 47p-5f with the owner's ratings, 47p-4b when the watch tool next watches real films, 47p-3b and 47p-3c when the watch tool is next touched; 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
 as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4 in that order (the owner asked
 for the drops' physics and their colour, 2026-11-12; ~~47z-5~~ shipped early, 2026-11-13, as Foam
 Cells), then 47z-7 after 47z-3, 47z-8 and 47z-6 after 28k-2 (a). Each its own thread

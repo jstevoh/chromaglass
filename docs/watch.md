@@ -64,7 +64,8 @@ node scripts/watch.mjs --notes [ratings.json]           # what the notes keep sa
 node scripts/watch.mjs --refs | --selftest
 ```
 
-In this repository `npm run watch -- …` runs the same thing.
+In this repository `npm run watch -- …` runs the same thing. The public copy (`npx reelreader …`, the Claude Code plugin, the
+skill zip) is built from here by `scripts/reelreaderpack.mjs` ([reelreader/README.md](../reelreader/README.md)).
 
 ## Liquid or general
 
