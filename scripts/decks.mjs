@@ -259,6 +259,8 @@ function softWhileMoving(frames) {
   */
   const wall = { ...DEFAULT_SETTINGS, layerCount: 2, twoProjectors: 1, lampGround: 1, backBlend: 'own', projDeck: 0, projCross: 0 };
   const one = { ...wall, twoProjectors: 0 };
+  // Each of the other three things a two-projector wall needs, missing: the look is laid whole there too (the skeptic's pass: the switch alone was the only control).
+  const halfBuilt = [{ ...wall, layerCount: 1 }, { ...wall, lampGround: 0 }, { ...wall, backBlend: 'add' }];
   let goOff = 0, songOff = 0, switchOnly = 0, oneMoved = 0, otherMoved = 0, photos = 0, photoBack = 0;
   const show = PRESETS.find(p => targetLook(wall, p.settings).renderStyle !== 'photo');
   for (const p of PRESETS) {
@@ -273,16 +275,18 @@ function softWhileMoving(frames) {
     if (!wallHasTwo({ ...full, twoProjectors: wall.twoProjectors, layerCount: wall.layerCount })) switchOnly++;
     const oneFull = targetLook(one, p.settings);
     if (keepWall(oneFull, one) !== oneFull) oneMoved++;
+    for (const h of halfBuilt) { const t = targetLook(h, p.settings); if (keepWall(t, h) !== t) oneMoved++; }
     // Nothing but the three held: the rest of the look, the render style among it, is the look's.
     for (const k of Object.keys(full)) if (!WALL_RIG.includes(k) && go[k] !== full[k]) otherMoved++;
   }
   const fades = readFileSync('src/app/useLookFades.ts', 'utf8');
   const send = fades.slice(fades.indexOf('const sendLook ='), fades.indexOf('const goLook ='));
   const wired = /const target = keepWall\(targetLook\(settingsRef\.current, next\.settings\), settingsRef\.current\);/.test(send)
-    && !/const target = targetLook\(/.test(send) && /const twoOnWall = wallHasTwo;/.test(fades);
+    && (send.match(/targetLook\(/g) ?? []).length === 1 && /lookPhase\(target\)/.test(send) && /fadeSettingsTo\(target, fade/.test(send)
+    && /const twoOnWall = wallHasTwo;/.test(fades);
   const notRoom = WALL_RIG.length === 3 && WALL_RIG.every(k => !RIG_KEYS.has(k));
   check('a plain Go and a song\'s look leave a two-projector wall as it is, every house look (a photograph\'s, which draws no lamp, gives both back at the next Go): the switch, the plates and the lamp ground held as one, nothing else, only while the wall has two, not as the room\'s, and the Go lays the held target (the controls: the switch alone leaves the wall one lamp under a dark-lamp look; a one-projector wall takes the look whole)',
-    PRESETS.length > 20 && goOff === 0 && songOff === 0 && switchOnly > 0 && oneMoved === 0 && otherMoved === 0 && notRoom && wired && photoBack === photos,
+    PRESETS.length > 20 && goOff === 0 && songOff === 0 && switchOnly > 0 && oneMoved === 0 && otherMoved === 0 && notRoom && wired && photos > 0 && photoBack === photos,
     `${PRESETS.length} looks: two off after a plain Go ${goOff}, after a song ${songOff}; the switch alone leaves one lamp in ${switchOnly}; a one-projector wall changed ${oneMoved}; other settings held ${otherMoved}; photo looks ${photos}, both back after ${photoBack}; not the room's ${notRoom}; the Go wired ${wired}`);
 }
 
