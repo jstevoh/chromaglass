@@ -265,7 +265,7 @@ sub-cell droplets. Ranked by what a person watching the wall would see against w
 
 | Rank | Item | On the wall | GPU cost | Build |
 |---|---|---|---|---|
-| 1 | 48s ouzo clouding (shipped #1007: the Ouzo bottle and the look Louche; check 48s-1, the retune 48s-6 and the middle 48s-7 shipped) | a clear pour blooms into opal clouds where it mixes | low: one carry and two per-cell passes, only with Ouzo on the plate | built and checked (`npm run ouzo`) |
+| 1 | 48s ouzo clouding (shipped #1007: the Ouzo bottle and the look Louche; check 48s-1, the retune 48s-6, the middle 48s-7 and its swells back 48s-8 shipped) | a clear pour blooms into opal clouds where it mixes | low: one carry and two per-cell passes, only with Ouzo on the plate | built and checked (`npm run ouzo`) |
 | 2 | 48t chemical gardens | a pour grows its own coloured walls, spirals and coral | medium: one reaction pass, a solid mask | Claude |
 | 3 | 48u shear-thinning gum | fingers turn from tulips into sharp cracks and lightning | low–medium: a viscosity per cell | Claude |
 | 4 | 48v electric field on the oil | a voltage pulls drops into needles that spray fine jets | medium: one potential solve, reuses the magnet's stress | Claude |
@@ -313,15 +313,19 @@ cells (18f-2, 48h); salt fingers (48l); Kelvin–Helmholtz (48o).
   was. Its dish is water, Ouzo and Alcohol by thirds; in the lab on its own settings a bloom
   reads 228 of 255 on a ground of 0, 208 after one drop of Alcohol and 0 after two. How it
   looks over a show is the owner's (docs/judging.md 150, step 6).
-- **48s-8. What took Louche's swells** (S–M). The first Louche filmed 4.9 swells a minute;
-  48s-6 and 48s-7 film 1.0, at Evolve 0.36 and 0.24 alike, and calm 10–11% against the
-  reference shows' 20–42%. So the rate is not it. Candidates, none measured: the first version's
-  wide dye pools were what a drop or a kick visibly moved (a swell is luma change standing above
-  its median, and a mostly dark dish changes little); the kick's press (platePressure 0.2 with a
-  0.3 cord) moving everything a little all the time, which raises the median; the white's own
-  slow drift. Film Louche with the kick cord off, and with the 48s-6 dish at Evolve 0.12, and
-  read swells and calm. Also open: why the late cloud gathers at the bottom of the frame (Plate
-  Rock's default 0.45 or the rim's carry; not measured), and 27f-9o.
+- **48s-9. Kick Bloom on the other dark looks** (S). The same bloom (eight dye drops a kick,
+  two a second) on any look whose dish is mostly dark lifts the plate's median motion over the
+  Press's passages, so its swells read under the 1.8 bar (48s-8 measured it on Louche only).
+  Film the dark looks (Night Sea, Foam Cells and any other under 30% dye) at their Kick Bloom
+  and at 0.3 and read swells, calm and near black before changing any. *Check:* the film's
+  swells a minute and calm, per look, before and after.
+- **48s-10. The kick's platePressure cord moves nothing a film can see** (S). Louche's
+  `kickHit → platePressure` (depth 0.3) pulled out changed neither swells (1 → 1 a minute) nor
+  the beat flicker (0.61 → 0.60): the press a film sees is the bass Press cord. Find what
+  platePressure still does on the GPU plate (it scales a squeeze that is only there under a
+  finger, passes.ts squeezeGain, and the CPU plate's clock) and either make the kick's press a
+  real squeeze of the gap or take the cord off the looks that carry it. *Check:* a lab or film
+  number that moves with the cord in and not with it out.
 - **48t. Chemical gardens in the gap** (M–L; builds on the Liesegang precipitate,
   `LIES_GRID`, and the pours). A metal salt pushed into silicate between two glasses grows a
   membrane of precipitate at the front, and the front's speed against its reaction sets the

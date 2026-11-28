@@ -3174,6 +3174,11 @@ crosses the solubility curve, the oil is conserved); how it looks in a show is t
    like paint, white gathering into thick opaque ribbons along an edge, the whole plate a
    grey veil inside a few minutes. Judged from the Mac's film (the thread's page), not by
    loading the app.
+7. Louche with music (PLAN 48s-8, Kick Bloom 0.3). Good: the plate breathes with the song,
+   a push and fold of the cloud through the passages where the kick hits hard, then a
+   quieter spell where little moves; each kick still drops a few small specks of colour.
+   Bad: a steady churn of bright specks on every beat with no rest between, or a dish that
+   has gone dark and empty. Judged from the before/after film on the thread's page.
 
 ## 151. Oil threads pinch into beads (PLAN 38w-27)
 

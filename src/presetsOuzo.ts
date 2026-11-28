@@ -89,11 +89,34 @@ import type { Preset } from './presets';
  *    quarter, so for each drop of Ouzo there are two thirds of a drop of the
  *    spirit that dissolves the droplets where it lands, not half of one.
  *
- * The music reaches it the way a hand would: the kick presses the top glass
- * (platePressure, as Night Sea's and Foam Cells' kick does), which pushes
- * the liquid out sideways and folds clear into cloudy, and the snare
- * tightens the swirls (vorticityConfinement), which draws the fronts out
- * into filaments where the cloud forms and clears along them.
+ * What did take them (PLAN 48s-8), found by filming seven variants of the
+ * look on the Mac (seed 1, 60 s each, `FILM_ONLY=louche npm run film`). The
+ * swells were never the dropper's. In every film, the first included, they
+ * sit at the same moments, 1, 16, 30, 45 and 57 s: the film track's
+ * kick-only passages, where the bass hits hard between silences. They are
+ * the music's Press (the palm on the glass every look carries on its
+ * Velocity reading, lib/musicCords.ts): with that route set to none they go
+ * to nought and the beat's flicker halves. Pulling the kick's own
+ * platePressure cord, halving Evolve or going back to the first dish
+ * changed nothing (1, 1 and 1 a minute). What had changed is what moves
+ * between them: every kick's bloom, a slug of eight dye drops. On the first
+ * version's wide pools a drop landed colour on colour and barely showed; on
+ * this dark dish each is a bright speck on black, two a second through
+ * every passage, and that lifted the median motion from 1.2 to 1.6 % a
+ * sample, so the Press's passages stood 1.5 to 1.7 times it where a swell
+ * needs 1.8. Kick Bloom is now 0.3: each kick still lets go its drops,
+ * smaller (the master scales what passes the gate, so no kick is lost),
+ * the median falls to 0.9 and the swells come back, 2 → 4 a minute (the
+ * reference shows' 1.6 to 3.7), calm 10% → 29%, the dish as lit as before
+ * (near black 60% → 63%). At 0 the swells come back too but the dish goes
+ * darker (70%): the blooms are some of the colour.
+ *
+ * The music reaches it the way a hand would: the bass presses the top glass
+ * (the Press above), which pushes the liquid out sideways and folds clear
+ * into cloudy; the kick leans on the same press (platePressure, as Night
+ * Sea's and Foam Cells' kick does); and the snare tightens the swirls
+ * (vorticityConfinement), which draws the fronts out into filaments where
+ * the cloud forms and clears along them.
  *
  * Every other number is a dark, slow plate, as Night Sea's is: no beads and
  * no bubbles (the owner, 2026-11-26: too many bubbles in the looks), a low
@@ -127,6 +150,7 @@ export const LOUCHE: Preset = {
     damping: 0.99,
     heatDecay: 0.995,
     automateRate: 0.24,
+    kickBloom: 0.3,            // each kick's bloom smaller, so the Press's passages stand above the plate's median (48s-8)
     platePressure: 0.2,
     glassSmear: 0,
     rainDrip: 0,
