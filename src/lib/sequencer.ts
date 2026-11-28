@@ -137,6 +137,10 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
   ['sideLight', 0.05],
   ['sideLightHue', 5],
   ['sideLightAngle', 5],
+  ['darkField', 0.05],
+  ['rheinberg', 0.05],
+  ['rheinbergInner', 5],
+  ['rheinbergOuter', 5],
   ['polariser', 0.05],
   ['analyserAngle', 5],
   ['quarterWave', 0.05],
@@ -168,7 +172,7 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
 
 /** The numeric fields a stage may glide; everything else switches at stage entry. */
 /** Dials that are a place round a circle, in degrees (PLAN 47b-1's side lamp): `lerpSettings` glides them the short way round. */
-const ROUND_THE_CIRCLE = new Set<keyof VisualizerSettings>(['sideLightHue', 'sideLightAngle']);
+const ROUND_THE_CIRCLE = new Set<keyof VisualizerSettings>(['sideLightHue', 'sideLightAngle', 'rheinbergInner', 'rheinbergOuter']);
 
 export function lerpSettings(
   from: Partial<VisualizerSettings>,

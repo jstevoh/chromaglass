@@ -1,4 +1,5 @@
 import { DISH_REST_GAP } from '../../lib/turntable';
+import { DARK_FIELD_WGSL } from './plateDarkField';
 import { BULB_FILL } from './lampField';
 import { MOIRE_WGSL } from './plateMoire';
 /**
@@ -352,13 +353,16 @@ fn camShadow(lapK: f32, relief: f32) -> f32 {
   (1 on a clear pour or oil drop, 0 at an air hole's false dye ramp). Kept the
   same at every Focus so the in-focus rim and the defocused shadowgraph separate.
 */
-fn oplPupilLoss(oplGrad: f32, dyeGrad: vec2f, normal0: vec3f, plateOn: bool, plateAmt: f32) -> f32 {
-  if (!plateOn || U.edgeRelief <= 0.005) { return 1.0; }
+fn oplTheta(oplGrad: f32, dyeGrad: vec2f, normal0: vec3f) -> f32 {
   let gRaw = length(dyeGrad);
   let gMod = length(normal0.xy) / (0.9 * max(normal0.z, 1e-4));
   let grad = abs(oplGrad) * select(1.0, gMod / gRaw, gRaw > 1e-4);
-  if (grad <= 1e-5) { return 1.0; }
-  let theta = grad * ${DISH_REST_GAP} * U.logicalGrid;
+  return grad * ${DISH_REST_GAP} * U.logicalGrid;
+}
+fn oplPupilLoss(oplGrad: f32, dyeGrad: vec2f, normal0: vec3f, plateOn: bool, plateAmt: f32) -> f32 {
+  if (!plateOn || U.edgeRelief <= 0.005) { return 1.0; }
+  let theta = oplTheta(oplGrad, dyeGrad, normal0);
+  if (theta <= 1e-5 * ${DISH_REST_GAP} * U.logicalGrid) { return 1.0; }
   let u = clamp(theta / (2.0 * DROP_NA), 0.0, 1.0);
   return 1.0 - clamp(smoothstep(0.0, 1.0, u) * U.edgeRelief * plateAmt, 0.0, 0.85);
 }
@@ -382,4 +386,5 @@ fn meniscus(color: vec3f, n: vec3f, a: f32, isCamera: bool) -> vec3f {
   let keep = edgePass(dyeBend(n), select(0.0, 1.0, isCamera));
   return color * mix(1.0, keep, U.edgeRelief * smoothstep(0.02, 0.2, a));
 }
+${DARK_FIELD_WGSL}
 `;

@@ -177,6 +177,51 @@ caustic at z = 1/(k²·A) within 5 %, the light is conserved over a period withi
 
 ## 47b. Dark-field and Rheinberg lighting for the closeup (S–M)
 
+**Shipped on the projected plate, 2026-11-28** (this PR), after the owner's three macro films
+of soap foam, a dyed bubble and his rig (Cosmodernism's, kept in
+`/mnt/project-files/bubbles-foam-2026-11-28/`; "our bubbles still suck", "his colours are also
+awesome"). Dark Field moves the lamp from the bulb to a ring RING_IN..RING_OUT aperture radii
+across, outside the pupil; the share of it the aperture catches at each point's bend
+(`oplTheta`, the bright field's own |grad OPL|) is two circles' overlap taken twice; Ring
+Colour, Inner Hue and Outer Hue are Rheinberg's two gels; a bubble's meniscus is bent by
+`airBend` of its tilt and lost past the critical angle (`gpu/wgsl/plateDarkField.ts`,
+`lib/darkField.ts`). Foam Cells' middles go black and its films glow as double lines; a bubble
+wears a pink ring inside a blue one (`npm run darkfield` 13/13). Named shortcut: DARK_EXPOSURE,
+the eye or camera opening up for the dark ground. Findings page with the films, our looks
+before and after and the ranked plan: https://claude.ai/artifact/5KJtgj7oHJV7rDwfaCWADJ. What
+stays open:
+
+- **47b-4. A ring split by azimuth.** Half pink and half blue by direction needs the bend's
+  direction, not only its size (the derive pass's near.xy carries the dye's slope, not the
+  optical path's). *Measure:* a bubble's ring pink on one side and blue on the other, turning
+  with the Ring Angle.
+- **47b-5. The closeup's dark field.** The camera's view (the closeup, a photographed look)
+  draws its edges with `edgePass(bend, 1)` against the light box and its bubble with
+  `airWallSeen`; neither reads Dark Field yet, so zooming in crosses back to bright field where
+  `dropCam` takes over. The owner's third film is the rig itself: a small lit dish under a
+  macro lens, which is the closeup. *Measure:* the same lines as `npm run darkfield` at
+  Macro Zoom 3.
+- **47b-6. A Foam Light look.** Clear soap water and air cells, laid packed like Foam Cells,
+  under Dark Field 1 and Ring Colour 0.7 (pink 330, blue 205), so the macro films' picture is
+  one tap. Needs its own lay (Foam Cells' cells are dyed oil) and the looks' checks.
+- **47b-7. Thick, glassy Plateau borders.** The films' borders are wet channels about a tenth
+  of a cell wide, curved across their whole width, so the whole border is a lens; ours are films
+  four grid cells thick with tanh edges, so they glow as two thin lines. Builds on 47z-8 and
+  28k-2 (a), a film carried as its own field, which also gives 20 to 30 cells across the frame
+  where Foam Cells has 7 to 9. *Measure:* the lit width of a border under Dark Field at least
+  a third of its bright-field width, and the cells per frame.
+- **47b-8. Satellite bubbles.** 20 to 40 specks a frame in the foam film, 0.5 to 2% of the
+  width, most on the borders and at the corners; under Dark Field each a small ring. Needs air
+  specks smaller than the list's discs (47z-4's lenses, 28k-3's specks).
+- **47b-10. The outline's black line, held.** Past the critical angle (n sin = 1) the
+  bubble's wall turns the light back into the water, so a thin black line stays at the
+  outline under the ring. `npm run darkfield` does not hold it: at 480 px the band is under a
+  pixel, and a shader that lit it passed (the check-skeptic, 2026-11-28). *Measure:* at a zoom
+  where the band is several pixels wide, the outline's brightest pixel under 0.6 of the ring's.
+- **47b-9. Dark Field in the lean display.** Its two tests (`U.darkField`) are not in
+  `displayLean.ts`'s list, so the opening look compiles them though it cannot reach them;
+  about the size of the side lamp's. *Measure:* `npm run leandisplay` finds both.
+
 *Seen:* a black ground on which only edges, fronts, pores and threads glow. *Physics:*
 dark-field illumination: the lamp lies outside the lens's acceptance cone, so undeviated
 light misses the lens and only light bent by a gradient of refractive index or scattered by

@@ -28,6 +28,7 @@ import { bankHasTwo, projectorGains } from '../lib/projectorBank';
 import { focusBoxPx } from '../lib/projectorFocus';
 import { SOAP } from '../lib/filmTable';
 import { SIDE_RADIANCE, sideLampColour, sideLampPlace } from '../lib/glint';
+import { ringGel, RING_INNER_HUE, RING_OUTER_HUE } from '../lib/darkField';
 import { BIREF_NM_PER_STRAIN } from '../lib/polar';
 import { FARADAY_GAIN_MAX } from '../lib/faraday';
 
@@ -296,6 +297,14 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('sideLight', side * SIDE_RADIANCE);
   pack.set('sideColor', ...sideLampColour(Number.isFinite(s.sideLightHue) ? s.sideLightHue : 30));
   pack.set('sideLamp', ...sideLampPlace(Number.isFinite(s.sideLightAngle) ? s.sideLightAngle : 160));
+  /*
+    Dark field and Rheinberg's ring (PLAN 47b; wgsl/plateDarkField.ts). At
+    Dark Field 0 the display takes no branch and is bright field, as before.
+  */
+  pack.set('darkField', Number.isFinite(s.darkField) ? clamp01(s.darkField) : 0);
+  const gel = Number.isFinite(s.rheinberg) ? clamp01(s.rheinberg) : 0;
+  pack.set('ringInner', ...ringGel(Number.isFinite(s.rheinbergInner) ? s.rheinbergInner : RING_INNER_HUE, gel));
+  pack.set('ringOuter', ...ringGel(Number.isFinite(s.rheinbergOuter) ? s.rheinbergOuter : RING_OUTER_HUE, gel));
   /*
     Polarised light (PLAN 31p-1; lib/polar.ts). 0, and so out of the beam,
     for every look saved before it. The analyser's angle is taken mod 180:

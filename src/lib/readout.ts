@@ -106,6 +106,8 @@ const UNITS: Record<string, (v: number) => string> = {
   lensStop:   v => `f/${v.toFixed(1)}`,
   sideLightHue: v => `${Math.round(v)}°`,
   sideLightAngle: v => `${Math.round(v)}°`,
+  rheinbergInner: v => `${Math.round(v)}°`,
+  rheinbergOuter: v => `${Math.round(v)}°`,
   analyserAngle: v => `${Math.round(v)}°`,
   tankFeed:   v => `${v.toFixed(1)} cm/s`,
   tankWeight: v => `${v.toFixed(2)}%`,

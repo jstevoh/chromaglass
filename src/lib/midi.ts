@@ -690,6 +690,10 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // Polarised light (PLAN 31p-1): the sheets in or out, the analyser's turn (a knob swept
   // from crossed to parallel swings every colour to its complement), and how hard the
   // liquid's stretch turns the light.
+  { key: 'darkField',       label: 'Dark Field',       min: 0, max: 1 },
+  { key: 'rheinberg',       label: 'Ring Colour',      min: 0, max: 1 },
+  { key: 'rheinbergInner',  label: 'Inner Hue',        min: 0, max: 360 },
+  { key: 'rheinbergOuter',  label: 'Outer Hue',        min: 0, max: 360 },
   { key: 'polariser',       label: 'Polarisers',       min: 0, max: 1 },
   { key: 'analyserAngle',   label: 'Analyser',         min: 0, max: 180 },
   { key: 'quarterWave',     label: 'Quarter Wave',     min: 0, max: 1 },

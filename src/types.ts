@@ -1095,6 +1095,10 @@ export interface VisualizerSettings {
   sideLight: number;          // a coloured lamp low beside the dish, 0 (off) to 1: glints on the glitter, the dye's pigment and the walls facing it (47b-side)
   sideLightHue: number;       // the side lamp's colour as a hue, degrees (30 amber, 0 red, 320 magenta)
   sideLightAngle: number;     // where round the dish the side lamp stands, degrees from the right, counter-clockwise
+  darkField: number;          // the lamp moved from the bulb to a ring outside the lens's pupil, 0 (bright field) to 1: level liquid goes black and only bent light (rims, borders, fronts) reaches the wall (47b)
+  rheinberg: number;          // coloured gels in the dark-field ring, 0 (white: plain dark field) to 1 (deep gels): Rheinberg's light, the bend picks the colour
+  rheinbergInner: number;     // the ring's inner gel as a hue, degrees: the colour a gentle bend turns in (330 pink)
+  rheinbergOuter: number;     // the ring's outer gel as a hue, degrees: the colour only a steep bend reaches (205 blue)
   polariser: number;          // polarising sheets under the plate and at the projector's head, 0 (out) to 1 (in): the stretched liquid shows Michel-Levy colours (PLAN 31p-1)
   analyserAngle: number;      // the analyser's turn against the polariser, degrees: 90 crossed (dark field), 0 parallel (white field, complementary colours)
   quarterWave: number;        // quarter-wave plates with the sheets, 0 (plane: dark pinwheel arms where the stretch lines up with a sheet) to 1 (circular: colour bands only)
@@ -1425,6 +1429,10 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   sideLight: 0,
   sideLightHue: 30,
   sideLightAngle: 160,
+  darkField: 0,
+  rheinberg: 0,
+  rheinbergInner: 330,
+  rheinbergOuter: 205,
   polariser: 0,             // no sheets in the beam: every look as it was, to the bit (the shader's branch)
   analyserAngle: 90,        // crossed, the classic: dark until the liquid moves
   quarterWave: 1,           // circular: the bands with no black lines through them (the owner dislikes thick black outlines)
