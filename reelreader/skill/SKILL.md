@@ -72,6 +72,9 @@ reelreader clip.mp4 --out <dir> --liquid                # or --general: choose t
 reelreader ours.mp4 --out <dir> --vs <reference dir or kept name>   # gaps, biggest first
 reelreader --before A.mp4 --after B.mp4 --out <dir>     # what changed: diff.md, pairs.png
 reelreader clip.mp4 --out <dir> --keep <name> --note "why"   # into your reference library
+reelreader --batch <folder | playlist | list.txt> --out <dir>   # one ranked table, rate.html
+reelreader --refit ratings.json                         # fit the card to the person's ratings
+reelreader --notes ratings.json                         # what their notes keep saying
 reelreader --refs                                       # the library
 reelreader --selftest                                   # synthetic clips with known answers
 ```
@@ -130,8 +133,10 @@ moment and longest rest fall); the look in one line; one or two things worth cha
 **Editor.** The cut list and cuts a minute; each shot's length and the spread of lengths;
 dissolves and how long each runs; where the pace rises and rests (the swells and rests in
 Overall, hedged as one take's); whether cuts land on motion peaks or loudness (motion vs
-loudness in the header); what each cut joins (the content read). A batch run adds a shot list
-with each shot's length, palette and whether it cut on a beat.
+loudness in the header); what each cut joins (the content read). The shot list (summary,
+report, shots.csv) gives each cut to the frame, each shot's length and palette, and how many
+cuts landed on a beat against what chance gives: quote both, since 3 of 10 on a beat at 120
+bpm is chance (28%), not cutting to the music. A batch run puts every clip's in one table.
 
 **Colourist.** The palette and each colour's share; colourfulness on the Hasler–Süsstrunk
 scale; the two strongest hues' angle (analogous, complementary) and the warm share; luminance

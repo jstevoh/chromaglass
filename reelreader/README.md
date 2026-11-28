@@ -12,7 +12,8 @@ and is copied into the release as it stands:
     tool's tests read it here (`npm run watchwords`, `npm run watchmode`).
   - `agents/video-watcher.md`: the helper that watches long or several videos in its own
     context.
-  - `example.md`: one worked account; `evals.md`: building an eval set from your own ratings.
+  - `example.md`: one worked account; `evals.md`: building an eval set from your own ratings
+    (a batch run's rating page, ratings.json, the agreement, the notes' themes and the refit).
   - `testset/`: four short clips with known answers (`README.md` is the key, `answers.json`
     its measured half), plus a linked real show that is not shipped.
 

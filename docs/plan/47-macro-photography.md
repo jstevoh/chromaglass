@@ -477,7 +477,7 @@ an unsteady measure says "may vary from take to take", and every word names its 
   second across phases of one drift, so a ratio between two takes of a picture that only slides
   can still reach most of a step (0.87 at worst of eight). Take the floor out of it as carried
   does (47v-5), or let the words compare a show measure under its floor as held.
-- **47x-15** refit the card's bands from the owner's ratings once there are enough.
+- **47x-15** refit the card's bands from the owner's ratings once there are enough. The refit itself shipped in 47p-5 (`npm run watch -- --refit`, scripts/watchfit.mjs); what is left is the owner's ratings in, 47p-5f.
 - **47x-16** calibrate `REAL_SHOW_CARDS` (`scripts/watchcard.mjs`) with more real optical liquid-show
   references so leave-one-out scoring (`(f2)` in `npm run watchcard`) passes `>= 6` on at least
   five canons per row; today three rows leave each film outside one or two peers' bands.
@@ -648,9 +648,20 @@ order; the README is `docs/watch.md`, the plugin's layout `docs/watch-plugin-pla
   Watch three or four of the library's films (a real show, an edited film, an app take) and
   look at whether `best.mp4` is the moment a person would pick; a liquid take may want the
   swell's peak (shape()'s swells) weighted over colour.
-- **47p-5** a shot list and batch runs: cut and dissolve times, each shot's length, the average
-  shot length, a palette per shot and the share of cuts on a beat (CSV and in the summary);
-  `--batch <folder|playlist>` with a table across the videos.
+- **47p-5f** the owner's own ratings (the phone rating page, its shared store) into a refit: export
+  its rows as ratings.json and give each film a read the refit can find (watch each of the 21
+  films with `--keep` under the page's key, or add `read` from a batch run), then
+  `npm run watch -- --refit` (47x-15 and 7d, which can now run on the tool's own refit).
+- **47p-5g** a shot's palette is its share of the 64 colour bins the cut test keeps (4 levels a
+  channel): it tells shots apart and says which is warmer, but two greens a colourist would call
+  different read as one. The design read's palette per shot would be finer, at a pass's cost.
+- **47p-5h** the beat comes only from music with a steady pulse: ambient music, rubato or a live
+  band's drift reads "no steady beat" (the tracker needs eight onsets of 3 dB and a period that
+  correlates), so the on-beat share is silent on most of the demo music. A beat from the motion's
+  own swells, against the sound's, would read those.
+- **47p-5i** the notes' themes read English words from a fixed list of fault names (froze,
+  drained, flicker, …): another language, or a fault no word on the list names, comes up only as a
+  plain repeated word. Claude reads the notes themselves as well (the skill's evals.md says so).
 - **47p-5c** a freeze is filed as a title card: on the test set's frozen take the Footage read
   drops 0:04.8 to 0:10.2 as a "title span", so the motion reads never meet it, Overall says
   "holds one steady pace from start to end", and the summary never prints what `freezes()`
@@ -674,7 +685,7 @@ in it". The reference library stays private and ships empty (watch-plugin-plan.m
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q; 47d-1 shipped), 47a, 47e (its glitter half shipped; 47e-1, 47e-2), 47f, 47k; 47b-2 and 47b-3 after 47b-1; 47g,
-47h, 47i and 47n when wanted; 47p-5 next (the owner's pick, 2026-11-28; 47p-4 shipped), 47p-4b when the watch tool next watches real films, 47p-3b and 47p-3c when the watch tool is next touched; 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
+47h, 47i and 47n when wanted; the release next (47p-5 shipped; the handoff's step 6), 47p-5f with the owner's ratings, 47p-4b when the watch tool next watches real films, 47p-3b and 47p-3c when the watch tool is next touched; 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
 as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4 in that order (the owner asked
 for the drops' physics and their colour, 2026-11-12; ~~47z-5~~ shipped early, 2026-11-13, as Foam
 Cells), then 47z-7 after 47z-3, 47z-8 and 47z-6 after 28k-2 (a). Each its own thread

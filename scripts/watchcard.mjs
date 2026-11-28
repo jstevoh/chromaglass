@@ -312,14 +312,37 @@ export function loadRatings({ env = process.env, libDirs = null } = {}) {
   for (const dir of dirs) {
     const f = path.join(dir, 'ratings.json');
     if (fs.existsSync(f)) {
-      try {
-        return { ratings: JSON.parse(fs.readFileSync(f, 'utf8')), libDirs: dirs };
-      } catch {
-        return { ratings: null, libDirs: dirs };
-      }
+      let ratings = null;
+      try { ratings = JSON.parse(fs.readFileSync(f, 'utf8')); } catch { /* unreadable: no ratings */ }
+      return { ratings, libDirs: dirs, ...loadFit(dir) };
     }
   }
   return { ratings: null, libDirs: dirs };
+}
+
+/**
+ * The card fitted to the user's own ratings, `card-fit.json` beside
+ * ratings.json (written by `--refit`, scripts/watchfit.mjs, PLAN 47p-5 and
+ * 47x-15). Its rows replace REAL_SHOW_CARDS as the bands only when the fit
+ * predicted clips it was not fitted on (`used`, set by the refit from its
+ * leave-one-out agreement): a fit that only agrees with its own clips would
+ * swap a calibration on real shows for one on nothing. Returns `cal` and
+ * `fitNote` (the card's first line) when it is used, nothing otherwise.
+ */
+export function loadFit(dir) {
+  const f = path.join(dir, 'card-fit.json');
+  if (!fs.existsSync(f)) return {};
+  try {
+    const fit = JSON.parse(fs.readFileSync(f, 'utf8'));
+    if (!fit?.used || !Array.isArray(fit.cal) || fit.cal.length < 2) return {};
+    const loo = fit.agreement?.leaveOneOut;
+    return { cal: fit.cal, fitNote: `Bands fitted to your ratings (${fit.liked?.length ?? fit.cal.length} clips you rated highest of ${fit.n}; on clips left out of the fit it agrees rho ${loo?.rho?.toFixed(2) ?? '–'}), not to the real shows. The agreement below is with the same ratings, so it flatters the fit.` };
+  } catch { return {}; }
+}
+
+/** The read a rated clip is graded from: its kept design.json, a real show's row, or the entry's own `read`. */
+export function ratedRead(filmKey, ratings, dirs) {
+  return resolveFilmRead(filmKey, ratings, dirs);
 }
 
 function resolveFilmRead(filmKey, ratings, dirs) {
@@ -344,7 +367,7 @@ function resolveFilmRead(filmKey, ratings, dirs) {
  * Grade a watched film (or `design.json` / `REAL_SHOW_CARDS` row) across the
  * seven canons calibrated against `REAL_SHOW_CARDS`.
  */
-export function reportCard(read, { cal = REAL_SHOW_CARDS, ratings = null, libDirs = null } = {}) {
+export function reportCard(read, { cal = REAL_SHOW_CARDS, ratings = null, libDirs = null, fitNote = null } = {}) {
   const m = cardMetrics(read);
 
   // 1. Unity (Monroe Beardsley)
@@ -504,9 +527,22 @@ export function reportCard(read, { cal = REAL_SHOW_CARDS, ratings = null, libDir
         agreementParts.push(`${canon.name} rho ${rho.toFixed(2)} (n=${toolScores.length})`);
       }
     }
+    // Overall: the mean of a clip's graded canons against its overall mark
+    // (47p-5). Most raters give one mark a clip and leave the canons blank,
+    // and with only the canons read their ratings never met the card.
+    const tool = [], own = [];
+    for (const [filmKey, subCard] of cachedCards) {
+      const o = ratings[filmKey]?.overall, g = subCard.canons.filter(c => c.score != null);
+      if (typeof o === 'number' && Number.isFinite(o) && g.length) { tool.push(g.reduce((a, c) => a + c.score, 0) / g.length); own.push(o); }
+    }
+    if (tool.length >= 3) {
+      const rho = spearman(tool, own);
+      agreement.Overall = { rho, n: tool.length };
+      agreementParts.push(`Overall rho ${rho.toFixed(2)} (n=${tool.length})`);
+    }
   }
 
-  const lines = formatCardLines({ canons, verdict, agreementParts });
+  const lines = [...(fitNote ? [fitNote, ''] : []), ...formatCardLines({ canons, verdict, agreementParts })];
   return { canons, verdict, agreement, lines };
 }
 

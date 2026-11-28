@@ -216,7 +216,8 @@ check('(f) the clip is beside the page and inside it', sources.some(t => t.inclu
   check('(f) a clip over 8 MB is beside the page, not inside it', bestHtml.includes('src="best.mp4"') && !bestHtml.includes('data:video'));
 }
 const ids = [...html.matchAll(/<section id="([^"]+)"/g)].map(m => m[1]);
-check('(f) its sections, in reading order', ids.join(',') === 'best,timeline,read,words,numbers,sheets,detail', ids.join(','));
+// The shot list (47p-5) is piece 5's section, placed after the timeline by writeReport's `extra`.
+check('(f) its sections, in reading order', ids.join(',') === 'best,timeline,shots,read,words,numbers,sheets,detail', ids.join(','));
 const sheetFigs = (html.split('<section id="sheets">')[1] ?? '').split('</section>')[0].match(/<figure><img src="data:image\//g)?.length ?? 0;
 check('(f) one figure per contact sheet', sheetFigs === r.sheets.length && r.sheets.length > 0, `${sheetFigs} of ${r.sheets.length}`);
 // Every line of the words, as text, inside the words section.
