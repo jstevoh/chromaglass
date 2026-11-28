@@ -48,7 +48,7 @@
  * the window's gradient across twelve cells would turn it into a jet round
  * the rim several times the stir in the middle (worked out on paper, ψ over
  * the window's width, and not tried), a ring the dish does not have. Φ by
- * the relaxation has none (\`npm run rimstir\` 3), and costs the source here and
+ * the relaxation has none (`npm run rimstir` 3), and costs the source here and
  * hsLiftRelax's sweeps on buffers of its own, as the seal's does.
  *
  * Φ is relaxed LIFT_SWEEPS red-black sweeps a step from where the last step
