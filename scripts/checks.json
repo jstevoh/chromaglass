@@ -609,6 +609,57 @@
       ]
     },
     {
+      "name": "The watch tool's shot list: cuts to the frame, and cuts on a beat",
+      "shard": "sound",
+      "run": "npm run watchshots",
+      "why": [
+        "Packaged for anyone (reelreader, PLAN 47p-5), a run lists its shots: each cut",
+        "to the frame, each shot's length and palette, and how many cuts land on a beat",
+        "of the music, beside what chance would give (scripts/watchshots.mjs). This",
+        "holds the beat tracker to click tracks (128 bpm for a minute without drifting,",
+        "90 bpm not doubled, a steady tone and noise with no beat), and end to end a",
+        "24 s film made here at 30 fps with seven cuts, five on a 120 bpm click and",
+        "two off it: each cut within a frame, 5 of 7 on a beat, eight shots of the",
+        "made lengths, a red shot's palette red and a blue one's blue, no beat without",
+        "sound, and a dissolve kept out of the count. In the sound shard for its",
+        "ffmpeg. About half a minute."
+      ]
+    },
+    {
+      "name": "The watch tool's batch runs, rating page, refit and notes",
+      "shard": "sound",
+      "run": "npm run watchbatch",
+      "why": [
+        "reelreader watches a folder or a playlist as one ranked table and writes a",
+        "page a person rates the clips on, so anyone can build an eval set of their",
+        "own (the owner, 2026-11-27; PLAN 47p-5). This holds a batch of clips made",
+        "here (one broken: its row says why and the batch goes on), the ranking by",
+        "the measure its heading names, the rating page driven in Chromium at a",
+        "phone's width (a mark, a note, a moment pinned on the timeline, keep aside,",
+        "all kept across a reload and saved as ratings.json with each clip's read;",
+        "Load merges), the refit (bands from the clips rated highest, used only when",
+        "clips left out of it agree; shuffled marks are not used; kept-aside clips",
+        "never fitted on), and the notes' themes (froze, stuck, frozen as one",
+        "candidate fault check). In the sound shard for its ffmpeg and Chromium.",
+        "About half a minute."
+      ]
+    },
+    {
+      "name": "The watch tool's rating page works in a browser, on a phone's width",
+      "shard": "browser",
+      "run": "npm run ratepage",
+      "why": [
+        "The page a batch run writes is how a person builds an eval set of their own",
+        "(the owner, 2026-11-27; PLAN 47p-5, scripts/watchrate.mjs), opened from the",
+        "disk with nothing behind it, so its script is held where it runs: Chromium at",
+        "390 px with no sideways scroll; a mark, a note typed just before a tap",
+        "elsewhere, a moment pinned on the timeline, a canon mark and keep aside kept",
+        "across a reload; Save writes ratings.json with exactly them, the moment on the",
+        "source's clock and each clip's read; a mark tapped twice clears; Load merges",
+        "a file in and keeps clips the page does not show. A few seconds."
+      ]
+    },
+    {
       "name": "The public judging skill is whole and its test set's answers hold",
       "shard": "sound",
       "run": "npm run reelset",

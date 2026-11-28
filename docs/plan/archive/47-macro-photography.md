@@ -197,3 +197,9 @@ blur.
   the folder whole, free of this project's names, and the key's measured half true.
   ChromaGlass's layer stays on top in `.claude/skills/watch/` (our faults, the Mac route, the
   settings map, the real shows). The agreement line now says "your ratings", not the owner's.
+- ~~**47p-5**~~ a shot list and batch runs: cut and dissolve times, each shot's length, the average
+  shot length, a palette per shot and the share of cuts on a beat (CSV and in the summary);
+  `--batch <folder|playlist>` with a table across the videos. Shipped (this PR), with the rating
+  page, the refit and the notes' themes (handoff "Ratings for everyone"): `scripts/watchshots.mjs`,
+  `watchbatch.mjs`, `watchrate.mjs`, `watchfit.mjs`, `watchnotes.mjs`; checks `npm run watchshots`,
+  `npm run watchbatch`, `npm run ratepage`.
