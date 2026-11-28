@@ -185,6 +185,46 @@ export const OIL_TENSION = 4e-4;
 */
 export const OIL_CELLS = 0.5;
 /*
+  The most a wide body's capillary force may move the liquid in a step on
+  the open thin gap, in cells (PLAN 38e-2, 47z-2; `npm run droplaw`): six
+  times OIL_CELLS. A thread keeps OIL_CELLS and THREAD_PULL's slowing
+  (wgsl/fluid/capillary.ts), the sealed bottle keeps SEALED_CELLS (27f-9q's
+  haze), the old plate OIL_CELLS.
+
+  What was measured (the lab at 512², the Mac's grid; a slightly oval drop
+  at rest, its oval part's decay against Darcy's λ = (2m/(1+m))·3Mσ/R³, m
+  the oil's mobility over the water's). The force sits in an edge two or
+  three cells wide, so its size there is about σ/(R·w), and half a cell a
+  step bound it on every drop under about forty-five cells' radius: past
+  the cap it keeps only its sign and a drop's rounding loses the 1/R³ that
+  sets it. R 10 cells rounded at 0.02 of the law, R 20 at 0.03, R 40 at
+  0.18; a sheared drop of any size, R 8 too, stretched on with nothing to
+  hold its shape (47z-2). The cap is half a cell whatever the grid, so on
+  192² and 256² it bit only under five to eleven cells, which is why the
+  checks there never saw it.
+
+  Why not none. With no cap at all every size rounds within the law's
+  range (0.95 at R 10, 0.76 at an R 40 alone) and the oil is kept to the
+  cell, but the edge reads half again as wide (cells between 0.1 and 0.45
+  oil, 890 against the cap's 590, from the first steps) and a faint halo
+  under 0.1 grows three times as fast: the spurious currents every
+  continuum-surface-force solver has, from the part of σκ∇c the pressure
+  does not take back exactly, and which grow with the force the cap had
+  clipped. Six caps (three cells a step) keeps the law from R 10 up (0.92,
+  0.92, 0.81 at R 10, 14, 20 in a crowd's spacing; 0.76 and 0.81 for R 40
+  and R 28 alone) with the edge at 710 and the halo at 740 after two
+  seconds (the cap's 480, none's 1,145); four caps cost R 10 (0.25) for
+  650, twelve gained nothing on six. A shortcut, named in PLAN 38e-2b:
+  the force taken at the pressure solve's own faces (balanced-force,
+  Francois 2006) leaves no spurious current to clip, and then this goes.
+  Fixed in cells as OIL_CELLS is, so on a finer grid than 512² it binds on
+  larger drops again (on 1024², under about twenty cells).
+  Only a body several gaps wide every way takes it (WIDE_ACROSS
+  in src/gpu/wgsl/fluid/capillary.ts): a thread's beads at six caps beside
+  a neck slowed by THREAD_PULL broke at 8.18 widths a bead, not 4.7.
+*/
+export const OIL_WIDE_CELLS = 3;
+/*
   The oil's tension in a sealed bottle (a standing plate, PLAN 27f-9q), as a
   multiple of the thin gap's own (oilTensionOf), and the most it may move
   the liquid in a step.
@@ -1085,9 +1125,9 @@ export const LIQUID_DENSITY = 1000;
   the looks did and the silicone at 0.037 55% faster, each now its own.
   The dial is unchanged in range and is the share of the oil's own tension.
 
-  The cap (OIL_CELLS, SEALED_CELLS) stays: lifting it is 38e's second half,
-  which needs the lab (Film Hold's crowd, the breath on a drop, the sealed
-  lamp's haze, PLAN 27f-9q) and is not done here.
+  The cap was 38e's second half (PLAN 38e-2): a wide body on the open thin
+  gap is held at OIL_WIDE_CELLS, six caps, which says why not none; the
+  sealed bottle keeps SEALED_CELLS for its haze (27f-9q).
 */
 export function oilMobility(sigma: number): number {
   return (REST_GAP_METRES ** 2 * sigma) / (12 * LIQUID_DENSITY * NU_REF) / PLATE_METRES ** 3;
