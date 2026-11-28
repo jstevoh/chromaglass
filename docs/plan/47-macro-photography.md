@@ -461,7 +461,7 @@ a curling head need).
 
 The owner asked (2026-11-22) for the watch tool to say what it sees, not only measure it,
 and to tell what changed between a before and an after film. The vocabulary is
-`docs/watch-words.md`: Laban's Effort factors for motion, Itten's contrasts for colour,
+`reelreader/skill/watch-words.md`: Laban's Effort factors for motion, Itten's contrasts for colour,
 Ching's ordering principles and Greenberg's all-over against centred for composition,
 Arnheim's balance, and the wet show's own words (cells, beads, threads, marbling, a wash,
 a bloom, a turned dish, a pour). Every word carries the number that chose it, a word from
@@ -639,6 +639,8 @@ order; the README is `docs/watch.md`, the plugin's layout `docs/watch-plugin-pla
   21 s) did, and a drained or frozen take fails the light or motion cue. Our own films are
   liquid by construction: have `film.mjs`, `gig.mjs`, `moving.mjs` and the 5b/7a bad-take
   set pass `liquid: true`, or let a take carry its own sidecar that says it is the app's.
+  A real show can too: one minute (2:00 to 3:00) of the 1969 *Liquid Loops* film reads general
+  on 3 hard cuts a minute from its splices (the test set's linked show, 47p-5b).
 - **47p-3c** footage that is continuous, coloured, on a dark ground and moving by itself reads
   liquid though it is not (a night street with neon on a tripod, a VJ loop, a fish tank).
   A fourth cue (rigid motion: the flow's blocks moving as solid pieces) would tell them apart.
@@ -647,6 +649,19 @@ order; the README is `docs/watch.md`, the plugin's layout `docs/watch-plugin-pla
 - **47p-5** a shot list and batch runs: cut and dissolve times, each shot's length, the average
   shot length, a palette per shot and the share of cuts on a beat (CSV and in the summary);
   `--batch <folder|playlist>` with a table across the videos.
+- **47p-5c** a freeze is filed as a title card: on the test set's frozen take the Footage read
+  drops 0:04.8 to 0:10.2 as a "title span", so the motion reads never meet it, Overall says
+  "holds one steady pace from start to end", and the summary never prints what `freezes()`
+  finds (4.7 to 10.3 s). Print the freezes in the summary and keep a still span that is the
+  picture itself (not a card) in the reads. Feeds the fault reads (handoff 7a).
+- **47p-5d** a whole-picture turn reads as the liquid's own flow: the turned take (the whole
+  picture inside a fixed rim, clockwise once every 8 s) reads own flow 17.2%/s, "fast,
+  churning", over every real show, whole-field only 31%, and "about one turn in 22 s". The
+  affine fit takes out too little of a rotation inside a round mask; name a rigid turn and
+  its true period. Feeds 7a and the owner's rule of no whole-frame motion from sound.
+- **47p-5e** the Footage read misfires on a slow dark liquid take: the test set's good take
+  gets four "still overlays" masked (one the left quarter of the frame) and three 0.4 s
+  "title spans" dropped, with no overlay or title on the sheets.
 
 Later, not now: photosensitivity (flash) screening, real units (mm/s), dance and pose, "what is
 in it". The reference library stays private and ships empty (watch-plugin-plan.md, point 3).

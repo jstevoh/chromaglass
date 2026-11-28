@@ -179,3 +179,13 @@ blur.
   words (low-key, linear, clustered, colour field). Measured: Big Buck Bunny graded Arc
   9.0/10 against the real shows before, now reads general with no card; the Joshua Light
   Show, glow ink and four app takes read liquid. `npm run watchmode` 21/21.
+- ~~**47p-5b**~~ the public judging skill (shipped, 2026-11-28): `reelreader/skill/`, a
+  self-contained skill folder the release copies: honesty rules first, the reading order, a
+  content read from the sheets, lenses for anyone, an editor, a colourist and a VJ or liquid
+  artist, the helper agent and the words guide (moved here from `docs/`), a worked example,
+  an eval-set guide on `ratings.json`, and a test set of four clips with known answers (an
+  edited cartoon, a good liquid take, the same take frozen and the same take turned as a
+  whole, both bad takes run with `--liquid`) plus a linked real show. `npm run reelset` holds
+  the folder whole, free of this project's names, and the key's measured half true.
+  ChromaGlass's layer stays on top in `.claude/skills/watch/` (our faults, the Mac route, the
+  settings map, the real shows). The agreement line now says "your ratings", not the owner's.

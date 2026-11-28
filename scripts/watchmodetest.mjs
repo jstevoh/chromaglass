@@ -37,7 +37,7 @@
  *   (g) the before/after read of two general films leaves out the show's own
  *       measures, which a pair of liquid reads keeps;
  *   (h) every wet-show word's general form, reached or not by these clips, has
- *       a general term, a general source on docs/watch-words.md, its number and
+ *       a general term, a general source on reelreader/skill/watch-words.md, its number and
  *       no liquid word, and describe() of the liquid films with liquid: false
  *       says none of the wet words their liquid read says.
  *
@@ -163,9 +163,9 @@ const HEADS = /\/10:|## (Physics|Techniques|Report card|Settings to try)/g;
 const outsideReadAs = md => md.split(/\n(?=## )/).filter(s => !s.startsWith('## Read as')).join('\n');
 const liquidProse = md => [...new Set((outsideReadAs(md).match(PROSE) ?? []).map(w => w.toLowerCase()))];
 const liquidVocab = md => [...liquidProse(md), ...new Set(outsideReadAs(md).match(HEADS) ?? [])];
-// Where each area's words may come from (docs/watch-words.md), with the
+// Where each area's words may come from (reelreader/skill/watch-words.md), with the
 // general words' sources: film and photography lighting, Arnheim, Ching, Greenberg.
-const DOC = fs.readFileSync(path.join(HERE, '..', 'docs', 'watch-words.md'), 'utf8').toLowerCase();
+const DOC = fs.readFileSync(path.join(HERE, '..', 'reelreader', 'skill', 'watch-words.md'), 'utf8').toLowerCase();
 const BOLD = new Set([...DOC.matchAll(/\*\*([^*]+)\*\*/g)].map(m => m[1].replace(/\s+/g, ' ').trim()));
 const GENERAL_SOURCES = { light: ['itten', 'arnheim', 'photography'], form: ['greenberg', 'ching'] };
 const generalOk = w => BOLD.has(String(w.term).toLowerCase()) && (GENERAL_SOURCES[w.area] ?? ['laban', 'ching', 'itten', 'greenberg', 'arnheim']).some(x => String(w.source).toLowerCase().includes(x)) && !/wet show/i.test(w.source);
@@ -190,7 +190,7 @@ const wet = (rStreet.words?.words ?? []).filter(w => w.source === 'the wet show'
 check("(c) no wet-show word in the street's words", (rStreet.words?.words?.length ?? 0) >= 4 && !wet.length,
   wet.map(w => w.term).join(', ') || `${rStreet.words.words.length} words: ${rStreet.words.words.map(w => w.term).join(', ')}`);
 const unsourced = (rStreet.words?.words ?? []).filter(w => !generalOk(w));
-check("(c) every one of the street's words is bold in docs/watch-words.md with a general source", (rStreet.words?.words?.length ?? 0) >= 4 && !unsourced.length,
+check("(c) every one of the street's words is bold in reelreader/skill/watch-words.md with a general source", (rStreet.words?.words?.length ?? 0) >= 4 && !unsourced.length,
   unsourced.map(w => `${w.term} (${w.source})`).join(', ') || 'all');
 const streetVocab = liquidVocab(streetMd);
 check("(c) none of the liquid show's vocabulary anywhere in the street's summary", !streetVocab.length, streetVocab.join(', ') || 'clean');

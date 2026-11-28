@@ -6,7 +6,7 @@
  * What was asked (the owner, 2026-11-22): the watch tool reads a film as
  * numbers, and should also say in words what it sees, in a vocabulary from
  * art criticism, architecture and the light shows themselves
- * (docs/watch-words.md), and tell what changed between a before and an
+ * (reelreader/skill/watch-words.md), and tell what changed between a before and an
  * after film. This check is the contract for both, written before either
  * was built, so the words are held to pictures and not to their own
  * thresholds: a steady drift must read sustained and a picture that sits and
@@ -36,7 +36,7 @@
  *                                     take (swells, calm, half-life), and its
  *                                     text then says "may vary from take to
  *                                     take". source names a source on
- *                                     docs/watch-words.md (Laban, Itten,
+ *                                     reelreader/skill/watch-words.md (Laban, Itten,
  *                                     Ching, Greenberg, Arnheim, or the wet
  *                                     show), the one its area draws on there
  *                                     (time, weight, space, flow and effort:
@@ -190,7 +190,7 @@ const has = (r, area, re) => terms(r, area).some(t => re.test(t));
 const hasNot = (r, area, re) => (r?.words?.words?.length ?? 0) >= 4 && !has(r, area, re);
 
 // ─── the words for one film ──────────────────────────────────────────────────
-const doc = fs.readFileSync(path.join(here, '..', 'docs', 'watch-words.md'), 'utf8').toLowerCase();
+const doc = fs.readFileSync(path.join(here, '..', 'reelreader', 'skill', 'watch-words.md'), 'utf8').toLowerCase();
 // The terms are the page's words in bold, and each area draws on its own sources: "laban" in
 // any source string, or a term that is merely somewhere in nine kilobytes of prose, would
 // pass anything.
@@ -209,7 +209,7 @@ for (const k of ['drift', 'jumps', 'crisp', 'soft']) {
   check(`${k}: every word carries the number that chose it`, ws.length && !bad.length,
     bad.length ? `no number in: ${bad.slice(0, 3).map(w => JSON.stringify(w.text ?? w.term)).join('; ')}` : `${ws.length} of ${ws.length}`);
   const unsourced = ws.filter(w => !sourced(w) || !termOk(w));
-  check(`${k}: every word and its source are on docs/watch-words.md`, ws.length && !unsourced.length,
+  check(`${k}: every word and its source are on reelreader/skill/watch-words.md`, ws.length && !unsourced.length,
     unsourced.length ? unsourced.slice(0, 4).map(w => `${w.term} (${w.source ?? 'no source'})`).join(', ') : 'all');
   const unhedged = ws.filter(w => w.steady === false && !/may vary from take to take/.test(w.text));
   const hedgedSteady = ws.filter(w => w.steady !== false && /may vary from take to take/.test(w.text));
