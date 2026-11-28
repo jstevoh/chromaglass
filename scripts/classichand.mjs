@@ -38,23 +38,26 @@
  *
  * Asked, on the look as shipped:
  *   1. the look presses the whole glass on the kick (Press the Whole Glass,
- *      Beat Squeeze up), and its Plate Rock is a real hand's lean (at or
- *      under ROCK_REAL)
+ *      Beat Squeeze up), its Plate Rock is a real hand's lean (at or under
+ *      ROCK_REAL), and the app's own kickPress and layKick send that kick to
+ *      the glass, the frame loop handing kickPress the switch
  *   2. the water sheared rather than slid: its own motion at least OWN_MIN,
  *      its forms turning over no slower than TURN_MAX, and the whole
  *      picture's slide no more than WHOLE_MAX of what moves (main's hand
  *      fails all three; the real shows' pace is PLAN 38w-36's)
- *   3. the oil kept in the frame: its share inside the middle third of the
+ *   3. the glass pressed: every kick on it, as deep as the stamp, the gap
+ *      under it down at the first kick's bottom, and opened again
+ *   4. the oil kept in the frame: its share inside the middle third of the
  *      dish, read each second from the first, within KEPT points of where it
  *      started, and the gap there back at rest between kicks
- *   4. the colour kept: the last second's colourfulness at least COLOUR of
+ *   5. the colour kept: the last second's colourfulness at least COLOUR of
  *      the first second's
- *   5. the control: the same kicks pressed as the old discs (no render, the
+ *   6. the control: the same kicks pressed as the old discs (no render, the
  *      oil read only) lose more than PUMPED points of the oil in the frame,
  *      so ask 3 can see a pump
  */
 import { build } from 'esbuild';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openLab } from './lab.mjs';
@@ -89,7 +92,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const out = join(root, 'node_modules', '.cache', 'classichand', 'app.mjs');
 mkdirSync(dirname(out), { recursive: true });
 await build({
-  stdin: { contents: "export { FluidSimulation } from './src/sim/fluidSimulation.ts'; export { PRESETS } from './src/presets.ts'; export { DEFAULT_SETTINGS } from './src/types.ts'; export { setShowSeed } from './src/lib/rng.ts'; export * from './src/lib/plateRock.ts'; export { kickDepth, kickPress, KICK_HOLD } from './src/lib/squish.ts'; export { thinGapViscosity } from './src/gpu/fluid/constants.ts';", resolveDir: root, loader: 'ts' },
+  stdin: { contents: "export { FluidSimulation } from './src/sim/fluidSimulation.ts'; export { PRESETS } from './src/presets.ts'; export { DEFAULT_SETTINGS } from './src/types.ts'; export { setShowSeed } from './src/lib/rng.ts'; export * from './src/lib/plateRock.ts'; export { kickDepth, kickPress, KICK_HOLD } from './src/lib/squish.ts'; export { thinGapViscosity } from './src/gpu/fluid/constants.ts'; export { layKick } from './src/sim/kickLay.ts'; export { GlassPress, glassDepth } from './src/lib/glassPress.ts'; export { KickRelease, PressLifts } from './src/lib/squish.ts'; export { RhythmSheet } from './src/lib/sheet.ts';", resolveDir: root, loader: 'ts' },
   bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning',
 });
 globalThis.GPUTextureUsage ??= { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16 };
@@ -99,6 +102,7 @@ globalThis.GPUShaderStage ??= { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 };
 const app = await import(pathToFileURL(out).href);
 const look = app.PRESETS.find((p) => p.id === 'classic').settings;
 const shipped = { ...app.DEFAULT_SETTINGS, ...look };
+const glassDepthOf = (a) => app.glassDepth(a, 3);
 const ROCK_REAL = app.ROCK_REAL_TO;   // lib/plateRock.ts: a real hand's lean, 0.45
 
 /** The look's liquid laid and its step read, as the app hands them to the solver (classicdish's appLay). */
@@ -162,10 +166,11 @@ async function run(settings, press, render, label) {
       lab.addDye(lay.water); lab.addOilDye(lay.oil); lab.flush();
     }, { N, P, lay });
     const phys = physicsAcc(), design = [], pacc = paletteAcc(), oil = [], gaps = [];
+    let least = null, glass = null;
     const t0 = Date.now();
     const per = 60 / RATE;
     for (let f = 0; f < SECONDS * RATE; f++) {
-      const got = await page.evaluate(async ({ P, hand, nu, from, n, W, s, press, render, read, curve, down }) => {
+      const got = await page.evaluate(async ({ P, hand, nu, from, n, W, s, press, render, read, bottom, curve, down }) => {
         for (let k = from; k < from + n; k++) {
           const h = hand[k];
           if (h.kick) {
@@ -198,9 +203,17 @@ async function run(settings, press, render, label) {
           if (q) for (let j = 0; j < q.n; j++) for (let i = 0; i < q.n; i++) if (Math.hypot((i + 0.5) / q.n - 0.5, (j + 0.5) / q.n - 0.5) < 1 / 3) { gm += q.gap[i + j * q.n]; gn++; }
           gap = gn ? gm / gn : null;
         }
-        return { px, inner, gap };
-      }, { P, hand, nu, from: f * per, n: per, W, s: settings, press, render, read: f % RATE === RATE - 1, curve: P.plateCurve ?? 0, down: process.env.DOWN ? Number(process.env.DOWN) : undefined });
+        // The glass at the bottom of the first kick (0.2 s after it, the depth at 95% of its way down): the least gap in the middle third.
+        let least = null;
+        if (bottom) {
+          const q = await lab.squeeze();
+          if (q) { least = 1; for (let j = 0; j < q.n; j++) for (let i = 0; i < q.n; i++) if (Math.hypot((i + 0.5) / q.n - 0.5, (j + 0.5) / q.n - 0.5) < 1 / 3) least = Math.min(least, q.gap[i + j * q.n]); }
+        }
+        return { px, inner, gap, least, glass: lab.glassState() };
+      }, { P, hand, nu, from: f * per, n: per, W, s: settings, press, render, read: f % RATE === RATE - 1, bottom: f === Math.round(0.2 * RATE) - 1, curve: P.plateCurve ?? 0, down: process.env.DOWN ? Number(process.env.DOWN) : undefined });
       if (got.inner != null) { oil.push(got.inner); gaps.push(got.gap); }
+      if (got.least != null) least = got.least;
+      glass = got.glass;
       if (got.px) {
         const rgb = new Uint8Array(W * W * 3);
         for (let i = 0; i < W * W; i++) { rgb[i * 3] = got.px[i * 4]; rgb[i * 3 + 1] = got.px[i * 4 + 1]; rgb[i * 3 + 2] = got.px[i * 4 + 2]; }
@@ -209,13 +222,13 @@ async function run(settings, press, render, label) {
         if (FRAMES) { mkdirSync(FRAMES, { recursive: true }); writeFileSync(join(FRAMES, `${label}-${String(f).padStart(3, '0')}.rgb`), rgb); }
       }
     }
-    const res = { oil, gaps, seconds: (Date.now() - t0) / 1000 };
+    const res = { oil, gaps, least, glass, kicks: hand.filter((h) => h.kick).length, depth: hand.find((h) => h.kick)?.kick, seconds: (Date.now() - t0) / 1000 };
     if (render) {
       const ds = designSummary(design, pacc);
       const ps = physicsSummary(phys, { rate: RATE, cut: design.map(() => false), W, scale: ds.scaleX?.med ?? null });
       const col = design.map((d) => d.colourfulness).filter((x) => Number.isFinite(x));
       const mean = (a) => a.reduce((s, x) => s + x, 0) / Math.max(1, a.length);
-      Object.assign(res, { own: ps.own.med, whole: ps.wholeShare, turnover: ps.turnover, speed: ps.speed.med, colourStart: mean(col.slice(0, RATE)), colourEnd: mean(col.slice(-RATE)) });
+      Object.assign(res, { colours: col.length, own: ps.own.med, whole: ps.wholeShare, turnover: ps.turnover, speed: ps.speed.med, colourStart: mean(col.slice(0, RATE)), colourEnd: mean(col.slice(-RATE)) });
     }
     const r = (x, d = 2) => (x == null || !Number.isFinite(x) ? '-' : x.toFixed(d));
     console.log(`  oil in the middle third ${oil.map((x) => x.toFixed(1)).join(' → ')} %, the gap there ${gaps.map((x) => (x ?? 0).toFixed(5)).join(' → ')}` + (render ? `; own ${r(res.own)} %/s, turnover ${r(res.turnover)} s, whole ${r(res.whole)}, colourfulness ${r(res.colourStart, 1)} → ${r(res.colourEnd, 1)}` : '') + ` (${res.seconds.toFixed(0)} s)`);
@@ -232,19 +245,47 @@ if (HAND !== 'check') {
 const checks = [];
 const check = (name, ok, detail = '') => { checks.push(ok); console.log(`${ok ? ' ok  ' : ' FAIL'} ${name}${detail ? ` — ${detail}` : ''}`); };
 const r = (x, d = 2) => (x == null || !Number.isFinite(x) ? '-' : x.toFixed(d));
-check('1. Lava Pop presses the whole glass on the kick, rocked at a real hand\'s lean',
-  shipped.kickGlass === true && shipped.beatSqueeze > 0 && (shipped.plateRock ?? 0) > 0 && shipped.plateRock <= ROCK_REAL,
-  `Press the Whole Glass ${shipped.kickGlass}, Beat Squeeze ${shipped.beatSqueeze}, Plate Rock ${shipped.plateRock} (real to ${ROCK_REAL})`);
+/*
+  And the app routes it there: the lab calls GlassPress itself, so this asks
+  the app's own pieces. kickPress with the look's switch picks the glass's
+  discs, and FluidSimulation's pressKick (sim/kickLay.ts layKick) on a thin
+  gap hands such a kick to the glass, never to the old discs' KickRelease;
+  the frame loop passes the switch to kickPress (LiquidVisualizer).
+*/
+const plate = { size: GRID, gpu: { coverMetres: 0.002 }, thinGap: true, pressLift: new app.PressLifts(), sheet: new app.RhythmSheet(), glassPress: new app.GlassPress(), kickRelease: new app.KickRelease(), pressedCells: { hand: 0, kick: 0, bubble: 0 }, pressedDepth: { hand: 0, kick: 0, bubble: 0 }, dishKicks: [], applySquish() {} };
+const kp = app.kickPress(app.thinGapViscosity(shipped.gapThickness), shipped.frameSway ?? 0, undefined, shipped.kickGlass);
+app.layKick(plate, GRID / 2, GRID / 2, app.kickDepth(shipped.beatSqueeze, 0.8, 1) * kp.share, 0, kp.radii, 1e-6, 0);
+const frameLoop = readFileSync(join(root, 'src/components/LiquidVisualizer.tsx'), 'utf8');
+const passes = /kickPress\(nu, currentSettings\.frameSway \?\? 0, [^)]*currentSettings\.kickGlass\)/.test(frameLoop);
+check('1. Lava Pop presses the whole glass on the kick, rocked at a real hand\'s lean, and the app routes it to the glass',
+  shipped.kickGlass === true && shipped.beatSqueeze > 0 && (shipped.plateRock ?? 0) > 0 && shipped.plateRock <= ROCK_REAL
+    && kp.radii.length === 3 && plate.glassPress.kicksPressed === 1 && plate.kickRelease.kicks === 0 && plate.pressedCells.kick > 0 && passes,
+  `Press the Whole Glass ${shipped.kickGlass}, Beat Squeeze ${shipped.beatSqueeze}, Plate Rock ${shipped.plateRock} (real to ${ROCK_REAL}); kickPress ${kp.radii.join('/')}; layKick: ${plate.glassPress.kicksPressed} on the glass, ${plate.kickRelease.kicks} on the discs; the frame loop ${passes ? 'passes' : 'does not pass'} the switch`);
 const [now, discs] = await Promise.all([run(shipped, shipped.kickGlass ? 'glass' : 'sheet', true, 'now'), run(shipped, 'discs', false, 'discs')]);
-check('2. the water sheared, not slid: twice main\'s pace or more, the slide under a third', now.own >= OWN_MIN && now.turnover <= TURN_MAX && now.whole <= WHOLE_MAX,
+const fin = (x) => typeof x === 'number' && Number.isFinite(x);
+check('2. the water sheared, not slid: twice main\'s pace or more, the slide under a third',
+  fin(now.own) && fin(now.turnover) && fin(now.whole) && now.own >= OWN_MIN && now.turnover <= TURN_MAX && now.whole <= WHOLE_MAX,
   `own ${r(now.own)} %/s (at least ${OWN_MIN}), turnover ${r(now.turnover)} s (at most ${TURN_MAX}), whole ${r(now.whole)} of what moves (at most ${WHOLE_MAX}); ${REAL}, PLAN 38w-36`);
+/*
+  The glass pressed: every kick of the hand landed on it, it went as deep as
+  the stamp asked, the plate's gap went down under it (read at the bottom of
+  the first kick), and opened again (no more than it closed: the spring gives
+  back the share of the dent it took, which the glass pressed again each step,
+  so the gap back at rest is ask 4's). Without this, ask 4 passes
+  on a plate no kick touched (check-skeptic: Beat Squeeze 0 read 65.8 → 65.7%,
+  the gap at rest, as the shipped run reads).
+*/
+const g = now.glass, want = glassDepthOf(now.depth?.a ?? 0);
+check('3. the glass pressed on every kick, as deep as the stamp, and let back up',
+  !!g && g.kicks === now.kicks && now.kicks === 2 * SECONDS && g.deepest >= 0.9 * want && fin(now.least) && now.least <= 0.03 - 0.5 * want && g.opened > 0 && g.opened <= g.closed,
+  g ? `${g.kicks} of ${now.kicks} kicks on the glass (${2 * SECONDS} beats), ${r(g.deepest, 4)} deep at the middle (the stamp ${r(want, 4)}), the least gap at the first kick's bottom ${r(now.least, 4)} (at most ${r(0.03 - 0.5 * want, 4)}), ${r(g.opened, 1)} opened against ${r(g.closed, 1)} closed` : 'no glass');
 const kept = now.oil.at(-1) - now.oil[0];
-const atRest = now.gaps.every((g) => g != null && Math.abs(g - 0.03) < 3e-4);
-check('3. the oil kept in the frame, the glass back at rest between kicks', Math.abs(kept) <= KEPT && atRest,
-  `${r(now.oil[0], 1)} → ${r(now.oil.at(-1), 1)} % in the middle third (within ${KEPT} points); the gap there ${now.gaps.map((g) => r(g, 5)).join(', ')} (rest 0.03000)`);
-check('4. the colour kept', now.colourEnd >= COLOUR * now.colourStart, `colourfulness ${r(now.colourStart, 1)} → ${r(now.colourEnd, 1)} (at least ${COLOUR * 100}%)`);
+const atRest = now.gaps.length === SECONDS && now.gaps.every((x) => fin(x) && Math.abs(x - 0.03) < 3e-4);
+check('4. the oil kept in the frame, the glass back at rest between kicks', Math.abs(kept) <= KEPT && atRest,
+  `${r(now.oil[0], 1)} → ${r(now.oil.at(-1), 1)} % in the middle third (within ${KEPT} points); the gap there ${now.gaps.map((x) => r(x, 5)).join(', ')} (rest 0.03000)`);
+check('5. the colour kept', now.colours >= 2 * RATE && now.colourStart > 0 && now.colourEnd >= COLOUR * now.colourStart, `colourfulness ${r(now.colourStart, 1)} → ${r(now.colourEnd, 1)} (at least ${COLOUR * 100}%, ${now.colours} frames read)`);
 const lost = discs.oil[0] - discs.oil.at(-1);
-check('5. the control: the old discs pump the oil out of the frame', lost > PUMPED, `${r(discs.oil[0], 1)} → ${r(discs.oil.at(-1), 1)} % (more than ${PUMPED} points lost)`);
+check('6. the control: the old discs pump the oil out of the frame', lost > PUMPED, `${r(discs.oil[0], 1)} → ${r(discs.oil.at(-1), 1)} % (more than ${PUMPED} points lost)`);
 const failed = checks.filter((ok) => !ok).length;
 console.log(failed ? `\n${failed} of ${checks.length} FAIL` : `\nall ${checks.length} ok`);
 process.exit(failed ? 1 : 0);
