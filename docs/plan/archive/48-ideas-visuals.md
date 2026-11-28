@@ -77,3 +77,17 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   hues not two; the late white 14.8% → 9.2% of the frame, its densest part (luma over 190) 7.5%
   → 2.4%, a thinner ribbon broken by dark holes. Swells did not come back (1.0 a minute both,
   calm 11% → 10%): 48s-8.
+- **48s-8. What took Louche's swells** (shipped 2026-11-28). Seven films on the Mac (main
+  240d08b, seed 1, 60 s each; `FILM_ONLY=louche npm run film`, read by the replay of
+  `watch.mjs` shape() in the project's louche-swells-48s8 folder). The swells were never the
+  dropper's: in every Louche film, the first included, they sit at 1, 16, 30, 45 and 57 s, the
+  film track's kick-only passages, and they are the music's bass Press (the Velocity route's
+  cord, lib/musicCords.ts): with that route at none, 0 a minute and half the beat flicker. Kick
+  cord off, Evolve 0.12 and the first dish: 1, 1 and 1 a minute, no change. What rose was the
+  plate's motion between them, every kick's bloom of eight dye drops, which barely showed on
+  the first version's wide pools and is a bright speck on black on the dark dish: Kick Bloom 0
+  takes the median from 1.62 to 0.72 % a sample (4 swells, but near black 60% → 70%), 0.3 to
+  0.93 (4 swells, near black 63%). Louche now ships Kick Bloom 0.3: swells 2.0 → 4.0 a
+  minute, calm 10% → 29%, motion half-life 0.3 → 2.3 s, brightness 0.17 → 0.16. Judging page
+  for the owner (before/after side by side). Still open from 48s-7: why the late cloud gathers
+  at the bottom of the frame (Plate Rock's default 0.45 or the rim's carry), and 27f-9o.

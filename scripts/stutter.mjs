@@ -46,23 +46,94 @@
 import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
+import path from 'node:path';
 
-const PORT = port(4361);
-const arg = (name, dflt) => {
-  const i = process.argv.indexOf(`--${name}`);
-  return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
-};
-const SECONDS = Number(arg('seconds', 180));
-const LOOKS = arg('looks', 'poster-1969,classic,neon-coral-reef').split(',');
-const OPENING_S = 10;
+if (path.basename(process.argv[1] ?? '') === 'stutter.mjs') {
+  const PORT = port(4361);
+  const arg = (name, dflt) => {
+    const i = process.argv.indexOf(`--${name}`);
+    return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
+  };
+  const SECONDS = Number(arg('seconds', 180));
+  const LOOKS = arg('looks', 'poster-1969,classic,neon-coral-reef').split(',');
+  const OPENING_S = 10;
 
-let chromium;
-for (const resolve of [() => 'playwright', () => 'playwright-core']) {
-  try { const m = await import(resolve()); chromium = m.chromium ?? m.default?.chromium; if (chromium) break; } catch { /* try the next */ }
+  const chromium = await resolveChromium();
+  if (!chromium) { console.error('playwright is not installed.'); process.exit(2); }
+
+  const { stop } = await startPreviewServer(PORT);
+
+  const browser = await launchChromium(chromium);
+  let failed = false;
+  const verdict = (ok, what, detail) => {
+    console.log(`  ${ok ? ' ok ' : 'FAIL'}  ${what} — ${detail}`);
+    if (!ok) failed = true;
+  };
+
+  try {
+    for (const look of LOOKS) {
+      const { first, gpu, noGpu, ticks, moves, ladder } = await measureLookFrames(browser, PORT, look, { seconds: SECONDS, captureRaf: false });
+      if (!first) { verdict(false, `${look}: the plate drew`, 'no frame in a minute'); continue; }
+      if (noGpu) {
+        console.error(`${look}: no hardware WebGPU here (${gpu?.label ?? 'none'}); this check needs a real GPU.`);
+        failed = true;
+        break;
+      }
+
+      const last = ticks[ticks.length - 1];
+      const opening = ticks.find((t) => t.at - first.at >= OPENING_S) ?? last;
+      const total = last.frames.reduce((a, b) => a + b, 0) - first.frames.reduce((a, b) => a + b, 0);
+      const twoAll = last.frames[2] + last.frames[3] - first.frames[2] - first.frames[3];
+      const twoAfter = last.frames[2] + last.frames[3] - opening.frames[2] - opening.frames[3];
+      const lateAfter = last.late - opening.late;
+      const onTimeAfter = twoAfter - lateAfter;
+      const climbs = moves.filter((m) => m.why === 'fast');
+      const undone = climbs.filter((m) => {
+        const next = moves.find((n) => n.at > m.at);
+        return next !== undefined && next.at - m.at < 10;
+      });
+      const rel = (s) => (s - first.at).toFixed(1);
+      console.log(`\n${look}: ${total} frames in ${(last.at - first.at).toFixed(0)} s, ${twoAll} of two steps or more (${twoAfter} after the opening: ${lateAfter} after a missed refresh, ${onTimeAfter} on time)`);
+      console.log(`  ends on ${last.rung} at ${last.stepRate} steps/s; GPU ${last.workMs?.toFixed(1)} ms a frame, ${last.stepMs?.toFixed(1)} ms a step`);
+      for (const m of moves) {
+        console.log(`  ${rel(m.at)} s  ${m.why.padEnd(8)} → ${ladder[m.rung] ?? m.rung} at ${m.stepRate}/s  (GPU ${m.workMs.toFixed(1)} ms${m.predictedMs !== null ? `, predicted ${m.predictedMs.toFixed(1)}` : ''})`);
+      }
+      // Where the two-step frames fell, by ten-second stretch, so a burst can be laid against a move.
+      const bursts = [];
+      for (let i = 1; i < ticks.length; i++) {
+        const n = ticks[i].frames[2] + ticks[i].frames[3] - ticks[i - 1].frames[2] - ticks[i - 1].frames[3];
+        const late = ticks[i].late - ticks[i - 1].late;
+        if (n > 0) bursts.push(`${rel(ticks[i].at)} s: ${n} (${late} late)`);
+      }
+      if (bursts.length) console.log(`  two-step frames by second: ${bursts.join(', ')}`);
+      // The most caught-up misses in any ten seconds after the opening, from the once-a-second counts.
+      let worst = 0;
+      for (let i = ticks.indexOf(opening); i < ticks.length; i++) {
+        const j = ticks.findIndex((t) => t.at >= ticks[i].at + 10);
+        worst = Math.max(worst, (j < 0 ? last : ticks[j]).late - ticks[i].late);
+      }
+      verdict(worst <= 2, `${look}: missed refreshes caught up with two steps come singly, at most two in any 10 s (the governor's)`,
+        `${lateAfter} in ${(last.at - opening.at).toFixed(0)} s, at most ${worst} in 10 s`);
+      verdict(onTimeAfter === 0, `${look}: no on-time frame of two steps after the opening (the step clock's, PLAN.md 14aa)`,
+        `${onTimeAfter} in ${(last.at - opening.at).toFixed(0)} s`);
+      verdict(undone.length === 0, `${look}: no climb undone within 10 s`,
+        undone.length ? undone.map((m) => `${rel(m.at)} s to ${ladder[m.rung]} at ${m.stepRate}/s`).join('; ') : `${climbs.length} climb(s), all kept`);
+    }
+  } finally {
+    await browser.close();
+    stop();
+  }
+  process.exit(failed ? 1 : 0);
 }
-if (!chromium) { console.error('playwright is not installed.'); process.exit(2); }
 
-{
+export async function resolveChromium() {
+  for (const resolve of [() => 'playwright', () => 'playwright-core']) {
+    try { const m = await import(resolve()); const c = m.chromium ?? m.default?.chromium; if (c) return c; } catch { /* try the next */ }
+  }
+  return null;
+}
+
+export async function startPreviewServer(PORT) {
   const held = await new Promise((resolve) => {
     const probe = net.createServer();
     probe.once('error', () => resolve(true));
@@ -70,111 +141,81 @@ if (!chromium) { console.error('playwright is not installed.'); process.exit(2);
     probe.listen(PORT, '127.0.0.1');
   });
   if (held) { console.error(`port ${PORT} is already in use.`); process.exit(2); }
+
+  const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'], {
+    detached: true, stdio: ['ignore', 'ignore', 'inherit'],
+  });
+  const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch { /* already gone */ } };
+  process.on('exit', stop);
+  for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => { stop(); process.exit(130); });
+  await new Promise((r) => setTimeout(r, 2500));
+  return { server, stop };
 }
 
-const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'], {
-  detached: true, stdio: ['ignore', 'ignore', 'inherit'],
-});
-const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch { /* already gone */ } };
-process.on('exit', stop);
-for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => { stop(); process.exit(130); });
-await new Promise((r) => setTimeout(r, 2500));
-
-const browser = await launchChromium(chromium);
-let failed = false;
-const verdict = (ok, what, detail) => {
-  console.log(`  ${ok ? ' ok ' : 'FAIL'}  ${what} — ${detail}`);
-  if (!ok) failed = true;
-};
-
-try {
-  for (const look of LOOKS) {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-    await page.goto(`http://localhost:${PORT}/?debug&tier=local&look=${encodeURIComponent(look)}`, { waitUntil: 'load' });
-    // The opening is counted from the first frame the loop draws, which is
-    // when the governor starts its own clock.
-    let first = null;
-    for (let i = 0; i < 120 && !first; i++) {
-      first = await page.evaluate(() => {
-        const d = window.chromaglassDebug?.();
-        const s = d?.solver?.();
-        return s && s.stepFrames.some((n) => n > 0) ? { at: performance.now() / 1000, frames: s.stepFrames, late: s.lateStepFrames } : null;
-      });
-      if (!first) await page.waitForTimeout(500);
-    }
-    if (!first) { verdict(false, `${look}: the plate drew`, 'no frame in a minute'); await page.close(); continue; }
-
-    const gpu = await page.evaluate(() => window.chromaglassDebug?.()?.webgpu ?? null);
-    if (!gpu || gpu.fallback || /swiftshader/i.test(gpu.label ?? '')) {
-      console.error(`${look}: no hardware WebGPU here (${gpu?.label ?? 'none'}); this check needs a real GPU.`);
-      failed = true;
-      await page.close();
-      break;
-    }
-
-    // Once a second: the counts so far, so the two-step frames can be placed in time.
-    const ticks = [];
-    const until = first.at + SECONDS;
-    for (;;) {
-      const t = await page.evaluate(() => {
-        const d = window.chromaglassDebug();
-        const s = d.solver();
-        const g = d.governor;
-        return {
-          at: performance.now() / 1000, frames: s.stepFrames, late: s.lateStepFrames, stepRate: s.stepRate,
-          rung: g ? `${g.rung.grid}²@${g.rung.dpr}` : '?', workMs: g?.workMs ?? null, stepMs: g?.stepMs ?? null,
-          moves: g?.moveLog?.length ?? null,
-        };
-      });
-      ticks.push(t);
-      if (t.at >= until) break;
-      await page.waitForTimeout(1000);
-    }
-    const moves = await page.evaluate(() => (window.chromaglassDebug().governor?.moveLog ?? []).map((m) => ({ ...m })));
-    const ladder = await page.evaluate(() => (window.chromaglassDebug().governor?.rungs ?? []).map((r) => `${r.grid}²@${r.dpr}`));
-    await page.close();
-
-    const last = ticks[ticks.length - 1];
-    const opening = ticks.find((t) => t.at - first.at >= OPENING_S) ?? last;
-    const total = last.frames.reduce((a, b) => a + b, 0) - first.frames.reduce((a, b) => a + b, 0);
-    const twoAll = last.frames[2] + last.frames[3] - first.frames[2] - first.frames[3];
-    const twoAfter = last.frames[2] + last.frames[3] - opening.frames[2] - opening.frames[3];
-    const lateAfter = last.late - opening.late;
-    const onTimeAfter = twoAfter - lateAfter;
-    const climbs = moves.filter((m) => m.why === 'fast');
-    const undone = climbs.filter((m) => {
-      const next = moves.find((n) => n.at > m.at);
-      return next !== undefined && next.at - m.at < 10;
+/**
+ * Open one look in Chromium, wait for its first drawn frame and hardware
+ * WebGPU, and sample `chromaglassDebug()` plus passive `requestAnimationFrame`
+ * timestamps for `seconds` seconds (`npm run stutter`, `npm run smooth`).
+ */
+export async function measureLookFrames(browser, PORT, look, { seconds, beforeGoto, afterGoto, onOpened, beforeClose, captureRaf = true } = {}) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  if (captureRaf) {
+    await page.addInitScript(() => {
+      window.__cgRafStamps = [];
+      const raf = window.requestAnimationFrame.bind(window);
+      const tick = (t) => { window.__cgRafStamps.push(t); raf(tick); };
+      raf(tick);
     });
-    const rel = (s) => (s - first.at).toFixed(1);
-    console.log(`\n${look}: ${total} frames in ${(last.at - first.at).toFixed(0)} s, ${twoAll} of two steps or more (${twoAfter} after the opening: ${lateAfter} after a missed refresh, ${onTimeAfter} on time)`);
-    console.log(`  ends on ${last.rung} at ${last.stepRate} steps/s; GPU ${last.workMs?.toFixed(1)} ms a frame, ${last.stepMs?.toFixed(1)} ms a step`);
-    for (const m of moves) {
-      console.log(`  ${rel(m.at)} s  ${m.why.padEnd(8)} → ${ladder[m.rung] ?? m.rung} at ${m.stepRate}/s  (GPU ${m.workMs.toFixed(1)} ms${m.predictedMs !== null ? `, predicted ${m.predictedMs.toFixed(1)}` : ''})`);
-    }
-    // Where the two-step frames fell, by ten-second stretch, so a burst can be laid against a move.
-    const bursts = [];
-    for (let i = 1; i < ticks.length; i++) {
-      const n = ticks[i].frames[2] + ticks[i].frames[3] - ticks[i - 1].frames[2] - ticks[i - 1].frames[3];
-      const late = ticks[i].late - ticks[i - 1].late;
-      if (n > 0) bursts.push(`${rel(ticks[i].at)} s: ${n} (${late} late)`);
-    }
-    if (bursts.length) console.log(`  two-step frames by second: ${bursts.join(', ')}`);
-    // The most caught-up misses in any ten seconds after the opening, from the once-a-second counts.
-    let worst = 0;
-    for (let i = ticks.indexOf(opening); i < ticks.length; i++) {
-      const j = ticks.findIndex((t) => t.at >= ticks[i].at + 10);
-      worst = Math.max(worst, (j < 0 ? last : ticks[j]).late - ticks[i].late);
-    }
-    verdict(worst <= 2, `${look}: missed refreshes caught up with two steps come singly, at most two in any 10 s (the governor's)`,
-      `${lateAfter} in ${(last.at - opening.at).toFixed(0)} s, at most ${worst} in 10 s`);
-    verdict(onTimeAfter === 0, `${look}: no on-time frame of two steps after the opening (the step clock's, PLAN.md 14aa)`,
-      `${onTimeAfter} in ${(last.at - opening.at).toFixed(0)} s`);
-    verdict(undone.length === 0, `${look}: no climb undone within 10 s`,
-      undone.length ? undone.map((m) => `${rel(m.at)} s to ${ladder[m.rung]} at ${m.stepRate}/s`).join('; ') : `${climbs.length} climb(s), all kept`);
   }
-} finally {
-  await browser.close();
-  stop();
+  if (beforeGoto) await beforeGoto(page);
+  await page.goto(`http://localhost:${PORT}/?debug&tier=local&look=${encodeURIComponent(look)}`, { waitUntil: 'load' });
+  if (afterGoto) await afterGoto(page);
+  // The opening is counted from the first frame the loop draws, which is
+  // when the governor starts its own clock.
+  let first = null;
+  for (let i = 0; i < 120 && !first; i++) {
+    first = await page.evaluate(() => {
+      const d = window.chromaglassDebug?.();
+      const s = d?.solver?.();
+      return s && s.stepFrames.some((n) => n > 0) ? { at: performance.now() / 1000, frames: s.stepFrames, late: s.lateStepFrames } : null;
+    });
+    if (!first) await page.waitForTimeout(500);
+  }
+  if (!first) { await page.close(); return { first: null, gpu: null, noGpu: false, ticks: [], moves: [], ladder: [], stamps: [], extra: null }; }
+
+  const gpu = await page.evaluate(() => window.chromaglassDebug?.()?.webgpu ?? null);
+  if (!gpu || gpu.fallback || /swiftshader/i.test(gpu.label ?? '')) {
+    await page.close();
+    return { first, gpu, noGpu: true, ticks: [], moves: [], ladder: [], stamps: [], extra: null };
+  }
+
+  if (onOpened) await onOpened(page, first);
+
+  // Once a second: the counts so far, so the two-step frames can be placed in time.
+  const ticks = [];
+  const until = first.at + seconds;
+  for (;;) {
+    const t = await page.evaluate(() => {
+      const d = window.chromaglassDebug();
+      const s = d.solver();
+      const g = d.governor;
+      return {
+        at: performance.now() / 1000, frames: s.stepFrames, late: s.lateStepFrames, stepRate: s.stepRate,
+        rung: g ? `${g.rung.grid}²@${g.rung.dpr}` : '?',
+        grid: g?.rung?.grid ?? null, dpr: g?.rung?.dpr ?? null,
+        workMs: g?.workMs ?? null, stepMs: g?.stepMs ?? null, drawMs: g?.drawMs ?? null,
+        refreshMs: d.drawGate?.refreshMs ?? null,
+        moves: g?.moveLog?.length ?? null,
+      };
+    });
+    ticks.push(t);
+    if (t.at >= until) break;
+    await page.waitForTimeout(1000);
+  }
+  const moves = await page.evaluate(() => (window.chromaglassDebug().governor?.moveLog ?? []).map((m) => ({ ...m })));
+  const ladder = await page.evaluate(() => (window.chromaglassDebug().governor?.rungs ?? []).map((r) => `${r.grid}²@${r.dpr}`));
+  const stamps = captureRaf ? await page.evaluate(() => window.__cgRafStamps ?? []) : [];
+  const extra = beforeClose ? await beforeClose(page) : null;
+  await page.close();
+  return { first, gpu, noGpu: false, ticks, moves, ladder, stamps, extra };
 }
-process.exit(failed ? 1 : 0);
