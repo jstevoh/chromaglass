@@ -404,7 +404,15 @@ try {
     }
     ls.sort((a, b) => a - b);
     const q = (t) => ls[Math.floor(ls.length * t)] ?? 0;
-    return { agree: agree / Math.max(judged, 1), px: ls.length, p10: q(0.1), p50: q(0.5), p90: q(0.9) };
+    /*
+      The fullest the pool stood, over the whole plate: on the owner's Mac two
+      runs in seven read no dome at all (0 px), the same commit before and
+      after reading 19446, so a 0 says here whether the domes never stood
+      (the plate under 1.5 everywhere) or stood and the frame missed them.
+    */
+    let most = 0;
+    for (let i = 0; i < f.data.length; i++) if (f.data[i] > most) most = f.data[i];
+    return { agree: agree / Math.max(judged, 1), px: ls.length, p10: q(0.1), p50: q(0.5), p90: q(0.9), most };
   }, { SIZE });
   /*
     A dome is a steep cone: most of its surface is past Snell's window (its
@@ -420,7 +428,7 @@ try {
     domes.agree > 0.95, `${(domes.agree * 100).toFixed(1)}% of the water's pixels lit`);
   check('in the closeup the Magnet\'s domes mirror the lit liquid round them, as a camera records a dark gloss, not one black',
     domes.px > 2000 && domes.p50 >= 12 && domes.p50 <= 100,
-    `the middle of the domes' light ${domes.p50.toFixed(1)} of 255 over ${domes.px} px of them (past 1.5 full)`);
+    `the middle of the domes' light ${domes.p50.toFixed(1)} of 255 over ${domes.px} px of them (past 1.5 full; the plate's fullest ${domes.most.toFixed(2)})`);
   check('and that light runs across each dome, its shape, not a flat grey',
     domes.p90 - domes.p10 >= 20,
     `${domes.p10.toFixed(1)} to ${domes.p90.toFixed(1)} from the 10th to the 90th percentile`);
