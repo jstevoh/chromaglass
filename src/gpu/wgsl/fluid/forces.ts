@@ -11,6 +11,7 @@ import { BILERP_N, HEAD, NOISE_WGSL, W } from './shared';
 import { OPEN_RIM } from '../../../lib/turntable';
 import { DISH_GAP_RANGE, DISH_GAP_FIELD_METRES, DISH_REST_GAP } from '../../../lib/turntable';
 import { BOIL_PROPERTIES_WGSL } from '../lampBoil';
+import { STIR_PSI } from './stir';
 
 /*
   What drives the lasting current, as one function the two plates share (PLAN
@@ -311,7 +312,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   // Everything the CPU applies after the projection, fused with addCurrent.
-  forcesB: `${HEAD}${NOISE_WGSL}${BILERP_N}${BOIL_PROPERTIES_WGSL}${CURRENT_DRIVE_WGSL}
+  forcesB: `${HEAD}${NOISE_WGSL}${STIR_PSI}${BILERP_N}${BOIL_PROPERTIES_WGSL}${CURRENT_DRIVE_WGSL}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var dye: texture_2d<f32>;
 @group(0) @binding(4) var cur: texture_2d<f32>;
@@ -330,17 +331,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let d = dyeC.a;
   let p = uv * S.l;
 
-  if (S.turbScale > 0.005) {
-    var cur = vec2f(0.0);
-    for (var o = 0; o < 4; o++) {
-      if (o >= S.turbDetail) { break; }
-      let freq = (0.012 / (S.l / 128.0)) * f32(1 << u32(o));
-      let tOff = S.time * (0.06 + f32(o) * 0.05) + f32(o) * 37.7;
-      let eps = 0.75;
-      let dn_dx = snoise(vec2f((p.x + eps) * freq, p.y * freq + tOff)) - snoise(vec2f((p.x - eps) * freq, p.y * freq + tOff));
-      let dn_dy = snoise(vec2f(p.x * freq, (p.y + eps) * freq + tOff)) - snoise(vec2f(p.x * freq, (p.y - eps) * freq + tOff));
-      cur += vec2f(dn_dy, -dn_dx) * (pow(0.55, f32(o)) / (2.0 * eps * freq));
-    }
+  // Turbulence: the curl of stir.ts's ψ. On the thin gap, whose rim is open, it is the closed dish's instead (stirFlow, PLAN 18a-25).
+  if (S.turbScale > 0.005 && A.a.x < 0.5) {
+    let eps = 0.75;
+    let cur = vec2f(stirPsi(p + vec2f(0.0, eps)) - stirPsi(p - vec2f(0.0, eps)),
+                    stirPsi(p - vec2f(eps, 0.0)) - stirPsi(p + vec2f(eps, 0.0))) / (2.0 * eps);
     v = vec4f(v.xy + cur * (S.turbScale * (0.5 / 3.0)), v.z, v.w);
   }
 

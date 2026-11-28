@@ -1,6 +1,6 @@
 # scripts
 
-The checks, one script per check (about 265 `.mjs` files), and the helpers they share. Every check CI runs is one entry in `checks.json`; the folder's other scripts are tools (`watch.mjs`, `watchwords.mjs`, `watchoverall.mjs`, `watchpair.mjs`, `watchfootage.mjs`, `watchcard.mjs`, `watchsettings.mjs`, `watchconfig.mjs` (where the watch tool keeps things, from `reelreader.config.json`; [docs/watch.md](../docs/watch.md)), `render-lab.mjs`, `planmove.mjs`, `planarchive.mjs`, `licenserotate.mjs`, `scorecard.mjs`).
+The checks, one script per check (about 265 `.mjs` files), and the helpers they share. Every check CI runs is one entry in `checks.json`; the folder's other scripts are tools (`watch.mjs`, `watchwords.mjs`, `watchoverall.mjs`, `watchpair.mjs`, `watchfootage.mjs`, `watchcard.mjs`, `watchsettings.mjs`, `watchffmpeg.mjs` (which sound encoder the watch self-tests make their clips with, 47x-6), `watchconfig.mjs` (where the watch tool keeps things, from `reelreader.config.json`; [docs/watch.md](../docs/watch.md)), `watchmode.mjs` (liquid or general: which read a film gets, PLAN 47p-3), `render-lab.mjs`, `planmove.mjs`, `planarchive.mjs`, `licenserotate.mjs`, `scorecard.mjs`).
 
 ## Start here
 

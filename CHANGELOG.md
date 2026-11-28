@@ -20,6 +20,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A kick that pressed the glass across the dish (Bass Drop's) closed the gap one way and let
   it open another, and every kick carried the oil a little further out. The glass now goes
   down and comes back up along one path, and the liquid comes back with it.
+
+### Added — real caustics: each drop focuses the lamp's light (PLAN 31s-2)
+
+- With **Projector Focus** turned off its middle, the lamp's light is traced through the
+  liquid to the wall: every ray bends by the slope of the light's path through the oil, dye
+  and pours, and the wall is as bright as the rays that land there. An oil drop gathers its
+  light into a bright core and, further off focus, crosses it into a bright rim with a dark
+  band beside it, the way it does on an overhead projector. The oil's shape is its real
+  surface (its meniscus), so the rim is one smooth line. The lamp's size softens the lines the
+  further off focus they are. Nothing changes at Focus's middle. The phone's Projector Focus
+  slider drives it too.
+
 ### Changed — the dye bends light at its real strength (PLAN 38u-10)
 
 - The dye's refractive index is its measured one (tartrazine's dn/dc over its absorbance),

@@ -381,8 +381,12 @@ const pc = x => (x == null || !Number.isFinite(x) ? '–' : `${(x * 100).toFixed
 const band = (x, cuts) => { if (x == null) return ''; for (const [lim, w] of cuts) if (x < lim) return w; return cuts.at(-1)[1]; };
 const range = (st, fmt = f) => (st ? `${fmt(st.med)} (${fmt(st.p10)} to ${fmt(st.p90)})` : '–');
 
-/** The design section of summary.md: numbers, each with what it means. */
-export function designLines(s) {
+/**
+ * The design section of summary.md: numbers, each with what it means.
+ * `liquid: false` (general footage, scripts/watchmode.mjs, PLAN 47p-3) says
+ * the forms' shape in general words: lobes and cells are a liquid's.
+ */
+export function designLines(s, { liquid = true } = {}) {
   const M = s.colourfulness?.med;
   const vivid = band(M, [[15, 'not colourful'], [33, 'slightly colourful'], [45, 'moderately colourful'], [59, 'averagely colourful'], [82, 'quite colourful'], [109, 'highly colourful'], [Infinity, 'extremely colourful']]);
   const gap = s.hueGap?.med;
@@ -390,9 +394,11 @@ export function designLines(s) {
   const ew = s.edgeWidth?.med;
   const edges = band(ew, [[0.4, 'crisp'], [1, 'clean'], [2.5, 'soft'], [Infinity, 'very soft, blurred']]);
   const coh = s.coherence?.med;
-  const lines = band(coh, [[0.3, 'no grain: blobs and texture going every way'], [0.5, 'some flow lines'], [0.7, 'flow lines: filaments and combed streaks'], [Infinity, 'strongly linear: streaks or stripes']]);
+  const lines = band(coh, liquid ? [[0.3, 'no grain: blobs and texture going every way'], [0.5, 'some flow lines'], [0.7, 'flow lines: filaments and combed streaks'], [Infinity, 'strongly linear: streaks or stripes']]
+    : [[0.3, 'no grain: shapes and texture going every way'], [0.5, 'some lines in one direction'], [0.7, 'lines: edges and streaks mostly one way'], [Infinity, 'strongly linear: streaks or stripes']]);
   const el = s.elongation?.med;
-  const shape = band(el, [[0.3, 'threads and filaments'], [0.55, 'elongated lobes'], [0.8, 'rounded forms'], [Infinity, 'round cells and discs']]);
+  const shape = band(el, liquid ? [[0.3, 'threads and filaments'], [0.55, 'elongated lobes'], [0.8, 'rounded forms'], [Infinity, 'round cells and discs']]
+    : [[0.3, 'long, thin lines'], [0.55, 'elongated shapes'], [0.8, 'rounded shapes'], [Infinity, 'round shapes']]);
   const sym = Math.max(s.mirror?.med ?? -1, s.halfTurn?.med ?? -1);
   const symWord = band(sym, [[0.3, 'free, asymmetric'], [0.6, 'loosely balanced'], [0.85, 'clearly symmetric'], [Infinity, 'kaleidoscopic']]);
   const sx = s.scaleX?.med, sy = s.scaleY?.med;

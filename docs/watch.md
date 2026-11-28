@@ -30,15 +30,37 @@ node scripts/watch.mjs <file or URL> [--out DIR] [--from S] [--to S] [--crop x,y
 node scripts/watch.mjs <file> --vs <reference>          # the gaps against a reference, biggest first
 node scripts/watch.mjs --before A --after B             # what changed between two films
 node scripts/watch.mjs <file> --keep NAME               # keep it in the reference library
+node scripts/watch.mjs <file> --liquid | --general      # the liquid or the general read, whatever the footage shows
 node scripts/watch.mjs --refs | --selftest
 ```
 
 In this repository `npm run watch -- …` runs the same thing.
 
+## Liquid or general
+
+Most footage gets a **general read**: the design read, the overall arc, a **Motion** section
+(on-screen speed, how much is the camera, zoom, roll, how long a view holds, detail) and
+words from film, design and colour theory. A **liquid read** adds what was calibrated on
+real liquid light shows: the physics read (the fluid's own flow, carried against fading,
+turnover), the technique guesses, the seven-canon report card, the wet show's words (cells,
+marbling, a pour) and, with a settings map, "Settings to try". The tool reads a clip as
+liquid only when it shows one: one take (at most 2 hard cuts a minute), motion of its own
+rather than a camera move, and coloured light on a dark ground; or when the page names a
+liquid technique and two of those hold. The summary's **Read as** line says which it chose
+and the numbers that chose it. `--liquid` or `--general` decides instead, and so does the
+config's `mode` (`auto`, `liquid` or `general`). Measured on real films and the rules:
+`scripts/watchmode.mjs`; held by `npm run watchmode`.
+
 ## What it needs
 
 Node 20 or later and `ffmpeg` (with `ffprobe`) on the PATH; `yt-dlp` only for links. No npm
 packages: the scripts import only Node's own modules.
+
+`--selftest` and its two neighbours (`npm run watchwords`, `npm run watchcard`) make their own
+clips, so their ffmpeg needs the `libvpx` encoder and `libvorbis` or `libopus` for the sound.
+Either gives the same reads (measured on ffmpeg 6.1 with each, 2026-11-28), so Homebrew's default
+`ffmpeg`, which has no libvorbis, will do; when neither is there the self-test says which ffmpeg it
+found (PLAN 47x-6).
 
 ## Its config file
 
@@ -51,6 +73,7 @@ is at the top of `scripts/watchconfig.mjs`):
 | `fetch` | for a link this machine is refused: which machine to fetch it on, its folder, where its `yt-dlp` and `ffmpeg` are, what to do with the file after | plain `yt-dlp` into `~/reelreader/<name>` |
 | `settingsMap` | a module turning `--vs` gaps into your app's settings ("Settings to try") | no such section |
 | `scratch` | the temp folder name used when `--out` is not given | `reelreader` |
+| `mode` | `auto` (the footage decides), `liquid` or `general`, when no flag is given | `auto` |
 
 It is found as `--config FILE`, else `$REELREADER_CONFIG`, else `reelreader.config.json` in the folder you
 run from, else beside the scripts. `$REELREADER_REFERENCES` is always the first library folder.

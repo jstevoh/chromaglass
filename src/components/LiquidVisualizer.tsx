@@ -68,6 +68,7 @@ import { MelodyWalk, melodyLine, type MelodyDrop, type MelodyLine } from '../lib
 import { makeNoteVoices, readNoteFeature, resetNoteVoices, type VoiceDrop, type VoiceTool } from '../lib/noteVoices';
 import { BarGrid, Accent, tellBar } from '../lib/barGrid';
 import { kickPress, kickDepth } from '../lib/squish';
+import { handPress } from '../sim/pressLay';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { captureFilmCamera, captureFilmWindow } from '../lib/filmCapture';
 import { Phrasing, type Phrase } from '../lib/phrasing';
@@ -3193,16 +3194,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 if (primary) magnetHandRef.current = { x: x / GRID_SIZE, y: y / GRID_SIZE, at: showNow() };
                 else hand.magnetAt = showNow();
               } else if (tool === 'press') {
-                // A hand on the top glass: the film thins under the palm and
-                // the dye spreads out in a ring, the rhythm plate worked by hand.
-                const fg = currentSettings.fingering ?? 0;
-                const pa = 0.004 * k;
-                af.applySquish(x, y, 30, pa, fg, true);
-                af.applySquish(x, y, 18, pa, fg);
-                af.applySquish(x, y, 8, pa, fg);
-                // And the liquid goes where a squeezed film sends it.
-                const prR = 30;
-                af.squeezeOut(x, y, prR * GRID_SCALE, pa);
+                // A hand on the top glass, its rate laid as this step's share (PLAN 18a-5).
+                handPress(af, x, y, k, currentSettings.fingering ?? 0, simStepS, GRID_SCALE);
 
                 /*
                   That is the whole press. It used to add a twist on top: a

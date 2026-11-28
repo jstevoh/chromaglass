@@ -35,8 +35,10 @@
  *        oil brighter than the water it displaced. The old flat 8% read 8%
  *        of the water's level there
  *   7.   oil out of focus is a lens: at Focus 0.8 some of it brighter than
- *        the water and some darker (the shadowgraph's 1 - Δz·∇²OPL), and at
- *        Focus 0.2 the same pixels the other way, which a flat gain cannot do
+ *        the water and some darker (the shadowgraph's 1 - Δz·∇²OPL), and
+ *        either side of the middle (Focus 0.56 against 0.44, where the traced
+ *        map is still linear: TURN's comment) the same pixels the other way,
+ *        which a flat gain cannot do
  *   8.   no grain: the same plate drawn at two times of the clock is the same
  *        picture, byte for byte
  *
@@ -64,7 +66,8 @@
  *
  *   13.  it is the whole column's, one term: a clear pour of glycerine, no
  *        dye in it and no oil, is a lens out of focus as line 7 asks of the
- *        oil, and brightens nothing in focus. And as strong a lens as the
+ *        oil (its turnover inside POUR_LINEAR of its radius, its sharp edge
+ *        dark both sides), and brightens nothing in focus. And as strong a lens as the
  *        oil's for its index step: the two drops are the same size, so the
  *        summed |ln T| each makes just off focus goes as glycerine's 0.142
  *        over water to the oil's 0.8 of 0.137 (1.29), within a quarter. The
@@ -135,6 +138,36 @@ const OIL = { x: 0.72, y: 0.28, r: 0.09 };
 const POUR = { x: 0.72, y: 0.72, r: 0.09 };
 /** Line 9's strength is read just off Focus's middle, where the transport is still linear in the path and nothing clips. */
 const NEAR = 0.56;
+/** Lines 7 and 13: a pixel turns over when it moves past this many levels (green) both sides of the middle. */
+const TURN = 2;
+/*
+  Line 13's turnover is asked inside this share of the pour's radius. The
+  oil's height (31s-1) is smooth and its whole disc turns over (line 7: 4057
+  of 4074). A pour is a column of glycerine, its index step sharp at its
+  edge: a ramp of path about 0.14 rest gaps over a cell or two, which at
+  Focus 0.56 throws its rays some 7 texels, far wider than the ramp. Past
+  that the map is not linear: the ramp's own pixels lose their light at
+  both sides of focus and it lands as bright lines either side of it, as a
+  real shadowgraph of a sharp interface draws (measured by radius, in tenths
+  of R: inside 0.8 R 975 of 1018 turn over; at 0.8 to 1.1 R, 714 of 1464
+  pixels are darker both sides; none anywhere brighter both). So the line
+  asks the sign where the map is linear, and of the rest that no pixel gains
+  light both ways, which a ramp's trace cannot do and a mistraced one would.
+*/
+const POUR_LINEAR = 0.8;
+/*
+  Lines 7 and 13's turnover is read across the same small step either side
+  of Focus's middle (NEAR and 1 - NEAR), not at 0.8 against 0.2. Since 31s-2
+  the wall's light is traced: each ray lands at x + dz·θ, and the light is
+  the inverse of how the landed mesh spreads. To first order in dz that is
+  1 - dz·∇²OPL, which turns over pixel for pixel when dz changes sign: the
+  shadowgraph these lines were written for. At 0.8 and 0.2 the throw is five
+  times larger, the oil's rim lobes have moved a pixel or more, and a lens
+  focused short of the wall at one side lands its light on other pixels than
+  it takes it from at the other, so the measured 75% (3761 of 5010) is the
+  trace being right, not the lens missing. 0.8 still says the lens is there
+  (brighter and darker in places); the sign is asked where the map is linear.
+*/
 /** Line 14's index-matched pour, on the clear plate: the corner away from the glycerine. */
 const MATCH = { x: 0.28, y: 0.72, r: 0.09 };
 
@@ -247,20 +280,20 @@ try {
     const s = lab.solver();
     out.waterFocus = await shot({ projectorFocus: 0.5 });
     out.water8 = await shot({ projectorFocus: 0.8 });
-    out.water2 = await shot({ projectorFocus: 0.2 });
     out.waterNear = await shot({ projectorFocus: NEAR });
+    out.waterFar = await shot({ projectorFocus: 1 - NEAR });
     s.addMix(OIL.x, OIL.y, OIL.r, { oil: 0.8 });
     await lab.step(1);
     out.oilFocus = await shot({ projectorFocus: 0.5 });
     out.oil8 = await shot({ projectorFocus: 0.8 });
-    out.oil2 = await shot({ projectorFocus: 0.2 });
     out.oilNear = await shot({ projectorFocus: NEAR });
+    out.oilFar = await shot({ projectorFocus: 1 - NEAR });
     // A clear pour, no dye in it, onto the wash away from the oil and the pools: glycerine, n 1.4746.
     lab.addSpecies(POUR.x, POUR.y, POUR.r, 50, 'glycerine', false);
     out.pourFocus = await shot({ projectorFocus: 0.5 });
     out.pour8 = await shot({ projectorFocus: 0.8 });
-    out.pour2 = await shot({ projectorFocus: 0.2 });
     out.pourNear = await shot({ projectorFocus: NEAR });
+    out.pourFar = await shot({ projectorFocus: 1 - NEAR });
     return out;
   }, { N, SIZE, OIL, POUR, DARK, NEAR });
   r2 = await page.evaluate(async ({ N, SIZE, LAMPS, CAM_BEADS }) => {
@@ -503,10 +536,11 @@ for (let i = 0; i < P; i++) {
   const x = i % SIZE, y = Math.floor(i / SIZE);
   if (!inOil(x / SIZE, y / SIZE)) continue;
   const g8 = lensOnly(r.oil8, r.water8, r.oilFocus, r.waterFocus, 4 * i + 1);
-  const g2 = lensOnly(r.oil2, r.water2, r.oilFocus, r.waterFocus, 4 * i + 1);
+  const gN = lensOnly(r.oilNear, r.waterNear, r.oilFocus, r.waterFocus, 4 * i + 1);
+  const g2 = lensOnly(r.oilFar, r.waterFar, r.oilFocus, r.waterFocus, 4 * i + 1);
   if (g8 > 2) up8++;
   if (g8 < -2) down8++;
-  if (Math.abs(g8) > 2 && Math.abs(g2) > 2) { both++; if (Math.sign(g8) !== Math.sign(g2)) flip++; }
+  if (Math.abs(gN) > TURN && Math.abs(g2) > TURN) { both++; if (Math.sign(gN) !== Math.sign(g2)) flip++; }
 }
 // That the oil is there at all is line 7's: out of focus it draws a lens. With none laid, 6 compares water to water.
 const oilThere = up8 > 20 && down8 > 20;
@@ -518,8 +552,8 @@ const oilThere = up8 > 20 && down8 > 20;
     oilThere && d.over <= SLACK, `brightest by ${d.over} levels over ${d.n} px (a flat 8% of this water would be ${Math.round(0.08 * lvl)})`);
 }
 {
-  check('7. oil out of focus is a lens: brighter and darker in places at Focus 0.8, and the other way at 0.2 (over 90% of those pixels)',
-    up8 > 20 && down8 > 20 && both > 20 && flip / both > 0.9, `${up8} px brighter, ${down8} darker at 0.8; ${flip} of ${both} turn over at 0.2`);
+  check(`7. oil out of focus is a lens: brighter and darker in places at Focus 0.8, and the other way either side of the middle (Focus ${NEAR} against ${(1 - NEAR).toFixed(2)}, over 90% of the pixels moved past ${TURN} levels at both)`,
+    up8 > 20 && down8 > 20 && both > 20 && flip / both > 0.9, `${up8} px brighter, ${down8} darker at 0.8; ${flip} of ${both} turn over`);
 }
 {
   const d = compare(r.later, r.plain), e = compare(r.plain, r.later);
@@ -560,15 +594,20 @@ const oilThere = up8 > 20 && down8 > 20;
 {
   const pourR = radii(POUR);
   const inPour = (u, v) => pourR(u, v) < 1.3;
-  let up = 0, down = 0, turn = 0, seen = 0;
+  let up = 0, down = 0, turn = 0, seen = 0, brightBoth = 0, darkBoth = 0;
   for (let i = 0; i < P; i++) {
     const x = i % SIZE, y = Math.floor(i / SIZE);
     if (!inPour(x / SIZE, y / SIZE)) continue;
     const g8 = lensOnly(r.pour8, r.oil8, r.pourFocus, r.oilFocus, 4 * i + 1);
-    const g2 = lensOnly(r.pour2, r.oil2, r.pourFocus, r.oilFocus, 4 * i + 1);
+    const gN = lensOnly(r.pourNear, r.oilNear, r.pourFocus, r.oilFocus, 4 * i + 1);
+    const g2 = lensOnly(r.pourFar, r.oilFar, r.pourFocus, r.oilFocus, 4 * i + 1);
     if (g8 > 2) up++;
     if (g8 < -2) down++;
-    if (Math.abs(g8) > 2 && Math.abs(g2) > 2) { seen++; if (Math.sign(g8) !== Math.sign(g2)) turn++; }
+    if (Math.abs(gN) > TURN && Math.abs(g2) > TURN) {
+      const turned = Math.sign(gN) !== Math.sign(g2);
+      if (pourR(x / SIZE, y / SIZE) < POUR_LINEAR) { seen++; if (turned) turn++; }
+      if (!turned) { if (gN > 0) brightBoth++; else darkBoth++; }
+    }
   }
   /*
     The strength, not only the area: the count of pixels past 2 levels fills
@@ -594,9 +633,9 @@ const oilThere = up8 > 20 && down8 > 20;
   // What the optics predict: each lens as strong as its index step (glycerine 1.4746, the oil 0.8 of 1.47, over water's 1.333).
   const expect = (1.4746 - 1.333) / (0.8 * (1.47 - 1.333));
   const ratio = sPour / Math.max(1, sOil) / expect;
-  check(`13. one shadowgraph for the whole column: a clear pour with no dye is a lens out of focus (brighter and darker at 0.8, the other way at 0.2, over 90%), as strong as the oil's for its index step (within a quarter), and in focus brightens nothing (by over ${SLACK})`,
-    up > 20 && down > 20 && seen > 20 && turn / seen > 0.9 && ratio > 0.75 && ratio < 1 / 0.75 && d.over <= SLACK,
-    `${up} px brighter, ${down} darker at 0.8 (the oil's ${up8 + down8}); summed |ln T| at ${NEAR} ${sPour.toFixed(1)} against the oil's ${sOil.toFixed(1)}, ${ratio.toFixed(2)} of the ${expect.toFixed(2)} the index steps predict; ${turn} of ${seen} turn over at 0.2; in focus brightest by ${d.over} levels`);
+  check(`13. one shadowgraph for the whole column: a clear pour with no dye is a lens out of focus (brighter and darker at 0.8; the other way either side of the middle, over 90% inside ${POUR_LINEAR} of its radius; nowhere brighter both sides), as strong as the oil's for its index step (within a quarter), and in focus brightens nothing (by over ${SLACK})`,
+    up > 20 && down > 20 && seen > 20 && turn / seen > 0.9 && brightBoth === 0 && ratio > 0.75 && ratio < 1 / 0.75 && d.over <= SLACK,
+    `${up} px brighter, ${down} darker at 0.8 (the oil's ${up8 + down8}); summed |ln T| at ${NEAR} ${sPour.toFixed(1)} against the oil's ${sOil.toFixed(1)}, ${ratio.toFixed(2)} of the ${expect.toFixed(2)} the index steps predict; ${turn} of ${seen} inside ${POUR_LINEAR} R turn over, ${brightBoth} px brighter both sides, ${darkBoth} darker both (its edge); in focus brightest by ${d.over} levels`);
 }
 
 /*

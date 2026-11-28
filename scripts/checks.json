@@ -574,12 +574,26 @@
       ]
     },
     {
+      "name": "General footage gets no liquid verdict",
+      "shard": "sound",
+      "run": "npm run watchmode",
+      "why": [
+        "The watch tool is packaged for anyone (reelreader, PLAN 47p), and its physics",
+        "read, report card, technique guesses, wet-show words and Settings to try are",
+        "a liquid light show's: before 47p-3 an edited cartoon graded Arc 9.0/10",
+        "against the real shows. scripts/watchmode.mjs reads liquid only on three",
+        "cues (one take, its own motion, coloured light on a dark ground) or when",
+        "asked. This holds the cues to the films they were measured on, a synthetic",
+        "street film (bright, panning, cut) to a general read with none of the liquid",
+        "vocabulary even with a settings map and --vs, the same film with --liquid to",
+        "all of it (so the scan sees what it scans for), a dye take to liquid by",
+        "itself, and the config's mode. In the sound shard for its ffmpeg. Under a minute."
+      ]
+    },
+    {
       "name": "Watching in words",
       "shard": "sound",
       "run": "npm run watchwords",
-      "quarantine": [
-        { "line": "drift → drift2 (the same look, another phase): no steady change past a step", "plan": "47x-11", "since": "2026-11-22", "until": "2026-12-06" }
-      ],
       "why": [
         "The watch tool says what it sees in words (docs/watch-words.md: Laban,",
         "Itten, Ching, Greenberg, Arnheim, the wet show) and tells a before film",
@@ -1837,6 +1851,21 @@
         "tau = 3 mu / (h0^3 (sigma k^4 + rho g k^2)) within 15% at two wavenumbers",
         "across 256^2 and 384^2 at 60 Hz and 30 Hz; total h is kept to 0.1% over",
         "600 steps with flow running."
+      ]
+    },
+    {
+      "name": "The lamp's light is traced through the liquid to the wall (SwiftShader)",
+      "shard": "lab4",
+      "run": "npm run caustics",
+      "why": [
+        "PLAN 31s-2 (src/gpu/caustic.ts, src/gpu/wgsl/caustic.ts, scripts/caustics.mjs):",
+        "the plate's own PlateCaustics on known paths. A flat path lights the wall",
+        "evenly (1%); light is kept (1%); a plano-convex lens focuses at Rc/dn",
+        "(10%) with its light all kept at focus; a ridge folds into bright lines",
+        "where the map says; three domes of 1, 2 and 4 cells light three peaks; a",
+        "ripple follows I = 1/|1 - c sin kx| (6%) and first folds between c 0.9 and 2",
+        "(47j); the display traces at Focus 0.8 and not at 0.5. --first-order (the",
+        "old shadowgraph's law) fails lines 3, 4 and 7."
       ]
     },
     {
@@ -3246,6 +3275,20 @@
       ]
     },
     {
+      "name": "A held press closes the glass over its own time",
+      "shard": "plate",
+      "run": "npm run pressclock",
+      "why": [
+        "PLAN.md 18a-5 (scripts/pressclock.mjs): the app's Press held on a thin gap closes the",
+        "glass by the same volume in the same seconds at 30, 60 and 120 steps a second, within 3%",
+        "(main's per-step dent, the control, closed 0.64-0.68 of it at 30); and let go, the thin",
+        "gap's squeeze rate is the gap's own change, no memory (the old plate keeps it; with main's",
+        "gap.ts the line read 7.96 rms off, which is its real control). The hand is pressed by",
+        "handPress, the Press tool's own lay.",
+        "About 45 s on SwiftShader (cloud, 2026-11-28)."
+      ]
+    },
+    {
       "name": "The Finger drags the liquid",
       "shard": "plate",
       "run": "npm run fingerflow",
@@ -3357,6 +3400,18 @@
         "the cells past the open rim as neighbours, and they are cleared every",
         "step, so the water's colour seeped over the rim and was wiped there;",
         "it now stops at the rim, as the dye's dispersion and the oil's do."
+      ]
+    },
+    {
+      "name": "Turbulence and the comet stir the dish without emptying it",
+      "shard": "lab",
+      "run": "npm run rimstir",
+      "timeout": 20,
+      "why": [
+        "Lacing Run and Classical Vibe left dim (PLAN 18a-25): the Turbulence's",
+        "curl noise and the comet's pull were laid into the open-rim solve as",
+        "through-flows and ran the dish out over its rim (7% and 0.04% left in",
+        "the lab); both are now the closed dish's circulation, as strong inside."
       ]
     },
     {
@@ -3758,6 +3813,21 @@
         "at 512², a thread of oil narrower than the gap breaks into beads",
         "(Rayleigh–Plateau, its curvature across the gap) and a ribbon wider",
         "than the gap holds (confinement); no oil made or lost. About seven",
+        "minutes on software WebGPU."
+      ]
+    },
+    {
+      "name": "Oil threads bead at the Rayleigh–Plateau wavelength",
+      "shard": "plate",
+      "run": "npm run pinch",
+      "timeout": 15,
+      "why": [
+        "PLAN 47k: the per-cell clip on the oil's capillary force flattened",
+        "Rayleigh–Plateau on a thread, so waves past the cutoff grew and beads",
+        "came at any spacing. At 512² on a thin gap, eight threads' waves grow",
+        "at the plate's Darcy law (past kr = 1 they shrink, the fastest near",
+        "0.67, the long ones within 30% of its rate) and four noisy threads",
+        "bead 4.7 widths apart within 15%; no oil made or lost. About five",
         "minutes on software WebGPU."
       ]
     },
