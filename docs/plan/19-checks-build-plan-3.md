@@ -659,8 +659,8 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
     - `live -- --codec aac` (3/3 green alone, 45/45) and `liveshow -- --stack` (3/3 green alone, 28/28): load/phase on deploy 967 (`liveshowstack.mjs:258` compares col 0/15 vs col 2/13, which hits the white bar on row 6 when the last decoded frame lands there).
     - `qa` ("no section is more than three screens deep — deepest is 3.1 screens"): bisected to `#889` (`3bb0899b`, `38u-11` adding `glassSlide` cord to `Crowd Plate`, growing `Patches` from `2205/758 = 2.91` to `2327/758 = 3.07`); fixed in `PatchesSection.tsx` (2×2 LFOs and 2×1 Envelopes in the sheet). Full `npm run qa` remains blocked at `origin/main` on `49c-2` (`#963` unhooking `overlayUp` at `<1024px`).
     - `videolamp` (0/3 alone, 9/11): bisected to `#755` (`6d11ce66`, `18e-2`, `19.57/3.57/3.91, flat 0.00` → `17.36/5.05/4.58, flat 8.68`); open for Claude Code (`scripts/videolamp.mjs` measures screen `(0.72, 0.5)` r=`0.12` where `uvToFluid` maps fluid `(0.72, 0.5)` r=`0.12` to screen `(0.83, 0.5)` r=`0.18` — `0.00` middle/far at true coords — and its `rim > 3 * flatRim` control predates `18e-2`'s real `|∇OPL|` pupil loss, which darkens the flat rim by `30.19` vs `58.27` on stripes).
-  - 19ak-24f, Lava Lamp: `lavacycle`'s control (no cool glass, the wax still falls) and
-    `lavaround` (after 27f-9q, #866, met 38w-31, #954).
+  - ~~19ak-24f, Lava Lamp: `lavacycle`'s control (no cool glass, the wax still falls) and
+    `lavaround` (after 27f-9q, #866, met 38w-31, #954)~~ **shipped in 19ak-25** (below).
   - ~~19ak-24g, `filmlook`'s two camera lines~~ **shipped**: 38h-6 (#750) rightly took the
     camera's rainbow away at every Film Physics, and the lines still measured Film Physics 1
     against it (0.3 against 0.3); re-read on the film's own footprint (9/9).
@@ -676,3 +676,28 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
     ring (0.8 to 1.1 of the nominal radius) sits inside the drawn drop's 0.8, where the
     gain is larger, or the drop draws a few levels of light. Measure the drawn radius in
     `beadTex` against CAM_BEADS first. Never a looser bar.
+- **19ak-25. Main's three reds at deploy 1053 (58395d1, 2026-11-27), fixed in one PR.**
+  - ~~`lampzero`: Classical Vibe 0% different from itself at Lamp Ground 0~~ **shipped**: the
+    owner's look (34b-7, #1010) is a Photograph, and plateUniforms.ts sends the shader a Lamp
+    Ground of 0 for every Photograph, so its saved 1 never drew. Set to 0, what it drew.
+  - ~~`qa` (a show night) stopped at its sixth line~~ **shipped**: since 49b (#962) there is no
+    floating overlay at any width, and the suite's 900 px steps waited 60 s for the overlay's
+    Band button (5 checks run on every deploy since 11-26). They take the desk's ways now
+    (scripts/qaDesk.mjs: the Settings sheet's Sound section, the Looks grid, the File menu,
+    the cue list and Go; the palette for MIDI, Songs, the Guide; F to freeze for the drag),
+    and the Settings sheet is shut before the plate is measured. The whole suite runs again
+    (128/144 on software WebGPU, the 16 others frame reads only a GPU makes). Found once it
+    ran: the cue chips' remove and add buttons were 16 px (34b-6), now 24.
+  - ~~`lavaround`: two leak meters and roundness 0.552~~ **shipped**: it never handed the solver
+    the look's Oil Thickness (38w-31, #954, gave the other two lava checks theirs), so it ran a
+    wax 5.5 times thicker than the lamp's. Handed over: 5/5 on the Mac (lip 11.5%, guard 16.1%,
+    0.780 against 0.567), found by Antigravity's PR #984.
+  - ~~`lavacycle`'s control (no cool glass) fell 0.86 to 0.81~~ **shipped**: Lava Lamp's Oil Weight
+    0.6 to 0.5 (presets.ts says why; the cause and the value are #984's). 7/7 on the Mac.
+  - 19ak-25b, open: the lava control's window is narrow: Oil Weight 0.45 fails it (0.88 to
+    0.82), 0.5 passes by 0.02, 0.6 fails at the bar (0.86 to 0.81). Find why the control is not monotonic in the wax's weight with no
+    cool glass (the tight ball's heat given to the water above it, 27f-9q's Oil Tension 4)
+    before the next change to the wax's weight or tension. Never a looser bar.
+  - 19ak-25c, open (Claude Code): `lampzero` dies in a cloud session ("Execution context was
+    destroyed" in its first lab, three runs in a row on this branch, whose only change it reads is one look's Lamp Ground); it runs on the Linux runner and the
+    Mac. Find what navigates the lab page there.
