@@ -42,7 +42,7 @@ const meshRecipe = (device: GPUDevice, splat = false): RenderRecipe => (module) 
   vertex: { module: module(CAUSTIC_MESH_WGSL), entryPoint: splat ? 'vsSplat' : 'vs' },
   fragment: {
     module: module(CAUSTIC_MESH_WGSL),
-    entryPoint: 'fs',
+    entryPoint: splat ? 'fsSplat' : 'fs',
     targets: [{
       format: 'r16float',
       blend: {
@@ -74,7 +74,6 @@ export function causticDz(ask: CausticAsk): number {
 }
 
 export class PlateCaustics {
-  private readonly sampler: GPUSampler;
   private readonly params: GPUBuffer[] = [];
   private readonly paramBytes = new ArrayBuffer(32);
   private readonly paramU32 = new Uint32Array(this.paramBytes);
@@ -85,9 +84,7 @@ export class PlateCaustics {
   private lit: GPUTexture | null = null;
   private light: GPUBuffer | null = null;
 
-  constructor(private readonly device: GPUDevice, private readonly pipelines: PipelineCache, private readonly disposer: Disposer) {
-    this.sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' });
-  }
+  constructor(private readonly device: GPUDevice, private readonly pipelines: PipelineCache, private readonly disposer: Disposer) {}
 
   /** Built behind the show: no look opens with Focus off the middle. */
   static prepare(cache: PipelineCache, device: GPUDevice): Prep[] {
@@ -166,7 +163,7 @@ export class PlateCaustics {
       const u = this.paramsFor(i, m, dz);
       const c = encoder.beginComputePass({ label: `caustic rays ${i}` });
       c.setPipeline(rays);
-      c.setBindGroup(0, groupOf(this.device, rays, [u, derived[i], this.sampler, this.rays!]));
+      c.setBindGroup(0, groupOf(this.device, rays, [u, derived[i], this.rays!]));
       c.dispatchWorkgroups(Math.ceil(side / 8), Math.ceil(side / 8));
       c.end();
       const r = encoder.beginRenderPass({
@@ -176,6 +173,7 @@ export class PlateCaustics {
       const tris = 2 * cells * cells;
       r.setPipeline(mesh);
       r.setBindGroup(0, groupOf(this.device, mesh, [u, this.rays!]));
+      // Each triangle as the box round it (wgsl/caustic.ts, vs: its texel centres are chosen in fs).
       r.draw(3 * tris);
       // The gathered triangles' light (CAUSTIC_SPLAT_FROM, _FULL), one tent each (wgsl/caustic.ts says why).
       r.setPipeline(splats);

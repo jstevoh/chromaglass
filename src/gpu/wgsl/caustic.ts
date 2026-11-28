@@ -140,16 +140,44 @@ export const CAUSTIC_KERNELS = {
   /*
     Each vertex of the mesh moved to where its ray lands. The vertex sits at
     a cell's corner; the slope of .w is the central difference across it,
-    read through the linear sampler at the corners' midpoints a cell apart,
-    so a vertex sees exactly the cells it touches and nothing a stride away
-    (the flower's lesson, PLAN 15g-15 and 31s-8). The sampler clamps at the
-    edge, so past the plate the path is flat and the ray goes straight.
+    read bilinearly at the corners' midpoints a cell apart, so a vertex sees
+    exactly the cells it touches and nothing a stride away (the flower's
+    lesson, PLAN 15g-15 and 31s-8). The read clamps at the edge, so past the
+    plate the path is flat and the ray goes straight.
+
+    The bilinear read is done here, from four textureLoads mixed in f32, and
+    not by the sampler (PLAN 31s-2f). The light is the slope's own slope: a
+    cell's light is its width at the plate over the gap between its two
+    corners' rays, each moved by a difference of two reads, so the light
+    hangs on the reads' last bits. A sampler is free to filter a half-float
+    texture at less than f32 (the filtering units of many GPUs keep a 16-bit
+    format's result at 16 bits, and the spec only bounds it loosely), and
+    the mean of two halves needs one bit more than a half: a CPU copy of
+    this trace (scratch/replica.mjs in the 31s-2f thread) moved npm run
+    caustics line 7's ripple from -4.7% to +4.9% against its law by
+    rounding that mean to a half, where the cloud's SwiftShader read -4.8%
+    and the owner's Mac 6.1%. Read here, every GPU mixes the same halves the
+    same way.
   */
   causticRays: /* wgsl */ `
 ${PARAMS}
 @group(0) @binding(1) var derived: texture_2d<f32>;
-@group(0) @binding(2) var samp: sampler;
-@group(0) @binding(3) var<storage, read_write> rays: array<vec4f>;
+@group(0) @binding(2) var<storage, read_write> rays: array<vec4f>;
+
+/* .w at plate uv, bilinear between the four nearest texels and clamped at the edge, as a linear clamping sampler reads it, in f32. */
+fn pathAt(uv: vec2f) -> f32 {
+  let dim = vec2i(textureDimensions(derived));
+  let p = uv * vec2f(dim) - 0.5;
+  let f = floor(p);
+  let t = p - f;
+  let lo = clamp(vec2i(f), vec2i(0), dim - 1);
+  let hi = clamp(vec2i(f) + 1, vec2i(0), dim - 1);
+  let a = textureLoad(derived, lo, 0).w;
+  let b = textureLoad(derived, vec2i(hi.x, lo.y), 0).w;
+  let c = textureLoad(derived, vec2i(lo.x, hi.y), 0).w;
+  let d = textureLoad(derived, hi, 0).w;
+  return mix(mix(a, b, t.x), mix(c, d, t.x), t.y);
+}
 
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) id: vec3u) {
@@ -157,10 +185,10 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   if (id.x >= side || id.y >= side) { return; }
   let cell = 1.0 / f32(P.m);
   let at = (vec2f(id.xy) - f32(P.border)) * cell;
-  let wx1 = textureSampleLevel(derived, samp, at + vec2f(0.5, 0.0) * cell, 0.0).w;
-  let wx0 = textureSampleLevel(derived, samp, at - vec2f(0.5, 0.0) * cell, 0.0).w;
-  let wy1 = textureSampleLevel(derived, samp, at + vec2f(0.0, 0.5) * cell, 0.0).w;
-  let wy0 = textureSampleLevel(derived, samp, at - vec2f(0.0, 0.5) * cell, 0.0).w;
+  let wx1 = pathAt(at + vec2f(0.5, 0.0) * cell);
+  let wx0 = pathAt(at - vec2f(0.5, 0.0) * cell);
+  let wy1 = pathAt(at + vec2f(0.0, 0.5) * cell);
+  let wy0 = pathAt(at - vec2f(0.0, 0.5) * cell);
   let grad = vec2f(wx1 - wx0, wy1 - wy0) / cell;
   // The ray's bend in radians (.w's slope in rest gaps per plate width, times gap over plate) and how much of its cone the head lens takes.
   let bend = length(grad) * ${(DISH_GAP_METRES / DISH_METRES).toPrecision(6)};
@@ -230,7 +258,27 @@ export type CausticKernel = keyof typeof CAUSTIC_KERNELS;
   The mesh: two triangles a cell, drawn with no vertex buffer. Each vertex
   invocation reads its triangle's three landed corners, so it knows the
   triangle's area at the wall; the triangle's light is its area at the plate
-  (half a cell) over that, the same at all three corners (flat). The target
+  (half a cell) over that, the same at all three corners (flat).
+
+  Which texel centres a triangle covers is decided here, in fs, from its
+  three landed corners exactly as the rays buffer holds them, not by the
+  rasteriser (PLAN 31s-2f). vs draws each triangle as the box round it, a
+  quarter texel out, and fs keeps the texel centres inside the triangle.
+  A rasteriser first puts every corner on its own sub-texel grid (a
+  sixteenth of a texel in SwiftShader, finer on Metal), so a texel centre
+  within that grid's step of a landed corner fell in one cell or its
+  neighbour by GPU; where rays gather the two can carry very different
+  drawn light (a cell at gain 1.98 draws 2% of its light, its neighbour at
+  1.84 draws 16%: the share between drawn and splatted ramps over gain 1 to
+  2), and one such centre beside the ripple's peak put 0.16 more light on
+  its column in the cloud than the same mesh covered exactly (npm run
+  caustics line 7). The box's quarter texel is more than any grid's step,
+  so every centre the triangle holds is offered to fs. Each edge is tested
+  with its two ends in one order whichever triangle asks (the lesser x
+  first), so the two triangles sharing an edge compute the same number and
+  a centre on it goes to exactly one of them: the one on the edge's left.
+  A sheet turned over by a fold covers its centres as well, and is counted
+  with the sheets under it. The target
   is the wall at the same texels as the plate's cells, added (one + one), so
   where the map folds and two sheets land on one texel both are counted.
   Clip y is 1 - 2v: the target's row 0 is the plate's v = 0, as the derive
@@ -239,8 +287,20 @@ export type CausticKernel = keyof typeof CAUSTIC_KERNELS;
   A triangle gathered past CAUSTIC_SPLAT_FROM gives a share of its light
   (all of it by CAUSTIC_SPLAT_FULL, when it is not drawn here at all: its
   three corners are put on one point, which covers nothing) to vsSplat: a
-  quad two texels square round the triangle's landed centre, each texel
-  centre inside it given the bilinear tent's share of that light.
+  quad round the triangle's landed centre, each texel centre inside it
+  given the bilinear tent's share of that light, a texel each side.
+
+  The tent is weighed in fsSplat from the texel's own centre and the
+  splat's centre as the vertex stage computed it (flat), not from a
+  coordinate interpolated across the quad (PLAN 31s-2f). A rasteriser puts
+  each corner on its own sub-texel grid before it interpolates anything:
+  SwiftShader's grid is a sixteenth of a texel (a CPU copy of the trace
+  matched the cloud's light to 0.1% only with its corners rounded to it),
+  Metal's another, so an interpolated tent stood up to a thirty-second of a
+  texel off the centre, by an amount that differs from GPU to GPU, and a
+  ripple's gathered light, a tent beside every texel, is read against its
+  law within a few percent. The quad reaches a texel and a half each side so
+  that no grid can trim a texel centre the tent still weighs.
 */
 export const CAUSTIC_MESH_WGSL = /* wgsl */ `
 ${PARAMS}
@@ -249,8 +309,12 @@ ${PARAMS}
 struct MeshOut {
   @builtin(position) pos: vec4f,
   @location(0) @interpolate(flat) gain: f32,
-  /* where in a splat's tent this is, in texels from its centre (0 on a triangle: weight 1) */
-  @location(1) tent: vec2f,
+  /* a splat's centre in the target's pixels (fsSplat weighs its tent from it; unused on a triangle) */
+  @location(1) @interpolate(flat) centre: vec2f,
+  /* a drawn triangle's landed corners in the target's pixels (fs tests its texel centre against them; unused in a splat) */
+  @location(2) @interpolate(flat) a: vec2f,
+  @location(3) @interpolate(flat) b: vec2f,
+  @location(4) @interpolate(flat) d: vec2f,
 }
 
 /* gain: plate area over wall area; passed: the share of its rays the head lens takes (PROJECTOR_NA), its corners' least */
@@ -299,6 +363,15 @@ fn splatShare(gain: f32) -> f32 {
 
 fn clip(p: vec2f) -> vec4f { return vec4f(p.x * 2.0 - 1.0, 1.0 - p.y * 2.0, 0.0, 1.0); }
 
+/* The quad's corner k of six, (0,0) (1,0) (0,1), (1,0) (1,1) (0,1). */
+fn quadCorner(k: u32) -> vec2f {
+  var c = vec2f(0.0, 0.0);
+  if (k == 1u || k == 3u) { c = vec2f(1.0, 0.0); }
+  else if (k == 2u || k == 5u) { c = vec2f(0.0, 1.0); }
+  else if (k == 4u) { c = vec2f(1.0, 1.0); }
+  return c;
+}
+
 @vertex fn vs(@builtin(vertex_index) vi: u32) -> MeshOut {
   let t = landed(vi / 3u);
   let k = vi % 3u;
@@ -309,18 +382,16 @@ fn clip(p: vec2f) -> vec4f { return vec4f(p.x * 2.0 - 1.0, 1.0 - p.y * 2.0, 0.0,
   var o: MeshOut;
   o.pos = clip(p);
   o.gain = t.gain * (1.0 - share) * t.passed;
-  o.tent = vec2f(0.0);
+  o.centre = vec2f(0.0);
+  o.a = vec2f(0.0); o.b = vec2f(0.0); o.d = vec2f(0.0);
   return o;
 }
 
 @vertex fn vsSplat(@builtin(vertex_index) vi: u32) -> MeshOut {
   let t = landed(vi / 6u);
   let k = vi % 6u;
-  // The quad's corners, in texels from the centre: (-1,-1) (1,-1) (-1,1), (1,-1) (1,1) (-1,1).
-  var c = vec2f(-1.0, -1.0);
-  if (k == 1u || k == 3u) { c = vec2f(1.0, -1.0); }
-  else if (k == 2u || k == 5u) { c = vec2f(-1.0, 1.0); }
-  else if (k == 4u) { c = vec2f(1.0, 1.0); }
+  // The quad's corners a texel and a half from the centre each way.
+  let c = 1.5 * (2.0 * quadCorner(k) - 1.0);
   let centre = (t.a + t.b + t.d) / 3.0;
   var o: MeshOut;
   // The rest, drawn as triangles, are put past the clip.
@@ -328,12 +399,37 @@ fn clip(p: vec2f) -> vec4f { return vec4f(p.x * 2.0 - 1.0, 1.0 - p.y * 2.0, 0.0,
   o.pos = select(vec4f(2.0, 2.0, 0.0, 1.0), clip(centre + c / f32(P.m)), share > 0.0);
   // Its share of half a cell's light, the triangle's area at the plate in texels.
   o.gain = 0.5 * share * t.passed;
-  o.tent = c;
+  // In pixels as @builtin(position) counts them: x right, y down from the target's row 0 (the plate's v = 0, clip above).
+  o.centre = centre * f32(P.m);
+  o.a = vec2f(0.0);
+  o.b = vec2f(0.0);
+  o.d = vec2f(0.0);
   return o;
 }
 
+fn cross2(u: vec2f, v: vec2f) -> f32 { return u.x * v.y - u.y * v.x; }
+
+/*
+  Whether p is on the inner side of the triangle's edge p0 -> p1, the triangle
+  turned by turn (+1 or -1): the edge's two ends taken in one order whatever
+  triangle asks (by x, then y), so a shared edge gives both its triangles the
+  same e; a centre on it (e = 0) goes to the triangle on its left.
+*/
+fn inside(p0: vec2f, p1: vec2f, p: vec2f, turn: f32) -> bool {
+  let first = p0.x < p1.x || (p0.x == p1.x && p0.y < p1.y);
+  let s = select(p1, p0, first);
+  let f = select(p0, p1, first);
+  let side = select(-turn, turn, first);
+  let e = cross2(f - s, p - s);
+  return e * side > 0.0 || (e == 0.0 && side > 0.0);
+}
+
 @fragment fn fs(in: MeshOut) -> @location(0) vec4f {
-  let w = max(vec2f(0.0), vec2f(1.0) - abs(in.tent));
+  return vec4f(in.gain, 0.0, 0.0, 1.0);
+}
+
+@fragment fn fsSplat(in: MeshOut) -> @location(0) vec4f {
+  let w = max(vec2f(0.0), vec2f(1.0) - abs(in.pos.xy - in.centre));
   return vec4f(in.gain * w.x * w.y, 0.0, 0.0, 1.0);
 }
 `;
