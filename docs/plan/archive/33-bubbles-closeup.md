@@ -34,3 +34,14 @@ Left from it, so none of it is lost:
   looks laid over two of them. Feeling Lucky rolls air one look in five at 0.1 to 0.3 (was
   four in five at 0.2 to 1). The dial still turns it on anywhere. `npm run lookair`: looks
   laying air 34 of 42 on main, 7 of 42 here; 2/7 on main, 7/7 here.
+
+## ~~33b. The soft glow still left round a hole~~ — **Shipped** (`airNear` flattens the dye's normal beside an air hole, `src/gpu/wgsl/plate.ts`; `npm run holeline`). Story in `docs/plan-shipped.md` §33b (moved 2026-10-29, 19m-2).
+
+- ~~**33b-5. The held air held only its own share.**~~ **Shipped** (2026-11-28, with 38u-10):
+  the slope's reads under a bubble's air were held at the pixel's own density by the air's
+  share, but the solver empties the dye wherever any air is (`airExclude` multiplies by
+  1 − air every step), so the soft rim's half-held ramp lit a pool's edge at every hole:
+  3.46 levels within 3 cells of a 14-cell hole on main (bar 1), 15.4 at the boost 38u-10
+  asks it at, unseen while `holeline` threw on its rim check. Held now by
+  `airShare` (air × `AIR_WALL` 12, clamped; `wgsl/plateSlope.ts`): 0.30 levels, the
+  pool's rim beside a hole kept at the control's 27.69. `npm run holeline`.

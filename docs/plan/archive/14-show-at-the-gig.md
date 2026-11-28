@@ -25,3 +25,10 @@ Left open from it:
 Story in `docs/plan-shipped.md`. Left open from it:
 
 - ~~**14o-smoke**~~ (S): the deployed Worker, measured from a cloud session on 2026-10-24. Story in `docs/plan-shipped.md` §14o-smoke (moved 2026-10-29, 19m-2). Left: whether a well-known commercial track comes back named, which needs a recording no cloud session should send.
+## ~~14o. The song-ID Worker is open to anyone~~
+- ~~**14o-count**~~ **parked: the song-ID Worker was retired with Song ID on 2026-11-27 and is kept in `archive/song-id/`** (S): the counters are in Workers KV, which takes one write a second per
+  key and, on the free plan, 1000 writes a day; each lookup writes two keys, so the
+  free plan meters about 500 lookups a day, and a second lookup from one address in the
+  same second can be refused as busy. A store that refuses answers 503 `busy` with CORS
+  (`npm run fingerprint-worker`, check 8). *Fix:* a Durable Object counter, or the paid
+  plan's quota. *Measure:* the same harness with a store that allows one write a second.
