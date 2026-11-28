@@ -171,3 +171,11 @@ blur.
 - ~~**47p-2**~~ the self-test green on a stock ffmpeg (shipped, this PR): 47x-6 (A, B, D fail on ffmpeg-full 9.0.2, the
   Homebrew default has no libvorbis) and 47x-11 (two takes of one look read as changed on
   Ubuntu, quarantined to 12-06). The root cause, not the bar.
+- ~~**47p-3** general mode by default~~ (shipped, this PR): `scripts/watchmode.mjs` reads a film
+  as liquid only on three cues (one take, its own motion, coloured light on a dark ground), or
+  a page naming a liquid technique and two of them, or `--liquid` / `--general` / the config's
+  `mode`; the summary's **Read as** says which and why. General footage gets a **Motion**
+  section in place of Physics and Techniques, no report card or Settings to try, and general
+  words (low-key, linear, clustered, colour field). Measured: Big Buck Bunny graded Arc
+  9.0/10 against the real shows before, now reads general with no card; the Joshua Light
+  Show, glow ink and four app takes read liquid. `npm run watchmode` 21/21.

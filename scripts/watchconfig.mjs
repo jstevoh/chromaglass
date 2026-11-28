@@ -38,6 +38,9 @@
  *   app to turn it in.
  * - `scratch`: the folder name under the system's temp folder that a watch
  *   writes to when `--out` is not given. No config: `reelreader`.
+ * - `mode`: `auto` (the footage decides, scripts/watchmode.mjs), `liquid` or
+ *   `general`: which read a film gets when no `--liquid` or `--general` is
+ *   given (PLAN 47p-3). No config: `auto`.
  *
  * Which file. `--config <file>` (watch.mjs), else `$REELREADER_CONFIG`, else
  * `reelreader.config.json` in the folder the command runs in, else
@@ -66,6 +69,7 @@ export const GENERAL = Object.freeze({
   fetch: { dir: '~/reelreader', bin: null, where: 'a computer on a home connection', then: null },
   settingsMap: null,
   scratch: 'reelreader',
+  mode: 'auto',
 });
 
 /** `~` to the home folder, `$NAME` to that variable (null when unset). */
@@ -111,7 +115,9 @@ export function loadConfig({ file = null, env = process.env, cwd = process.cwd()
     fetch: { ...GENERAL.fetch, ...(raw.fetch && typeof raw.fetch === 'object' ? raw.fetch : {}) },
     settingsMap: typeof raw.settingsMap === 'string' && raw.settingsMap ? path.resolve(path.dirname(f), raw.settingsMap) : null,
     scratch: typeof raw.scratch === 'string' && raw.scratch ? raw.scratch : GENERAL.scratch,
+    mode: raw.mode == null ? GENERAL.mode : raw.mode,
   };
+  if (!['auto', 'liquid', 'general'].includes(cfg.mode)) throw new Error(`watch config ${f}: mode is "${cfg.mode}", not auto, liquid or general`);
   if (!fresh) cached = cfg;
   return cfg;
 }

@@ -574,6 +574,23 @@
       ]
     },
     {
+      "name": "General footage gets no liquid verdict",
+      "shard": "sound",
+      "run": "npm run watchmode",
+      "why": [
+        "The watch tool is packaged for anyone (reelreader, PLAN 47p), and its physics",
+        "read, report card, technique guesses, wet-show words and Settings to try are",
+        "a liquid light show's: before 47p-3 an edited cartoon graded Arc 9.0/10",
+        "against the real shows. scripts/watchmode.mjs reads liquid only on three",
+        "cues (one take, its own motion, coloured light on a dark ground) or when",
+        "asked. This holds the cues to the films they were measured on, a synthetic",
+        "street film (bright, panning, cut) to a general read with none of the liquid",
+        "vocabulary even with a settings map and --vs, the same film with --liquid to",
+        "all of it (so the scan sees what it scans for), a dye take to liquid by",
+        "itself, and the config's mode. In the sound shard for its ffmpeg. Under a minute."
+      ]
+    },
+    {
       "name": "Watching in words",
       "shard": "sound",
       "run": "npm run watchwords",

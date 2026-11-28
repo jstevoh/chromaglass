@@ -320,6 +320,7 @@ export const BANDS = [
     read: m => m.blackMean,
     test: v => v >= 0.45,
     say: v => `dark-ground (${fmtPct(v)} near black)`,
+    general: { term: 'low-key', source: 'film and photography lighting', say: v => `low-key, a dark frame (${fmtPct(v)} near black)` },
   },
   // Bright colour over a dark ground (`crisp`/`soft` p95 0.58/0.55, black 0.89/0.87, colourfulness 68/66).
   {
@@ -328,6 +329,7 @@ export const BANDS = [
     read: m => m.p95,
     test: (v, m) => v >= 0.45 && m.blackMean != null && m.blackMean >= 0.45 && m.colourfulness != null && m.colourfulness >= 45,
     say: v => `luminous (95th luminance ${fmtNum(v)} over dark ground)`,
+    general: { source: 'Rudolf Arnheim', say: v => `luminous, bright colour glowing out of the dark (95th luminance ${fmtNum(v)})` },
   },
   // Bright everywhere with little dark (e.g. an over-lit white plate: Poster 1969 read lumMean 0.63).
   {
@@ -336,6 +338,7 @@ export const BANDS = [
     read: m => m.lumMean,
     test: (v, m) => v >= 0.55 && (m.blackMean == null || m.blackMean <= 0.1),
     say: v => `washed, bright ground (mean luminance ${fmtNum(v)})`,
+    general: { term: 'high-key', source: 'film and photography lighting', say: v => `high-key, bright all over (mean luminance ${fmtNum(v)})` },
   },
   // Strong light-dark contrast with large areas of both dark and bright.
   {
@@ -379,6 +382,7 @@ export const BANDS = [
     read: m => m.elongation,
     test: (v, m) => v < 0.35 && m.coherence != null && m.coherence >= 0.6 && (m.forms == null || m.forms >= 1),
     say: v => `marbling, aligned filaments (elongation ${fmtNum(v)})`,
+    general: { term: 'linear', source: 'Francis D. K. Ching', say: v => `linear forms laid one way (elongation ${fmtNum(v)})` },
   },
   {
     area: 'form', term: 'threads', source: 'the wet show',
@@ -386,6 +390,7 @@ export const BANDS = [
     read: m => m.elongation,
     test: (v, m) => v < 0.35 && (m.coherence == null || m.coherence < 0.6) && (m.forms == null || m.forms >= 1),
     say: v => `threads (elongation ${fmtNum(v)})`,
+    general: { term: 'linear', source: 'Francis D. K. Ching', say: v => `linear forms (elongation ${fmtNum(v)})` },
   },
   {
     area: 'form', term: 'lobes', source: 'the wet show',
@@ -400,6 +405,7 @@ export const BANDS = [
     read: m => m.elongation,
     test: (v, m) => v >= 0.75 && m.forms != null && m.forms >= 12,
     say: v => `beads (elongation ${fmtNum(v)})`,
+    general: { term: 'clustered', source: 'Francis D. K. Ching', say: v => `clustered forms, many small rounded shapes (elongation ${fmtNum(v)})` },
   },
   {
     area: 'form', term: 'cells', source: 'the wet show',
@@ -415,6 +421,7 @@ export const BANDS = [
     read: m => m.forms,
     test: (v, m) => v <= 2 && m.coherence != null && m.coherence < 0.35 && ((m.scaleX != null && m.scaleX >= 15) || (m.formArea != null && m.formArea >= 0.25)),
     say: v => `wash (${fmtNum(v)} broad forms a frame)`,
+    general: { term: 'colour field', source: 'Clement Greenberg', say: v => `colour field, broad even areas (${fmtNum(v)} broad forms a frame)` },
   },
   // Scale: `drift` reads scaleX 3.3% (fine); `crisp`/`soft` read 10.7%–11.3% (broad).
   {
@@ -423,6 +430,7 @@ export const BANDS = [
     read: m => m.scaleX,
     test: v => v < 4.5,
     say: v => `fine form scale (${fmtNum(v)} per cent of the width)`,
+    general: { source: 'Clement Greenberg', say: v => `fine form scale (${fmtNum(v)} per cent of the width)` },
   },
   {
     area: 'form', term: 'broad', source: 'Clement Greenberg',
@@ -533,11 +541,22 @@ const EFFORT_TABLE = {
 /**
  * Describe a watched video (`watchVideo`'s return object) in the vocabulary of
  * `docs/watch-words.md`. Returns `{ lines, words }`.
+ *
+ * `liquid: false` (general footage, scripts/watchmode.mjs, PLAN 47p-3): the
+ * wet show's words name what a liquid does (cells, marbling, a pour, a turned
+ * dish), and said of a cartoon or a street they are wrong, so each is said in
+ * its `general` form, a film or design word for the same measure and edge
+ * (low-key for dark-ground, linear forms for threads), or not at all when no
+ * such word says the same thing (lobes, cells, and the show's own moves).
+ * Default: the read's own mode, else liquid, the vocabulary as it was.
  */
-export function describe(read) {
+export function describe(read, { liquid = read?.mode?.liquid ?? true } = {}) {
   const m = extract(read ?? {});
   const words = [];
-  for (const b of BANDS) {
+  for (const b0 of BANDS) {
+    const wet = b0.source === 'the wet show';
+    if (!liquid && wet && !b0.general) continue;
+    const b = !liquid && wet ? { ...b0, ...b0.general } : b0;
     const v = b.read(m);
     if (v == null || !Number.isFinite(v)) continue;
     if (!b.test(v, m)) continue;
@@ -632,8 +651,12 @@ const COMPARE_SPECS = [
  * Returns `{ changed, held, lines }`, `changed` sorted descending by `steps`.
  */
 export function compareReads(before, after) {
-  const bWords = before?.words?.words ? before.words : describe(before);
-  const aWords = after?.words?.words ? after.words : describe(after);
+  // General footage on either side (scripts/watchmode.mjs): the show's own
+  // measures (the fluid's flow speed, turnover, form lifetime) are left out,
+  // as they are from its words.
+  const liquid = (before?.mode?.liquid ?? true) && (after?.mode?.liquid ?? true);
+  const bWords = before?.words?.words ? before.words : describe(before, { liquid });
+  const aWords = after?.words?.words ? after.words : describe(after, { liquid });
   const wordByMeasure = (ws, measure) => ws.words.find(w => w.measure === measure) ?? null;
 
   const bm = extract(before ?? {});
@@ -643,6 +666,7 @@ export function compareReads(before, after) {
   const edge = [];
 
   for (const s of COMPARE_SPECS) {
+    if (!liquid && s.area === 'show') continue;
     const bw = wordByMeasure(bWords, s.measure);
     const aw = wordByMeasure(aWords, s.measure);
     const from = bw ? bw.value : s.read(bm);

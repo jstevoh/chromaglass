@@ -424,7 +424,8 @@
     "tvvideo": "node scripts/tvvideo.mjs",
     "glow": "PW_WEBGPU=1 node scripts/glow.mjs",
     "linearlight": "node scripts/linearlight.mjs",
-    "watchconfig": "node scripts/watchconfigtest.mjs"
+    "watchconfig": "node scripts/watchconfigtest.mjs",
+    "watchmode": "node scripts/watchmodetest.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

@@ -131,6 +131,21 @@ From the physics and techniques reads: a **bloom** (spreading outwards: divergen
 **turned dish** (the whole picture rotating: curl of the whole), a **pour** (a new colour
 arriving in one place), **marbling** (sheared lines), **cells** breaking or joining.
 
+### General footage
+
+Footage that is not a liquid light show (`scripts/watchmode.mjs`, PLAN 47p-3: a film with
+cuts, a camera that pans, daylight) is read in general words, because the wet show's name
+what a liquid does and are wrong said of a cartoon or a street. The same measure and edge
+then says: **low-key** for dark-ground and **high-key** for washed (film and photography
+lighting: a frame mostly in shadow, or lit bright all over); **luminous** as Arnheim's
+luminosity (colour that seems to glow because it is brighter than all around it); **linear**
+for threads and marbling, and **clustered** for beads (Ching's linear and clustered forms);
+a **colour field** for a wash (Greenberg's broad, even areas); **fine** form scale as it is.
+Lobes, cells and the show's own moves (bloom, turned dish, pour) have no general word that
+says the same thing, so they are not said; nor, in the before/after read, are the fluid's
+flow speed, turnover, form lifetime, whole-field share and spreading. Sources for the
+lighting words: Wikipedia, "Low-key lighting" and "High-key lighting".
+
 ## What changed: the before/after read
 
 Two films of the same look, before and after a change, are told apart in the same words.
