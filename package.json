@@ -223,6 +223,7 @@
     "classichand": "node scripts/classichand.mjs",
     "splitcarry": "node scripts/splitcarry.mjs",
     "beads": "node scripts/beads.mjs",
+    "pinch": "node scripts/pinch.mjs",
     "filmhold": "node scripts/filmhold.mjs",
     "dropcolour": "node scripts/dropcolour.mjs",
     "dropwindow": "node scripts/dropwindow.mjs",
