@@ -2483,6 +2483,20 @@
       ]
     },
     {
+      "name": "Readable in a dark room",
+      "shard": "browser",
+      "run": "node scripts/readable.mjs",
+      "why": [
+        "PLAN 49i-guard (scripts/readable.mjs): 49i's floor kept. Every desk tab, the",
+        "header's sheets and every settings section at 1440 x 900, the phone's dock sheets",
+        "and More tiles and the remote at 390 x 844: no words under 12 px, nothing to read",
+        "or press under 60% effective opacity (its own times its ancestors', times its",
+        "text colour's alpha). A made-up page must fail first. On the tree before 49i",
+        "(#972) it fails 8,110 small and 2,458 faint. No GPU; the site the steps above",
+        "built. About two minutes."
+      ]
+    },
+    {
       "name": "Saving presets",
       "shard": "browser",
       "run": "node scripts/saves.mjs",
