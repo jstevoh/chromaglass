@@ -59,3 +59,18 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   fault itself to `scripts/mutants.json` with that check as `expect`, so the weekly run
   proves it every week; one no check can see goes to `docs/judging.md` and still into the
   list, where it shows as a hole until a check exists.
+- ~~**50b**~~ *One smoothness number per look* (rank 2, S, Antigravity; **50b shipped**): `npm run smooth`
+  (`scripts/smooth.mjs`, reusing `stutter.mjs` and `rungs-120.mjs`), not a gate. On the owner's
+  Mac, every look for 30 s with the band: the 99th-percentile frame time, frames over one
+  refresh, and long tasks over 8 ms, at 60 and 120 Hz (46c's `npm run stutter`, 46e-2's
+  replay stamps), written as one worst-first table into `~/chromaglass-films/smooth/<date>-<sha>.md`.
+  Measured on main (`53f5aee7`, 46 looks, 60 Hz Air): worst by frame p99 and dropped refreshes
+  are `mushy-mushy` (83.3 ms p99, 208/1289 >1, 143 tasks >8 ms, dropped to `256²@1 30/s`),
+  `soapy-mess` (66.7 ms, 262/1404, 113 tasks >8 ms), `acid-trip` (66.6 ms, 186/1492),
+  `lace-run` (66.7 ms, 171/1479), `oil-and-water` (66.7 ms, 158/1505, 101 tasks >8 ms),
+  `bass-drop` (66.6 ms, 71/1672), `stardust-collapse` (50.0 ms, 223/1524), `neon-coral-reef`
+  (50.0 ms, 222/1526), `solar-flare` (50.0 ms, 190/1567) and `moire-groove` (50.0 ms,
+  186/1590); worst main-thread >8 ms tasks also include `moire-press` (354, max 47 ms),
+  `velvet-underground` (140, max 39 ms), `home-movie` (103), `crowd-plate` (98) and
+  `red-cabbage` (90). Only six looks held `512²@1 60/s` with 0–1 missed refreshes (`cell-bloom`,
+  `turing-print`, `night-sea`, `classic`, `soap-film`, `chemical-clock`).

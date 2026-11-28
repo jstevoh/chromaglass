@@ -153,31 +153,19 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   h²σ/(12μR) for two oils.
   38v (2026-11-21): the ferrofluid's own rounding runs by steps, with no seconds and no grid
   size in its Cahn–Hilliard mobility (`fluid.ts:1393-1401`): 9ae.
-  - ~~**38e-1**~~ σ in N/m from each bottle: shipped 2026-11-27 (from PR #624, ported onto
-    38r's gap and the sealed bottle). The thin gap's pull is `oilMobility(σ)`, Darcy's
-    h₀²σ/12μ_ref, times the cover's (h/h₀)² as before; σ is each pour's own against water
-    (`interfacialTension`: the bottle's `interfacial`, sunflower 27 mN/m, silicone 37, or
-    Antonow's |γ_w − γ_o| for a Designer oil), averaged over the plate by what each covers
-    (`oilSigma`, carried and snapshotted with the oil). The dial keeps its 0–1 and is the share
-    of the oil's own. The old `OIL_TENSION_GAP` was σ = 0.0239 by the same law, so oil looks
-    round 13% faster with sunflower and 55% with silicone. `npm run gap` part 4 holds it.
-    Oil a look lays with no bottle (its bodies, a lava lamp's wax) stays at 0.0239, the
-    tension the looks were tuned at: with sunflower's 27 for it, `lavacycle`'s no-cool-glass
-    control fell 0.88 to 0.71 by 40 s on the Mac (main holds it), so only poured bottles change.
   - **38e-3** A lava lamp's wax at a measured σ of its own (paraffin against water, about
     0.04–0.05 N/m, against the 0.0239 the lamp was tuned at), after 19ak-25b says why the
     no-cool-glass control's window in the wax's weight and tension is narrow. Shortcut in the
     meantime: a look's bottle-less oil is held at the looks' tuned tension (`fluid/core.ts`
     `oilSigma`).
-  - **38e-2** The cap, still there (`OIL_CELLS` 0.5, `SEALED_CELLS` 1 cell a step). PR #624
-    took it off the thin gap outright and needed three things with it, measured on the lab in
-    October before 38r: a held film taking the blur's concave waist pull back out (Film Hold's
-    crowd fell 35 → 19 uncapped, back to 31 with it), `airblow` part 5 measuring a drop as one
-    body (written against the Blow before its rebuild as a jet, #852), and `npm run oiltension`
-    (a drop's rounding against h²σ/4μR³, the silicone's ratio, twice the dial in half the
-    time, and stability at three times real). Since then 27f-9q found the explicit force at
-    nine times sheds the sealed lamp's interface as haze, and PLAN 27f-9s plans the capillary
-    implicit. Redo on the lab, after 27f-9s or as CFL sub-steps; the PR branch has the three.
+  - **38e-2b. The force at the pressure solve's faces (balanced-force CSF, Francois 2006),
+    then no cap at all.** σκ∇c̃ is laid at cells and the thin gap's solve takes its gradient
+    part back only up to the faces' interpolation, so a round drop's edge keeps a spurious
+    current that grows with σ: what makes OIL_WIDE_CELLS a shortcut, what widens an
+    uncapped edge, and likely 47z-2b. Laid at the faces with the same face weights as the
+    pressure's gradient, a round drop's force is exactly a gradient and moves nothing. Then
+    OIL_WIDE_CELLS goes (it binds again on finer grids than 512²: on 1024² under about twenty
+    cells), and `droplaw`'s bar can tighten to 30%.
 
 - **38f. The lamp's heat lifts the liquid as a force, and cools by the plate's own losses**
   (S for the force, M for the cooling; Medium: plumes on the upright looks and Lava).
@@ -298,10 +286,6 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
     = 1.6, drop the star, and drive the halo from `defocusShadow`. Check: a projected ferro
     look added to `scripts/nolight.mjs` gains no pixel over the lamp. (S–M; Medium; from
     RS-27.)
-  - ~~**38h-14**~~ *shipped 2026-11-08.* The projector's bubble film at Film Physics 0 is
-    the light through it, cp·(1 − 0.55·k·filmC) (`projectorFilm`, bubbleFilm.ts), a
-    transmittance in 0.67..1 per channel, never over the lamp: 54 levels over to 0.
-    `npm run nolight` line 16. Story in `docs/plan-shipped.md` §38.
   - **38h-16. The plate still reads the grid's hole round a bubble** (S–M, nil). Found doing
     38h-15. The solver cuts the dye out under a bubble on its grid, so the dye the plate
     decodes is thinned over a texel and a half inside each rim and, through the bicubic

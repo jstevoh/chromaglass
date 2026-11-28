@@ -14,3 +14,8 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   Red-Black SOR) so $\int h\,dA$ is conserved to 100.00%, and `packVelDrop` writes
   `z = min(h + FILM_H0 * max(phase - 1, 0), gap_live)`. `FerroDrop.read()` and `lab.dropSurface()`
   now return both `h` and `z`. Updates 29a-3. (38v, from RS-21.)
+- ~~**29a-13. The Magnet's domes were one black in the closeup.**~~ **Shipped** (the owner,
+  2026-11-01: "Let's make sure we have 3d in the macro view"; `npm run ferrodrop` 11-13).
+  The drop's reflection is worked in light and encoded as a camera records it, so a dome's
+  steep sides show the lit liquid round them as a dark gloss. Story in
+  `docs/plan-shipped.md` §29a-13.

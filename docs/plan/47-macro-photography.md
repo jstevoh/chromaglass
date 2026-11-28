@@ -557,17 +557,33 @@ The physics, in the order to build (each its own thread and PR):
     thins, the two oils are one phase holding both colours, and they multiply. Real ones keep a
     water film between them: 47z-3's films, or a second oil phase.
 - **47z-2. Drops of every size, from a stir.** A real oil layer stirred or swirled breaks into
-  a crowd: a drop sheared past the critical capillary number (Ca = μ γ̇ R / σ, near 0.5 for
-  equal viscosities) stretches and splits, its pieces split again until each is under the
-  critical size, so the sizes spread over a decade or more; threads between them bead at the
-  Rayleigh–Plateau wavelength (**47k**). Whether that happens on our plate depends on the
-  tension in real units and the capillary cap that bites at the moment of break-up (**38e**).
-  Specks under three cells are the beads' (**28k-3**). *Build:* first measure: stir a pool of
-  oil in the lab at three rates and count the drops and their sizes after five seconds; then
-  fix what stops it in that order (38e's cap, 47k's gap curvature, 28k-3's specks).
-  *Measure:* the count rises with the stir rate, the largest surviving drop's radius falls as
-  σ / (μ γ̇) within 30% (the free-shear law; a drop squashed in the gap may follow a
-  confined variant, which the build PR names before it measures), and the size distribution spans at least a factor of ten.
+  a crowd: a drop sheared past the critical capillary number stretches and splits, its pieces
+  split again until each is under the critical size, so the sizes spread over a decade or
+  more; threads between them bead at the Rayleigh–Plateau wavelength (**47k**).
+  *Measured first (2026-11-28, `npm run droplaw`), and the first fault fixed (38e-2):* stirred
+  in the lab (Turbulence 0.5, five seconds), a pool a quarter of the dish across stayed one
+  body; under a laid shear, drops from R 8 to 48 cells at 512² stretched into ribbons
+  whatever their size. The half-cell cap on the capillary force bound on every drop under
+  about 45 cells' radius at the Mac's grid (a drop rounded at 2% of the law at R 10, 18% at
+  R 40), so a sheared drop had no tension to hold its shape. Wide bodies on the open thin
+  gap now have six caps (`OIL_WIDE_CELLS`): at rest 0.93, 0.80 and 0.67 of the law at R 10,
+  20 and 40, falling as R^−3.2; in a shear R 12 and R 16 hold a steady shape while R 32
+  stretches on (with the old cap, R 8 too stretched on). **The law the PR names:** between
+  two glasses the drop is confined, and its shape is held by Darcy's flow, not the free
+  drop's stress: ε = γ̇R³/(6Mσ), M = h²/12μ, so the critical size goes as γ̇^(−1/3), not as
+  σ/(μγ̇). A ribbon wider than the gap is stable between two glasses (the 2/h across the gap
+  is the same along it), so it breaks only once stretched thinner than the gap, where 47k's
+  thread curvature takes it: the crowd's sizes are set by the gap and the stretch, not by a
+  free-shear cascade.
+  - **47z-2b. Sheared small drops hold at about twice the law's ε** (R 12: 2.1, R 16: 1.7 at
+    γ̇ 2.9 per plate width), and a big drop's rounding slows as it goes (R 40: 0.76 of the law
+    over its first fifteen steps, 0.67 over forty), where the at-rest rate of the small ones is
+    the law's. Both look like the diffuse edge's spurious current, which 38e-2b takes out.
+  - **47z-2c. The count from a stir.** With 38e-2 in, stir a pool at three rates and count
+    the drops and their sizes after five seconds; the count rises with the rate, the largest
+    surviving drop's radius falls as γ̇^(−1/3) within 30%, and the sizes span a factor of ten
+    (the beads at the gap's scale, the bodies the stir could not stretch). What a ribbon
+    thinned to the gap does next is 47k's; what dissolves under three cells is 28k-3's.
 - **47z-3. Drops that touch and wait.** A crowd stays a crowd because the water film between
   two drops must drain before they merge, a time that grows with the drop's size and the
   viscosity; Film Hold holds a film until pressed, which is the threshold without the timing.
