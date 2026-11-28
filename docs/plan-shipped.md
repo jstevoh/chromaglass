@@ -7270,6 +7270,29 @@ spread inside the drop 1 of 255 flat, 177 at Relief / 3D 0.7, its brightest up a
 yellow over it takes the highlight's blue 183 → 2 and its red 209 → 165; the 1x plate 0
 bytes different at any relief.
 
+### 29a-13. The Magnet's domes in the closeup: a dark gloss, not one black
+
+Asked 2026-11-01 by the owner, after the films of Magnet Garden's domes on their real
+onset (#662): "Let's make sure we have 3d in the macro view". Rendered in the lab (a pool
+0.09 of the plate across on 256², held over the hand's Magnet for 160 steps, Magnet
+Garden's settings, 6x), each dome in the closeup was a black blob with a dim red dot on its
+top. The shapes were there: the domes stand 2.2 l_c, with slopes from 0 to 63 degrees, and
+90% of a dome's surface is past Snell's window (49 of 136 cells) or faces down (73). Such a
+surface can show only what it mirrors of the lamp-lit liquid round it, at Fresnel's 0.5 to
+4% under water, and the display multiplied its colours (display values, shown as they are
+on an sRGB canvas) by that reflectance as if they were light: 2% of a white came to 5 of
+255, where a camera records about 39. A 30 times brighter room only grew the dot on the
+top, since the sides do not see the room. Now the plate's colour is taken back to light
+(a 2.2 power), the reflection worked there and encoded as a camera's frame is; the studio's
+lights are radiances already. Measured (`npm run ferrodrop`, 13 checks, the three new on that
+pool, read over the pixels the plate says stand past 1.5 full, the screen-to-plate mapping
+held by 98.4% of the water's pixels drawn lit): the domes' brightest channel 2 of 255 in the
+middle and 1 to 6 across (both red on main), now 23 and 7 to 38; the ten older lines unchanged in verdict (the drop's light spread
+176 of 255, its brightest up and left, the dye line blue 197 to 0, red 209 to 187, the 1x
+plate 0 bytes different). No setting and no phone change: the phone draws the same plate
+shader. Found along the way: 29a-14 (the ridges), 29a-15 (the dye's amount over a dome),
+38h-12 (the bubbles' walls on display values too). Judging §152.
+
 ### 29c. The drop follows the hand and holds together (#373)
 
 Reported 2026-10-11 (the handoff's `drag-today.png`): a magnet at 0.35–0.5, height 0.2,
@@ -13035,6 +13058,24 @@ model cannot reach one, the PR says what it reached and asks.
     just inside the contact, was a black band (2 to 94 of 179). A pale fringe a cell past
     the rim on the lamp ground (119 against 105) is unchanged and stays 38h-9's. Found:
     38h-11.
+  - **38h-14 (shipped 2026-11-08).** The projector's bubble film still reflected at Film
+    Physics 0. Found writing 38h-6's check: the plate's own bubbles at Iridescence 1 read 51
+    to 54 levels brighter than at 0, because plate.ts's bubble block multiplied the lamp by
+    `0.45 + 1.25 × filmC` above Iridescence 0.25, a reflected rainbow added on top of the
+    light. A pocket between the glasses throws only what passes its film, T = 1 − R, the
+    pale complement, and a film splits light, never adds it. Film Physics 0 now treats the
+    stylised rainbow as R with a peak of FILM_R_RAINBOW = 0.55 and draws
+    cp·(1 − 0.55·clamp(0.6·irid)·filmC); Film Physics 1 still mixes in the measured table's
+    transmitted colour, unchanged. The code moved to `src/gpu/wgsl/bubbleFilm.ts`
+    (`projectorFilm`), plate.ts being at its size ceiling. Measured: `npm run nolight` line
+    16 (new), the plate's bubbles at Iridescence 1 against 0 at Film Physics 0 and 1, no
+    pixel brighter by over 1 and over 0.2% of the picture still moved: main 54 over (4.39%
+    moved), this 0 at both (4.34% and 3.12%; landed on 2026-11-27's main, after the
+    bubbles' rework, 0 at both again with 4.59% and 3.19% moved). The lab's stills: 30 → 0 at Iridescence 0.6,
+    53 → 0 at 1; the plate's mean at Iridescence 1 160.0 → 158.4. Only looks with
+    Iridescence over 0.25 change (Soap Film, and what Lucky, drift or MIDI push there): a
+    cream glow becomes a pale cool tint. The owner judged it from before/after clips filmed
+    on the Mac (Soap Film, Acid Trip at 0.6 and 1, Crowd Plate at 1) and kept it.
   - **38h-4 (shipped 2026-10-31).** The back plate's lamp read the grain as its share of
     the opacity (`grained1 / film1`, grainedDepth's factor), which is 1 in a body near
     opaque, so on a lamp look with two plates the back plate's pools lost their grain. It
@@ -16282,3 +16323,18 @@ bubbles, macro camera, `liquidPhase`, and every pour/seed/GPU handoff path.
   `project`, `advect`, `advectMacCormack`, `setBoundary`, `applyCurlTurbulence`,
   `s`/`sR`/`sG`/`sB`/`vx0`/`vy0`/`mcA`/`mcB`, and `TURB_SPEED`) for
   `scripts/musicstir.mjs`.
+### 38e-1: oil's surface tension in newtons a metre, from each bottle (2026-11-27, from PR #624)
+
+The thin gap's capillary pull was a 0–1 dial times `OIL_TENSION_GAP`, the lab's 4e-4 at 6 mm
+carried to 2 mm by h². It is now `oilMobility(σ)`, Darcy's h₀²σ/12μ_ref over the plate's
+width cubed, times the cover's (h/h₀)² and the sealed bottle's `SEALED_TENSION` as before,
+with σ each pour's own tension against water: a bottle's `interfacial` (sunflower 27 mN/m,
+silicone 37) or, for a Designer oil with only its tension against air, Antonow's
+|γ_w − γ_o| (`interfacialTension` in `src/lib/liquidProps.ts`). The plate's oil has one σ,
+averaged by the area each pour covers (`oilSigma`, carried across a resize and kept in
+Undo's snapshot); a look's own laid oil is the shelf's Oil. The old plate keeps its 4e-4,
+scaled by σ over the σ it stood for. By the same law the old number was σ = 0.0239 N/m, so
+every oil look rounds 13% faster with sunflower oil and 55% with silicone. The dial keeps
+its 0–1 range and is the share of the oil's own tension. `npm run gap` part 4 holds the law
+in SI from the millimetres (its first run caught the 6 mm ratio written upside down, σ 1.93
+N/m). The cap is unchanged: 38e-2.
