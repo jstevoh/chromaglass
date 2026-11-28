@@ -149,6 +149,11 @@ phone version in the same PR.
 
 ## 47j. Caustics: the light focused into a network by a rippled or mixing layer (M)
 
+*The projected plate's half shipped as 31s-2 (2026-11-28): the Jacobian of the ray map, folds
+kept by splatting, clamped by the lamp's disc; `npm run caustics` line 7 holds a ripple to
+1/|1 - c sin kx| within 6% and its first fold between c 0.9 and 2. Open: the closeup's half (its
+Focus dial, 47d, and 47b's dark field), and a measure of the onset tighter than that bracket.*
+
 *Seen:* in a whole long shot, the picture is bright lines of focused light on black that
 drift and re-form, like sunlight on a pool floor. *Physics:* a layer whose optical path
 varies (a rippled surface, or two liquids of different index mixing) bends the light by the

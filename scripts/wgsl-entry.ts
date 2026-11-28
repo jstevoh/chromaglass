@@ -17,7 +17,7 @@ import { TANK_KERNELS } from '../src/gpu/wgsl/tank';
 import { TANK_DRAW_WGSL } from '../src/gpu/tankDraw';
 import { FARADAY_KERNELS } from '../src/gpu/wgsl/faraday';
 import { SURFACE_KERNELS } from '../src/gpu/wgsl/surfaceHeight';
-import { PACK_SURFACE_KERNEL } from '../src/gpu/wgsl/plateSurface';
+import { CAUSTIC_KERNELS, CAUSTIC_MESH_WGSL } from '../src/gpu/wgsl/caustic';
 import { GLOW_KERNELS } from '../src/gpu/wgsl/glow';
 
 /** The closeup's fine dye (PLAN 47a): carried, averaged and turned into detail, built behind the show. */
@@ -58,7 +58,9 @@ const FORMATS: Record<string, string> = {};
   // The dish on a shaker (PLAN 48f): its standing wave's step, built behind the show unless the look opens shaken.
   for (const [name, code] of Object.entries(FARADAY_KERNELS)) await check(`faraday.${name}`, code);
   for (const [name, code] of Object.entries(SURFACE_KERNELS)) await check(`surface.${name}`, code);
-  await check('plate.packSurface', PACK_SURFACE_KERNEL);
+  // The lamp's light traced through the liquid (PLAN 31s-2), built behind the show.
+  for (const [name, code] of Object.entries(CAUSTIC_KERNELS)) await check(`caustic.${name}`, code);
+  await check('caustic.mesh', CAUSTIC_MESH_WGSL);
   for (const [name, code] of Object.entries(SOAP_PLATE_KERNELS)) await check(`soapPlate.${name}`, code);
   for (const [name, code] of Object.entries(SOAP_AIR_KERNELS)) await check(`soapAir.${name}`, code);
   for (const [name, code] of Object.entries(FINE_KERNELS)) await check(`fine.${name}`, code);

@@ -34,6 +34,7 @@ import { INTERFACE_WGSL } from './plateInterface';
 import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
 import { BUBBLE_FILM_WGSL } from './bubbleFilm';
 import { VIEW_OPTICS } from './platePolar';
+import { SURFACE_PATH_WGSL } from './caustic';
 import { BUBBLE_SHAPE_WGSL } from './bubbleShape';
 import { BEAD_SHAPE_WGSL } from './beadShape';
 import { FILM_DYE_WGSL } from './filmDye';
@@ -1174,17 +1175,15 @@ export const DERIVE_WGSL = `${HEAD}${SAMPLING}${DECODE}${VERT}
 @group(0) @binding(3) var viewSrc: texture_2d<u32>;
 /*
   The poured liquids' species (PLAN 18d, src/lib/liquidProps.ts), the
-  solver's own rgba32float field: r the share of the column that is poured
-  liquid, a the share-weighted sum of their refractive indices (each bottle's
-  own, from the shelf's table in src/types.ts: glycerine 1.4746, syrup
-  1.452, alcohol 1.361, milk 1.345). Read with textureLoad, never sampled:
-  a 32-bit float texture is not filterable (the layout says so in
-  deriveLayout, src/gpu/plate.ts). 1×1 and empty when nothing is poured.
+  solver's rgba32float field: r the poured share of the column, a the
+  share-weighted sum of their indices (each bottle's own, src/types.ts).
+  Read with textureLoad: a 32-bit float texture is not filterable (as
+  deriveLayout says, src/gpu/plate.ts). 1×1 and empty with none poured.
 */
 @group(0) @binding(4) var speciesSrc: texture_2d<f32>;
 // The bubbles' air, 1x1 blank with none, read as missing dye (plateSlope.ts).
 @group(0) @binding(5) var airSrc: texture_2d<f32>;
-
+${SURFACE_PATH_WGSL}
 // Water, n 1.333 (589 nm, room temperature); .w holds the path less it (38u-20).
 const N_CLEAR: f32 = 1.333;
 
@@ -1296,7 +1295,7 @@ fn oplAt(dyeN: f32, uv: vec2f) -> f32 {
   let g = gs * (3.0 / m2) * dyeHere;
   let oplGrad = length(go * (3.0 / m2) * dyeHere);
 
-  return vec4f(g, oplGrad, oC - N_CLEAR);
+  return vec4f(g, oplGrad, surfacePath(oC, vC, in.uv) - N_CLEAR);
 }
 `;
 
@@ -1751,8 +1750,8 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
   Refraction optics across plate liquid interfaces (PLAN 18e): hairline dark
   rims from light deflected outside the projector pupil (aperture loss). The
   Becke doublets under defocus are not here: they are the whole column's
-  shadowgraph, dye, oil and pour as one term (defocusShadow, plateTransmit.ts,
-  PLAN 38h-3).
+  light traced to the wall, dye, oil and pour as one map (wallLight0,
+  caustic.ts, PLAN 31s-2).
 
   Named shortcuts:
   1. The column's small-angle deflection θ = |∇OPL| · DISH_REST_GAP · logicalGrid is read
@@ -2709,8 +2708,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       camera's and the derive-less plate's is drawn here (the projector's
       comes from oplPupilLoss below, PLAN 18e-2). Its body is a weak lens,
       which brightens nothing in focus (PLAN 38h): out of focus it is the
-      column's shadowgraph, with the dye's, the pour's and the gap's, one
-      term (defocusShadow, PLAN 38h-3).
+      column's light traced to the wall with the dye's, the pour's and the
+      gap's (wallLight0, caustic.ts, PLAN 31s-2).
     */
     if (view.oil > 0.004) {
       if (isCamera || U.derivedOn <= 0.5) {
@@ -2722,7 +2721,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       }
     }
     if (!isCamera && U.derivedOn > 0.5) {
-      outColor *= mix(oplPupilLoss(near0.z, near0.xy, normal0, plateOn, plateAmt), 1.0, phaseCover) * defocusShadow(derived0, fuv0);
+      outColor *= mix(oplPupilLoss(near0.z, near0.xy, normal0, plateOn, plateAmt), 1.0, phaseCover) * wallLight0(fuv0);
     }
     /*
       A pH indicator in the dye (red cabbage's anthocyanin). The indicator
@@ -2848,7 +2847,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     if (sharp1 && fluid1.a > 0.03) {
       if (!isCamera && U.derivedOn > 0.5) {
         // The back plate's shadowgraph on its own dye, until 18e-1 puts it at its own height.
-        fluid1 = vec4f(fluid1.rgb * defocusShadow(derived1, fuv1), fluid1.a);
+        fluid1 = vec4f(fluid1.rgb * wallLight1(fuv1), fluid1.a);
         // Painted shortcut (see refractionOptics note 5, PLAN 18e-1 / 31a):
         // keeps the upper dish's boundary brightness until 31a separates the
         // two dishes' focal heights Δz in the projector cone.

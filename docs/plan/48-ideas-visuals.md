@@ -55,7 +55,7 @@ through a cord the owner patches (never the solver's step taking sound): **48f**
   a wave out (the front's speed inside the disc under a tenth of outside), and with the
   coupling on the front's shape bends where the flow does.
 
-- **48b. Every oil drop a lens: caustic rims and focused light on the wall** (M; builds on
+- ~~**48b. Every oil drop a lens: caustic rims and focused light on the wall**~~ **Shipped** as 31s-2 (2026-11-28, `npm run caustics`: a lens focuses at Rc/dn, a flat layer throws nothing) (M; builds on
   **47j** caustics, **47z-4** each drop a lens, **18e**'s optical path, **18c-4** lens or
   film by the spreading coefficient). In a real overhead-projector show the brightest thing
   on the wall is light the oil *focused*: every drop's meniscus is a lens, so a drop throws a

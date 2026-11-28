@@ -1837,6 +1837,21 @@
       ]
     },
     {
+      "name": "The lamp's light is traced through the liquid to the wall (SwiftShader)",
+      "shard": "lab4",
+      "run": "npm run caustics",
+      "why": [
+        "PLAN 31s-2 (src/gpu/caustic.ts, src/gpu/wgsl/caustic.ts, scripts/caustics.mjs):",
+        "the plate's own PlateCaustics on known paths. A flat path lights the wall",
+        "evenly (1%); light is kept (1%); a plano-convex lens focuses at Rc/dn",
+        "(10%) with its light all kept at focus; a ridge folds into bright lines",
+        "where the map says; three domes of 1, 2 and 4 cells light three peaks; a",
+        "ripple follows I = 1/|1 - c sin kx| (6%) and first folds between c 0.9 and 2",
+        "(47j); the display traces at Focus 0.8 and not at 0.5. --first-order (the",
+        "old shadowgraph's law) fails lines 3, 4 and 7."
+      ]
+    },
+    {
       "name": "The water's bioluminescence",
       "shard": "lab4",
       "run": "npm run glow",
