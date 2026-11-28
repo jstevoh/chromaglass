@@ -73,6 +73,7 @@ import zlib from 'node:zlib';
 import { physicsAcc, physicsFrame, physicsSummary, physicsLines, physicsGaps, comparePhysics, techniqueLines } from './watchphysics.mjs';
 import { designFrame, designSummary, designLines, designGaps, compareDesign, paletteAcc, paletteStrip } from './watchdesign.mjs';
 import { readSelftest, dissolveClips } from './watchreadtest.mjs';
+import { clipAudio, ffmpegVersion } from './watchffmpeg.mjs';
 import { thumb, findDissolves } from './watchcuts.mjs';
 import { resolveRef, keepRef, listRefs } from './watchrefs.mjs';
 import { overall } from './watchoverall.mjs';
@@ -164,21 +165,6 @@ function findYtDlp() {
 }
 
 /**
- * The sound encoder the self-tests' clips are made with, as ffmpeg arguments
- * (47x-6). libvorbis first, which every clip was made and measured with
- * until now; then libopus, what Chrome's MediaRecorder itself writes into a
- * WebM, and what Homebrew's default ffmpeg has when it has no libvorbis (the
- * owner's Mac, 2026-11-22: the self-test could not make one clip). Null when
- * the build has neither, and the caller says so with the version it found.
- */
-function clipAudio(ffPath) {
-  const r = spawnSync(ffPath, ['-hide_banner', '-encoders'], { encoding: 'utf8' });
-  const has = name => new RegExp(`^\\s*A\\S*\\s+${name}\\s`, 'm').test(r.stdout ?? '');
-  for (const enc of ['libvorbis', 'libopus']) if (has(enc)) return ['-c:a', enc];
-  return null;
-}
-
-/**
  * Add one pixel to the 4×4×4 colour histogram the cut test compares (47x-6),
  * shared between the bins either side of it on each channel by how near it
  * is to each bin's middle (32, 96, 160, 224), as a linear interpolation
@@ -199,11 +185,6 @@ function softBin(hist, r, g, b) {
     const w = (i ? rf : 1 - rf) * (j ? gf : 1 - gf) * (k ? bf : 1 - bf);
     if (w) hist[(r0 + i) * 16 + (g0 + j) * 4 + b0 + k] += w;
   }
-}
-
-/** The first line of `ffmpeg -version`, for a self-test to say which build it ran on. */
-function ffmpegVersion(ffPath) {
-  return (spawnSync(ffPath, ['-version'], { encoding: 'utf8' }).stdout ?? '').split('\n')[0].trim() || 'unknown ffmpeg';
 }
 
 const INSTALL = 'Install: `brew install ffmpeg yt-dlp` on a Mac; in a cloud session `python3 -m pip install yt-dlp imageio-ffmpeg`.';
@@ -434,12 +415,13 @@ const sampleAt = rate => `setpts=PTS-STARTPTS,fps=${rate}:round=up`;
 /**
  * Where the picture's first frame sits on the file's clock, in seconds
  * (after the seek, as the reads decode it), for decodeAudio to start the
- * sound there. 0 when it cannot be read.
+ * sound there; below zero where an edit list puts it there. 0 when it
+ * cannot be read.
  */
 function pictureStart() {
   const r = spawnSync(ff(), ['-hide_banner', '-nostats', ...seekArgs(), '-an', '-vf', 'showinfo', '-frames:v', '1', '-f', 'null', '-'], { encoding: 'utf8' });
   const m = /pts_time:\s*(-?[\d.]+)/.exec(r.stderr ?? '');
-  return m ? Math.max(0, +m[1]) : 0;
+  return m ? +m[1] : 0;
 }
 
 /**
@@ -458,7 +440,11 @@ function decodeAudio() {
     p.on('close', code => {
       if (code !== 0) return reject(new Error(err));
       const b = Buffer.concat(chunks), all = new Int16Array(b.buffer, b.byteOffset, b.length >> 1);
-      resolve(all.subarray(Math.min(all.length, Math.round(pictureStart() * 8000))));
+      // A first frame before the file's zero (an MP4 edit list can put it
+      // there) has silence ahead of the sound, not sound cut away.
+      const at = Math.round(pictureStart() * 8000);
+      if (at >= 0) return resolve(all.subarray(Math.min(all.length, at)));
+      const padded = new Int16Array(all.length - at); padded.set(all, -at); resolve(padded);
     });
   });
 }
@@ -1106,15 +1092,16 @@ export function shape({ rows, rate, span, cuts = [] }) {
 
 const SW_ = 320, SH_ = 180, SFPS = 30;
 
+/** The self-test's clips' sound encoder, found once (watchffmpeg.mjs). */
+let CLIP_AUDIO_ = null;
+const clipAudioArgs = () => (CLIP_AUDIO_ ??= clipAudio(ff()) ?? fail(`the self-test makes its clips with libvpx and libvorbis or libopus, and ${ffmpegVersion(ff())} has neither sound encoder. ${INSTALL}`, 2));
+
 /**
  * Encode a clip made here: `frame(f)` gives RGB for frame f, `sound(t)` a
  * sample in [-32768, 32767], `delay` shifts the sound later. It goes out as
  * WebM through a pipe, the way MediaRecorder writes it, so the file has no
  * duration and no cues: the case the app's own recordings are.
  */
-let CLIP_AUDIO_ = null;
-const clipAudioArgs = () => (CLIP_AUDIO_ ??= clipAudio(ff()) ?? fail(`the self-test makes its clips with libvpx and libvorbis or libopus, and ${ffmpegVersion(ff())} has neither sound encoder. ${INSTALL}`, 2));
-
 async function makeClip(dir, name, { sec, frame, sound, delay = 0 }) {
   const wav = Buffer.alloc(44 + sec * 8000 * 2);
   wav.write('RIFF', 0); wav.writeUInt32LE(36 + sec * 16000, 4); wav.write('WAVEfmt ', 8); wav.writeUInt32LE(16, 16);
@@ -1556,7 +1543,7 @@ export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2, blipSeconds =
   return out;
 }
 
-export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg, clipAudio, ffmpegVersion, pickSource, ffmpegLocation, fetchArgs, macFetch, fetchElsewhere, writePng, label };
+export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg, pickSource, ffmpegLocation, fetchArgs, macFetch, fetchElsewhere, writePng, label };
 
 // Run as a command only when this file is the one node was given: a harness
 // that imports it, or bundles it (gig.mjs goes through esbuild, where

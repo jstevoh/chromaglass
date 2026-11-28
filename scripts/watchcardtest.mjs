@@ -22,7 +22,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { watchVideo, findFfmpeg, clipAudio, ffmpegVersion } from './watch.mjs';
+import { watchVideo, findFfmpeg } from './watch.mjs';
+import { clipAudio, ffmpegVersion } from './watchffmpeg.mjs';
 import { reportCard, REAL_SHOW_CARDS } from './watchcard.mjs';
 import { MEASURE_SETTINGS } from './watchsettings.mjs';
 
@@ -41,7 +42,7 @@ if (!ff) {
   console.error('ffmpeg not found (set FFMPEG=...)');
   process.exit(2);
 }
-// libvorbis or libopus, whichever the build has (47x-6, clipAudio in watch.mjs).
+// libvorbis or libopus, whichever the build has (47x-6, watchffmpeg.mjs).
 const AUDIO = clipAudio(ff);
 const audioArgs = () => AUDIO ?? (console.error(`${ffmpegVersion(ff)} has neither libvorbis nor libopus, so no clip with sound can be made`), process.exit(2));
 
