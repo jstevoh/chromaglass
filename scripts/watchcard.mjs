@@ -473,7 +473,7 @@ export function reportCard(read, { cal = REAL_SHOW_CARDS, ratings = null, libDir
     verdict = `Strongest on ${strongest}; weakest on ${weakest.name} (${weakest.score.toFixed(1)})${secondWeak}.${ungraded.length ? ` Not graded: ${ungraded.join(', ')}.` : ''} Most helpful change: ${lift}.`;
   }
 
-  // Owner ratings agreement (Spearman's rho per canon where n >= 3).
+  // Ratings agreement (the user's own ratings.json) (Spearman's rho per canon where n >= 3).
   const agreement = {};
   const agreementParts = [];
   if (ratings && typeof ratings === 'object') {
@@ -521,7 +521,7 @@ export function formatCardLines({ canons, verdict, agreementParts = [] }) {
     ...rows,
     '',
     verdict,
-    ...(agreementParts.length ? ['', `Agreement with owner ratings (Spearman's rho): ${agreementParts.join('; ')}`] : []),
+    ...(agreementParts.length ? ['', `Agreement with your ratings (Spearman's rho): ${agreementParts.join('; ')}`] : []),
   ];
 }
 

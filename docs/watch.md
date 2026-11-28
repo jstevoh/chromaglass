@@ -9,8 +9,10 @@ from the sheets itself.
 It began as ChromaGlass's way of judging its own plate against real liquid light shows, and is
 being packaged for anyone who studies moving pictures as **reelreader**, under the MIT licence
 (PLAN §47p; this repository's own licence is separate). This page is its front page;
-[watch-words.md](watch-words.md) is the vocabulary its words come from, and
-[watch-plugin-plan.md](watch-plugin-plan.md) the plan for shipping it as a Claude Code plugin.
+[watch-words.md](../reelreader/skill/watch-words.md) is the vocabulary its words come from, and
+[watch-plugin-plan.md](watch-plugin-plan.md) the plan for shipping it as a Claude Code plugin. Its judging skill (how to read what it makes, honestly, for an editor, a colourist,
+a VJ or anyone), with a test set of clips with known answers, is
+[reelreader/skill/](../reelreader/skill/SKILL.md).
 
 ## What it makes
 

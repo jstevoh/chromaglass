@@ -232,6 +232,7 @@
     "microscope": "node scripts/microscope.mjs",
     "ferrolook": "node scripts/ferrolook.mjs",
     "maze": "node scripts/maze.mjs",
+    "bondmaze": "node scripts/bondmaze.mjs",
     "spikes": "node scripts/spikes.mjs",
     "slump": "node scripts/slump.mjs",
     "disc": "node scripts/disc.mjs",
@@ -426,7 +427,8 @@
     "linearlight": "node scripts/linearlight.mjs",
     "watchconfig": "node scripts/watchconfigtest.mjs",
     "watchmode": "node scripts/watchmodetest.mjs",
-    "watchreport": "node scripts/watchreporttest.mjs"
+    "watchreport": "node scripts/watchreporttest.mjs",
+    "reelset": "node scripts/reelsettest.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

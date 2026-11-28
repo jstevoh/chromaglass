@@ -108,11 +108,20 @@ Open, from building 9i:
     hundreds), so the domes grow at a scale the grid draws; at the lab's G 4.3 they set
     as bars along the grid. A finer film grid under the magnet (the patch at twice the
     plate's cells) would let it rise.
-  - **9t-2. No pull under the film.** The magnet's Kelvin pull is in the film's
-    pressure, worked out from the liquid's susceptibility (EFH1, χ0 2.6), and scaled to
-    nothing: at the whole of it the pool gathered into one heap with no domes on it (the
-    lift being held low, 9t-1), and at a tenth or a quarter its gathering front set the
-    domes along the grid. With 9t-1's finer grid it can come back.
+  - **9t-2. No pull under the film (shipped, #662, with 38k-7).** The plate's pull
+    acts under the standing film's window on each cell's own share. Story in
+    `docs/plan-shipped.md` §9t-2 + 38k-7. Landed 2026-11-28 (thread "Re-measure the
+    ferrofluid pair") with three checks re-read at the real 2 mm gap on the owner's Mac:
+    `standing`'s spacing bar now from the film's own fastest-growing wavelength (0.49 of
+    the pitch at the Magnet's G 3.0) and asked to widen as the domes merge; `ferrohold`'s
+    compression differential reads the body, as its absolute bar does, since a cone's
+    core is past three quarters with or without the pass; `ferropour`'s ring arm is a
+    plate by its pour and its mass, not by how much stays black once its drops stand up.
+  - **9t-2b. Domes merge slower at 2 mm than at 6 mm.** Under the Magnet they stand 0.67
+    then 0.74 of 2π l_c apart (Mac, e60a5262), against about 0.8 at 6 mm: the glass
+    holds the layer to the oil. Whether a real EFH1 layer in a 2 mm cell coarsens at
+    this rate wants a reference film (Hele-Shaw normal-field experiments) before a look
+    is tuned on it.
   - **9t-3. No hysteresis.** Real domes stay a few per cent under the field that raised
     them; turned to 0.95 of the onset on the axis, these were all gone two seconds on.
   - **9t-4. Slower than a real layer.** Domes start a second and a half after the Magnet
@@ -162,6 +171,15 @@ Open, from building 9i:
     the film's pressure, and start the patches on the largest |ΣB_z| over the plate. Check:
     pressed to 0.8 mm the domes' volume holds within 0.5%; two fingers at 0.65 of the onset
     raise domes where their fields add. Updates 9t-5 and 38k-3. (38v, from RS-24.)
+  - **9t-12. A wide pool dragged by the hand creeps and turns to worms.** Filmed on the
+    owner's Mac with 9t-2 and 38k-7 (2026-11-01, Classic, a pool 0.08 in radius, 0.9
+    full, the Magnet held 3 s then dragged 0.17 of the plate in 6 s): the pool stands
+    into a labyrinth of lit, worm-shaped domes and creeps after the hand, the same as on
+    main, where the hand's Magnet was already past the old onset. A small drop keeps up
+    (`ferrodrag`, 1.67 R). Open: whether a pool four pitches wide should gather toward
+    the axis under the pull before it fingers, and how fast a pool that size follows a
+    magnet through a thin gap (Hele-Shaw drag against the Kelvin force over the field's
+    reach), measured against the real thing before anything is tuned.
 - **9u. A set-down magnet still gathers a pool with no domes.** What the hand leaves
   behind (strength 0.8 at the look's height, 0.225 at Classic's Scale) is a field
   share of 0.15 on its axis, under the spikes' onset (0.18, `spikes.ts`), so it pulls
@@ -175,7 +193,7 @@ Open, from building 9i:
   the standing-domes plate PR that lab is for, not to a retune of the set-down
   strength here.
   The liquid's onset is now worked out (38k, 4.0 mT, five times under the lab's), and
-  at it this magnet stands its pool up; it waits on 9t-2's pull, then 38k-7.
+  at it this magnet stands its pool up, and since 9t-2 and 38k-7 the plate runs on it.
 - **9x. Picking the Magnet poured the hole itself; a magnet you size and play**
   (**shipped**). Story in `docs/plan-shipped.md` §9x (moved 2026-10-29, 19m).
   Open: on one Mac run (PR #230, after main came in) the pool's centre was 0.11 off
@@ -242,7 +260,7 @@ Open, from building 9i:
   |B| is still high. (38v, from RS-20.)
 
 - **9af. The magnet's strength and walk ride the music outside the cords** (S; Medium).
-  `magnetFor` (`LiquidVisualizer.tsx:2374-2462`) sets the field to min(1, lab·(0.55 +
+  `magnetFor` (`LiquidVisualizer.tsx:2374-2462`) sets the field to min(1, lab·(0.75 +
   0.35·energy + 0.45·env)) and speeds its walk on the music whatever the patch says (no
   built-in look takes the stale path). An electromagnet's field is B = μ0 n I with an L/R lag
   on the current, and a permanent magnet moves only with a hand. Make the music's share a
@@ -260,3 +278,18 @@ Open, from building 9i:
   wavelength the solver resolves sits near the grid's pitch so a pool either breaks into
   pieces or stays joined by thin necks. Don't lower the bar: those two lines are quarantined on
   PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the fix takes them out.
+  At the real onset (9t-2 + 38k-7, 2026-11-28, Mac at b9595e82) the first line passes and
+  the lighting line reads 8 of 8 domes lit against 3.0 bright points half a pitch off (the
+  bar wants three times as many; main read 16 of 27 against 0.5): the pool now gathers
+  into a heap and stands 8 full domes in 4 pieces where main stood 27 in 18, so the few
+  domes leave the off-pitch control with a third of their points. The lighting line's
+  control wants a ratio over domes of this size (the off-pitch points per dome, not a
+  count), read from the optics, before the quarantine ends.
+
+- **9ag. The ferrofluid looks lit from the front, in the photos' colours** (S-M). Held
+  against the owner's photos (2026-11-12, the looks-against-references read), Ferro Paint
+  reads luminance 0.14 against 0.56 and colourfulness 62 against 129, all warm, where
+  Colored I and II run blue to orange with bright dye between glossy black channels; Magnet
+  Garden is dark on dark gold (0.15) where the labyrinth photo is black on near-white (0.74).
+  38d-1 set the maze's period and left the light: a lamp from above (the dish's reflection, 38h)
+  and the looks' dye contracts. Measure with `npm run watch -- <take> --vs <ref>`.

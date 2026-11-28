@@ -1,7 +1,7 @@
 /**
  * Watching in words, and what changed between two films (PLAN 47x-1, 47x-2).
  *
- * Vocabulary, sources and the three rules: `docs/watch-words.md`.
+ * Vocabulary, sources and the three rules: `reelreader/skill/watch-words.md`.
  * Every word lives in BANDS below with its area, bold term, source, measure,
  * edge, and why that edge was chosen. No word is said from a NaN or null
  * measure, every text prints its deciding number to at least two significant
@@ -143,7 +143,7 @@ function extract(read) {
 }
 
 /**
- * The bands table: one entry per word in `docs/watch-words.md`.
+ * The bands table: one entry per word in `reelreader/skill/watch-words.md`.
  * Every edge states in a comment what set it (test clips, REAL_SHOWS, or design/physics bands).
  */
 export const BANDS = [
@@ -540,7 +540,7 @@ const EFFORT_TABLE = {
 
 /**
  * Describe a watched video (`watchVideo`'s return object) in the vocabulary of
- * `docs/watch-words.md`. Returns `{ lines, words }`.
+ * `reelreader/skill/watch-words.md`. Returns `{ lines, words }`.
  *
  * `liquid: false` (general footage, scripts/watchmode.mjs, PLAN 47p-3): the
  * wet show's words name what a liquid does (cells, marbling, a pour, a turned

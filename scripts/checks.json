@@ -609,11 +609,28 @@
       ]
     },
     {
+      "name": "The public judging skill is whole and its test set's answers hold",
+      "shard": "sound",
+      "run": "npm run reelset",
+      "why": [
+        "reelreader ships with a judging skill anyone can install (PLAN 47p-5b):",
+        "reelreader/skill/, copied into the release as it stands. This holds that",
+        "every link in it reaches a file in the folder, that no page names this",
+        "project, its owner, its places, its plan, its run scripts or a model (the",
+        "scan shown to catch them in the project's own layer on top), and that the",
+        "test set's four clips still measure what the answer key leans on: the",
+        "cartoon reads general with its seven cuts, the good liquid take liquid with",
+        "no freeze and no turn, the frozen take one 5.6 s freeze, the turned take a",
+        "steady curl. The bad takes run with --liquid. In the sound shard for its",
+        "ffmpeg. About two minutes."
+      ]
+    },
+    {
       "name": "Watching in words",
       "shard": "sound",
       "run": "npm run watchwords",
       "why": [
-        "The watch tool says what it sees in words (docs/watch-words.md: Laban,",
+        "The watch tool says what it sees in words (reelreader/skill/watch-words.md: Laban,",
         "Itten, Ching, Greenberg, Arnheim, the wet show) and tells a before film",
         "from an after one (PLAN.md 47x). Held to clips made to sit at known poles:",
         "a steady drift reads sustained, analogous and all-over; a picture that",
@@ -3590,6 +3607,18 @@
       ]
     },
     {
+      "name": "The ferrofluid maze's period from the Bond number",
+      "shard": "logic",
+      "run": "npm run bondmaze",
+      "why": [
+        "The labyrinth's period follows the coil's field through the magnetic Bond",
+        "number (PLAN 38d-1, src/gpu/fluid/mazeBond.ts): the closed form against",
+        "the stripe energy minimised from its Fourier sum, M on the Langevin curve",
+        "of the inner field, finer with field and a pool under the onset, the",
+        "looks no wider than the old maze, and the field the maze feels averaged over seconds."
+      ]
+    },
+    {
       "name": "The ferrofluid maze's detail",
       "shard": "plate",
       "run": "npm run maze",
@@ -3663,7 +3692,6 @@
       "shard": "plate",
       "run": "npm run spikes",
       "quarantine": [
-        { "line": "held close under a pool, the magnet parts it into domes", "plan": "9e-1", "since": "2026-11-22", "until": "2026-12-06" },
         { "line": "the plate lights a point on the domes", "plan": "9e-1", "since": "2026-11-22", "until": "2026-12-06" }
       ],
       "why": [

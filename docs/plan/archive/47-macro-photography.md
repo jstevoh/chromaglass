@@ -186,4 +186,14 @@ blur.
   `best.mp4` (the strongest 12 s, H.264 with sound) and `best.png` (its strongest frame), from
   `scripts/watchreport.mjs`; `--no-report` turns them off. The moment is the window with most
   motion, colour, lit area and loudness by rank, with no title card and a cost per hard cut.
-  `npm run watchreport` 34/34; its three choice rules each shown to catch a mutant.
+  `npm run watchreport` 41/41; each choice rule and both seeks shown to catch a mutant.
+- ~~**47p-5b**~~ the public judging skill (shipped, 2026-11-28): `reelreader/skill/`, a
+  self-contained skill folder the release copies: honesty rules first, the reading order, a
+  content read from the sheets, lenses for anyone, an editor, a colourist and a VJ or liquid
+  artist, the helper agent and the words guide (moved here from `docs/`), a worked example,
+  an eval-set guide on `ratings.json`, and a test set of four clips with known answers (an
+  edited cartoon, a good liquid take, the same take frozen and the same take turned as a
+  whole, both bad takes run with `--liquid`) plus a linked real show. `npm run reelset` holds
+  the folder whole, free of this project's names, and the key's measured half true.
+  ChromaGlass's layer stays on top in `.claude/skills/watch/` (our faults, the Mac route, the
+  settings map, the real shows). The agreement line now says "your ratings", not the owner's.
