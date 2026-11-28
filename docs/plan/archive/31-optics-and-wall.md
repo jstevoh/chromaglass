@@ -70,7 +70,12 @@ story in `docs/plan-shipped.md` §31p-3; `npm run polar`).
   least of its corners' (a pancake of oil keeps 0.9800 of the plate's light against 0.9797
   predicted, and nothing lands past where a passing ray can, line 10). The ripple's law is now
   drawn as the trace draws each part (drawn triangles at texel centres, splats as tents): 4.8% in
-  the cloud, where the first target read 5.3% and the Mac 6.4%. `npm run nolight`'s turnover (lines 7 and 13) is now asked either side of the middle
+  the cloud, where the first target read 5.3% and the Mac 6.4%. Small drops still went black at 0.6 in the second films: 31s-1
+  seeds its 1.5 mm of oil over the share's edge of a cell or two, steeper than a real meniscus,
+  which between two glasses is about half the gap round, so the path now reads the height through
+  a tent half a gap each side (`MENISCUS_METRES`); in the lab at a 512 grid small drops then light
+  as lenses at 0.6 and, far past their own short focus at 0.8, draw a dark disc ringed by their
+  spread light, as a strong bead does on a projector. `npm run nolight`'s turnover (lines 7 and 13) is now asked either side of the middle
   (Focus 0.56 against 0.44), where the traced map is linear: at 0.8 against 0.2 the oil turned
   over at 75% (3761 of 5010), the trace moving light rather than flipping it pixel for pixel; at
   0.56/0.44 4057 of 4074. A glycerine pour's sharp edge throws its rays wider than its ramp even

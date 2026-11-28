@@ -399,7 +399,21 @@ fn wallLight1(uv: vec2f) -> f32 {
   pupil's loss, in focus) keeps the share until 31s-2b moves it too, so no
   look changes at Focus's middle. With no height (a plate with no oil, the
   1x1 stand-in) the share stays.
+
+  The height is read through a tent half a gap wide each side (MENISCUS),
+  nine bilinear taps a quarter gap apart. Between two glasses the oil's
+  edge is an interface curved across the gap, about half a gap round, which
+  a height field of one value a cell cannot hold: 31s-1 seeds 1.5 mm of oil
+  over the share's edge of a cell or two and does not level it in the time
+  a look runs. The owner's Mac films of Oil & Water (Focus 0.6 and 0.8)
+  showed what the trace made of that: on a 512 grid the edge's slope is 1.5
+  mm over 0.4 mm, a bend of 0.5 rad, past the head lens (PROJECTOR_NA), and
+  a drop a few cells across is all edge, so it went black. Over a millimetre
+  the same edge bends about 0.15 rad and the drop is the lens it is; a body
+  wider than the tent keeps its height.
 */
+/** The oil's edge in metres each side: half the dish's rest gap (the interface's round across it). */
+export const MENISCUS_METRES = DISH_GAP_METRES / 2;
 export const SURFACE_PATH_WGSL = /* wgsl */ `
 @group(0) @binding(6) var surfaceSrc: texture_2d<f32>;
 
@@ -407,15 +421,27 @@ fn surfaceLoad(i: i32, j: i32, n: i32) -> f32 {
   return textureLoad(surfaceSrc, vec2i(clamp(i, 0, n - 1), clamp(j, 0, n - 1)), 0).r;
 }
 
-/* The column's path with the oil from its height (metres), given calcOpl's o for view v at uv. */
-fn surfacePath(o: f32, v: vec3f, uv: vec2f) -> f32 {
-  let n = i32(textureDimensions(surfaceSrc).x);
-  if (n < 4) { return o; }
+/* The height at uv, bilinear. */
+fn surfaceAt(uv: vec2f, n: i32) -> f32 {
   let p = uv * f32(n) - 0.5;
   let b = vec2i(floor(p));
   let f = p - floor(p);
-  let h = mix(mix(surfaceLoad(b.x, b.y, n), surfaceLoad(b.x + 1, b.y, n), f.x),
-              mix(surfaceLoad(b.x, b.y + 1, n), surfaceLoad(b.x + 1, b.y + 1, n), f.x), f.y);
+  return mix(mix(surfaceLoad(b.x, b.y, n), surfaceLoad(b.x + 1, b.y, n), f.x),
+             mix(surfaceLoad(b.x, b.y + 1, n), surfaceLoad(b.x + 1, b.y + 1, n), f.x), f.y);
+}
+
+/* The column's path with the oil from its height (metres, through the meniscus's tent), given calcOpl's o for view v at uv. */
+fn surfacePath(o: f32, v: vec3f, uv: vec2f) -> f32 {
+  let n = i32(textureDimensions(surfaceSrc).x);
+  if (n < 4) { return o; }
+  let step = ${(MENISCUS_METRES / 2 / DISH_METRES).toPrecision(6)};
+  var h = 0.0;
+  for (var j = -1; j <= 1; j++) {
+    for (var i = -1; i <= 1; i++) {
+      h += surfaceAt(uv + vec2f(f32(i), f32(j)) * step, n) * f32((2 - abs(i)) * (2 - abs(j)));
+    }
+  }
+  h = h / 16.0;
   let gapM = select(${DISH_GAP_METRES}, v.y * ${DISH_GAP_FIELD_METRES}, v.y > 0.001);
   let hg = select(1.0, clamp(v.y / 0.03, 0.3, 3.0), v.y > 0.001);
   return o - v.x * 0.137 * hg + 0.137 * clamp(h, 0.0, gapM) / ${DISH_GAP_METRES};
