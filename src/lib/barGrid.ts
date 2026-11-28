@@ -212,9 +212,6 @@ const SLIP = 0.2, TEMPO_SLIP = 0.04, SLIP_HOLD = 4;
 const ON_BEAT = 0.2;
 export const MIN_BEAT_CONFIDENCE = 0.15;
 
-interface Frame { t: number; onset: number; harmony: number[]; snare: number; kick: number; }
-interface Beat { harmony: number[]; snare: number; kick: number; }
-
 const EMPTY: BarNow = { period: 0, beatAt: null, place: null, half: null, beatConfidence: 0, barConfidence: 0 };
 /*
   How long a place told from outside (`tell`) stands after the last telling,
@@ -225,25 +222,67 @@ const EMPTY: BarNow = { period: 0, beatAt: null, place: null, half: null, beatCo
 */
 const TOLD_HOLD = 1;
 
-const median = (a: number[]): number => {
-  if (!a.length) return -120;
-  const s = a.slice().sort((x, y) => x - y);
-  return s[s.length >> 1];
+/**
+ * The k-th smallest of a[0..n), found by partitioning in place, so `medianSelect`
+ * finds the same element `slice().sort()` puts at `n >> 1` with no copy or sort
+ * allocation (same pattern as `audioFeatures.ts` `select`).
+ */
+function select(a: Float64Array, n: number, k: number): number {
+  let lo = 0, hi = n - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (a[mid] < a[lo]) { const t = a[mid]; a[mid] = a[lo]; a[lo] = t; }
+    if (a[hi] < a[lo]) { const t = a[hi]; a[hi] = a[lo]; a[lo] = t; }
+    if (a[hi] < a[mid]) { const t = a[hi]; a[hi] = a[mid]; a[mid] = t; }
+    const pivot = a[mid];
+    let i = lo, j = hi;
+    while (i <= j) {
+      while (a[i] < pivot) i++;
+      while (a[j] > pivot) j--;
+      if (i <= j) { const t = a[i]; a[i] = a[j]; a[j] = t; i++; j--; }
+    }
+    if (k <= j) hi = j; else if (k >= i) lo = i; else return a[k];
+  }
+  return a[k];
+}
+
+const medianSelect = (a: Float64Array, n: number): number => (n > 0 ? select(a, n, n >> 1) : -120);
+
+const standardiseInto = (src: Float64Array, dst: Float64Array, n: number, floor: number): void => {
+  const d = n || 1;
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += src[i];
+  const m = sum / d;
+  let sq = 0;
+  for (let i = 0; i < n; i++) sq += (src[i] - m) ** 2;
+  const sd = Math.max(floor, Math.sqrt(sq / d)) || 1;
+  for (let i = 0; i < n; i++) dst[i] = (src[i] - m) / sd;
 };
-const standardise = (a: number[], floor: number): number[] => {
-  const n = a.length || 1;
-  const m = a.reduce((s, x) => s + x, 0) / n;
-  const sd = Math.max(floor, Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / n)) || 1;
-  return a.map(x => (x - m) / sd);
+
+const growF64 = (a: Float64Array, minCap = a.length * 2): Float64Array => {
+  const next = new Float64Array(minCap);
+  next.set(a);
+  return next;
 };
+
 const mod4 = (i: number): number => ((i % 4) + 4) % 4;
 const square = (): number[][] => [0, 1, 2, 3].map(() => [0, 0, 0, 0]);
 
 export class BarGrid {
-  private frames: Frame[] = [];
+  // Growable ring buffer of recent frames, avoiding per-frame Frame/harmony[] objects and shift().
+  private frameT = new Float64Array(256);
+  private frameOnset = new Float64Array(256);
+  private frameH0 = new Float64Array(256);
+  private frameH1 = new Float64Array(256);
+  private frameH2 = new Float64Array(256);
+  private frameH3 = new Float64Array(256);
+  private frameSnare = new Float64Array(256);
+  private frameKick = new Float64Array(256);
+  private frameHead = 0;
+  private frameCount = 0;
   private lastDb: number[] | null = null;
   private tickAt = -Infinity;
-  private state: BarNow = { ...EMPTY };
+  private readonly state: BarNow = { ...EMPTY };
   // The numbering (see "The one").
   private anchorAt: number | null = null;
   private anchorPeriod = 0;
@@ -254,24 +293,109 @@ export class BarGrid {
   // decayed sum of the later beat's score less the earlier's, of its square,
   // and how many.
   private heardTo = -Infinity;
-  private sum = [0, 0, 0, 0];
-  private pairSum = square();
-  private pairSquares = square();
-  private pairs = square();
-  private recent: { at: number; x: number }[] = [];
+  private readonly sum = [0, 0, 0, 0];
+  private readonly pairSum = square();
+  private readonly pairSquares = square();
+  private readonly pairs = square();
+  private readonly recentAt = new Float64Array(3);
+  private readonly recentX = new Float64Array(3);
+  private recentHead = 0;
+  private recentCount = 0;
   private sureOfOne = false;
   private sureOfHalf = false;
   private estimated = 0;
+  // Reused scratch buffers for `estimate` (PLAN 46j: no typed arrays, closures or .slice().sort() per call).
+  private readonly bins = new Float64Array(Math.round(BEAT_WINDOW * GRID_HZ));
+  private readonly rawBins = new Float64Array(Math.round(BEAT_WINDOW * GRID_HZ));
+  private readonly centered = new Float64Array(Math.round(BEAT_WINDOW * GRID_HZ));
+  private readonly ac = new Float64Array(Math.ceil((GRID_HZ * 60) / MIN_BPM) + 2);
+  private starts = new Float64Array(64);
+  private bandBuf0 = new Float64Array(128);
+  private bandBuf1 = new Float64Array(128);
+  private bandBuf2 = new Float64Array(128);
+  private bandBuf3 = new Float64Array(128);
+  private beatH0 = new Float64Array(64);
+  private beatH1 = new Float64Array(64);
+  private beatH2 = new Float64Array(64);
+  private beatH3 = new Float64Array(64);
+  private beatSnare = new Float64Array(64);
+  private beatKick = new Float64Array(64);
+  private changeBuf = new Float64Array(64);
+  private snareBuf = new Float64Array(64);
+  private kickBuf = new Float64Array(64);
+  private zcBuf = new Float64Array(64);
+  private zsBuf = new Float64Array(64);
+  private zkBuf = new Float64Array(64);
   // The bar told from outside, and until when it stands (see `tell`).
-  private told: BarNow = { ...EMPTY };
+  private readonly told: BarNow = { ...EMPTY };
   private toldUntil = -Infinity;
   private clockAt = -Infinity;
 
+  private clearState(): void {
+    const s = this.state;
+    s.period = 0; s.beatAt = null; s.place = null; s.half = null;
+    s.beatConfidence = 0; s.barConfidence = 0;
+  }
+
+  private setState(period: number, beatAt: number | null, place: number | null, half: number | null, beatConfidence: number, barConfidence: number): void {
+    const s = this.state;
+    s.period = period; s.beatAt = beatAt; s.place = place; s.half = half;
+    s.beatConfidence = beatConfidence; s.barConfidence = barConfidence;
+  }
+
+  private growFrames(): void {
+    const cap = this.frameT.length;
+    const nextCap = cap * 2;
+    const ft = new Float64Array(nextCap), fo = new Float64Array(nextCap);
+    const h0 = new Float64Array(nextCap), h1 = new Float64Array(nextCap);
+    const h2 = new Float64Array(nextCap), h3 = new Float64Array(nextCap);
+    const fs = new Float64Array(nextCap), fk = new Float64Array(nextCap);
+    for (let i = 0; i < this.frameCount; i++) {
+      const idx = (this.frameHead + i) % cap;
+      ft[i] = this.frameT[idx]; fo[i] = this.frameOnset[idx];
+      h0[i] = this.frameH0[idx]; h1[i] = this.frameH1[idx];
+      h2[i] = this.frameH2[idx]; h3[i] = this.frameH3[idx];
+      fs[i] = this.frameSnare[idx]; fk[i] = this.frameKick[idx];
+    }
+    this.frameT = ft; this.frameOnset = fo;
+    this.frameH0 = h0; this.frameH1 = h1; this.frameH2 = h2; this.frameH3 = h3;
+    this.frameSnare = fs; this.frameKick = fk;
+    this.frameHead = 0;
+  }
+
+  private growBandBufs(): void {
+    this.bandBuf0 = growF64(this.bandBuf0);
+    this.bandBuf1 = growF64(this.bandBuf1);
+    this.bandBuf2 = growF64(this.bandBuf2);
+    this.bandBuf3 = growF64(this.bandBuf3);
+  }
+
+  private growBeats(): void {
+    this.beatH0 = growF64(this.beatH0);
+    this.beatH1 = growF64(this.beatH1);
+    this.beatH2 = growF64(this.beatH2);
+    this.beatH3 = growF64(this.beatH3);
+    this.beatSnare = growF64(this.beatSnare);
+    this.beatKick = growF64(this.beatKick);
+  }
+
+  private growScoreBufs(need: number): void {
+    let cap = this.changeBuf.length;
+    while (cap < need) cap *= 2;
+    this.changeBuf = new Float64Array(cap);
+    this.snareBuf = new Float64Array(cap);
+    this.kickBuf = new Float64Array(cap);
+    this.zcBuf = new Float64Array(cap);
+    this.zsBuf = new Float64Array(cap);
+    this.zkBuf = new Float64Array(cap);
+  }
+
   reset(): void {
-    this.frames = [];
+    this.frameHead = 0;
+    this.frameCount = 0;
     this.lastDb = null;
     this.tickAt = -Infinity;
-    this.state = { ...EMPTY };
+    this.clearState();
     this.anchorAt = null;
     this.slipSince = null;
     this.grooveFrom = -Infinity;
@@ -282,11 +406,14 @@ export class BarGrid {
 
   private forget(): void {
     this.heardTo = -Infinity;
-    this.sum = [0, 0, 0, 0];
-    this.pairSum = square();
-    this.pairSquares = square();
-    this.pairs = square();
-    this.recent = [];
+    this.sum.fill(0);
+    for (let q = 0; q < 4; q++) {
+      this.pairSum[q].fill(0);
+      this.pairSquares[q].fill(0);
+      this.pairs[q].fill(0);
+    }
+    this.recentHead = 0;
+    this.recentCount = 0;
     this.sureOfOne = false;
     this.sureOfHalf = false;
   }
@@ -343,20 +470,35 @@ export class BarGrid {
    * advancing clock and the phone saying "Counting the one" to silence.
    */
   update(reading: AudioReading | null, time: number): void {
-    const newest = this.frames.length ? this.frames[this.frames.length - 1].t : null;
+    const cap = this.frameT.length;
+    const newest = this.frameCount > 0 ? this.frameT[(this.frameHead + this.frameCount - 1) % cap] : null;
     if (newest !== null && (time < newest - 0.5 || time > newest + 5)) this.reset();
     this.clockAt = time;
     if (!reading || !reading.db) {
       this.lastDb = null;
-      if (this.state.beatAt !== null && time - this.state.beatAt > BEAT_WINDOW) this.state = { ...EMPTY };
+      if (this.state.beatAt !== null && time - this.state.beatAt > BEAT_WINDOW) this.clearState();
       return;
     }
     const db = reading.db;
     let onset = 0;
     if (this.lastDb) for (let i = 0; i < db.length; i++) onset += Math.max(0, db[i] - this.lastDb[i]);
     this.lastDb = db;
-    this.frames.push({ t: time, onset, harmony: HARMONY_BANDS.map(k => db[k]), snare: reading.snare, kick: db[KICK] });
-    while (this.frames.length && time - this.frames[0].t > BAR_WINDOW + 1) this.frames.shift();
+    if (this.frameCount === this.frameT.length) this.growFrames();
+    const curCap = this.frameT.length;
+    const tail = (this.frameHead + this.frameCount) % curCap;
+    this.frameT[tail] = time;
+    this.frameOnset[tail] = onset;
+    this.frameH0[tail] = db[HARMONY_BANDS[0]];
+    this.frameH1[tail] = db[HARMONY_BANDS[1]];
+    this.frameH2[tail] = db[HARMONY_BANDS[2]];
+    this.frameH3[tail] = db[HARMONY_BANDS[3]];
+    this.frameSnare[tail] = reading.snare;
+    this.frameKick[tail] = db[KICK];
+    this.frameCount++;
+    while (this.frameCount > 0 && time - this.frameT[this.frameHead] > BAR_WINDOW + 1) {
+      this.frameHead = (this.frameHead + 1) % curCap;
+      this.frameCount--;
+    }
     if (time - this.tickAt >= TICK_S) { this.tickAt = time; this.estimate(time); }
   }
 
@@ -375,16 +517,33 @@ export class BarGrid {
     return mod4(s.half + k) % 2 === 0 ? STRONG_BEAT : WEAK_BEAT;
   }
 
+  private over(p: number, q: number): number {
+    const m = this.pairs[p][q];
+    if (!(m > 2)) return 0;
+    const mean = this.pairSum[p][q] / m;
+    const spread = Math.sqrt(Math.max(1e-12, this.pairSquares[p][q] / m - mean * mean));
+    return mean / (spread / Math.sqrt(m));
+  }
+
+  private kickedAt(j: number, last: number, kickFloor: number): boolean {
+    return j >= 0 && j <= last && this.beatKick[j] >= kickFloor;
+  }
+
   private estimate(now: number): void {
     this.estimated++;
     // Onset strength in bins over the beat window, each frame spread over
     // the bins it stands for.
-    const n = Math.round(BEAT_WINDOW * GRID_HZ);
+    const bins = this.bins;
+    const n = bins.length;
     const from = now - BEAT_WINDOW;
-    if (!this.frames.length || this.frames[0].t > from + 1) { this.state = { ...EMPTY }; return; }
-    const bins = new Float64Array(n);
-    for (let k = 0; k < this.frames.length; k++) {
-      const f = this.frames[k];
+    const frameCap = this.frameT.length;
+    const frameHead = this.frameHead;
+    const frameCount = this.frameCount;
+    if (frameCount === 0 || this.frameT[frameHead] > from + 1) { this.clearState(); return; }
+    bins.fill(0);
+    for (let k = 0; k < frameCount; k++) {
+      const idx = (frameHead + k) % frameCap;
+      const ft = this.frameT[idx];
       // A millionth of a bin over, so a frame that falls exactly on a bin's
       // edge lands in the same bin whatever the clock reads. On the page's
       // clock (an hour and more of seconds) the subtraction rounds a frame
@@ -393,13 +552,16 @@ export class BarGrid {
       // measured, the same song on a clock at 4321 s was placed alike on
       // 93 to 98 % of its kicks at sure marks of 2.0 and 2.4, and on 100 %
       // with this. A real clock seldom lands on an edge; a render's does.
-      const i0 = Math.floor((f.t - from) * GRID_HZ + 1e-6);
-      const span = k > 0 ? Math.max(1, Math.min(8, Math.round((f.t - this.frames[k - 1].t) * GRID_HZ))) : 1;
-      for (let i = i0 - span + 1; i <= i0; i++) if (i >= 0 && i < n) bins[i] += f.onset / span;
+      const i0 = Math.floor((ft - from) * GRID_HZ + 1e-6);
+      const prevT = k > 0 ? this.frameT[(frameHead + k - 1) % frameCap] : 0;
+      const span = k > 0 ? Math.max(1, Math.min(8, Math.round((ft - prevT) * GRID_HZ))) : 1;
+      const add = this.frameOnset[idx] / span;
+      for (let i = i0 - span + 1; i <= i0; i++) if (i >= 0 && i < n) bins[i] += add;
     }
     // And smoothed, a triangle SMOOTH bins either side (see "The beats").
     {
-      const raw = bins.slice();
+      const raw = this.rawBins;
+      raw.set(bins);
       for (let i = 0; i < n; i++) {
         let s = 0, w = 0;
         for (let k = -SMOOTH; k <= SMOOTH; k++) {
@@ -414,14 +576,14 @@ export class BarGrid {
     let mean = 0;
     for (let i = 0; i < n; i++) mean += bins[i];
     mean /= n;
-    const x = Array.from(bins, v => v - mean);
+    const x = this.centered;
     let zero = 0;
-    for (let i = 0; i < n; i++) zero += x[i] * x[i];
-    if (!(zero > 0)) { this.state = { ...EMPTY }; return; }
+    for (let i = 0; i < n; i++) { const xi = bins[i] - mean; x[i] = xi; zero += xi * xi; }
+    if (!(zero > 0)) { this.clearState(); return; }
 
     // Tempo: the autocorrelation's best lag, weighted toward PREFER_BPM.
     const lo = Math.floor((GRID_HZ * 60) / MAX_BPM), hi = Math.ceil((GRID_HZ * 60) / MIN_BPM);
-    const ac = new Float64Array(hi + 2);
+    const ac = this.ac;
     for (let lag = lo - 1; lag <= hi + 1; lag++) {
       let s = 0;
       for (let i = lag; i < n; i++) s += x[i] * x[i - lag];
@@ -466,7 +628,7 @@ export class BarGrid {
     // refinement as it was and this lock off, `npm run downbeat`'s fuzzed
     // streams never returned (killed at its two-minute deadline). Nothing
     // known is better than that.
-    if (!(lag >= lo - 0.5 && lag <= hi + 0.5)) { this.state = { ...EMPTY }; return; }
+    if (!(lag >= lo - 0.5 && lag <= hi + 0.5)) { this.clearState(); return; }
     const beatConfidence = Math.max(0, Math.min(1, ac[best] / zero));
 
     // Phase: the comb back from now collecting the most onset, recent beats first.
@@ -475,44 +637,61 @@ export class BarGrid {
       let s = 0, w = 1;
       for (let p = n - 1 - ph; p >= 1; p -= lag) {
         const i = Math.round(p);
-        s += w * (bins[i] + 0.5 * (bins[i - 1] ?? 0) + 0.5 * (bins[i + 1] ?? 0));
+        s += w * (bins[i] + 0.5 * (i > 0 ? bins[i - 1] : 0) + 0.5 * (i + 1 < n ? bins[i + 1] : 0));
         w *= 0.9;
       }
       if (s > phaseV) { phaseV = s; phase = ph; }
     }
     const period = lag / GRID_HZ;
     const beatAt = from + (n - 1 - phase + 0.5) / GRID_HZ;
-    const unsure: BarNow = { period, beatAt, place: null, half: null, beatConfidence, barConfidence: 0 };
-    if (beatConfidence < MIN_BEAT_CONFIDENCE) { this.state = unsure; return; }
+    if (beatConfidence < MIN_BEAT_CONFIDENCE) { this.setState(period, beatAt, null, null, beatConfidence, 0); return; }
 
     // The beats of the bar window, read one by one: the frames are in time
     // order, so one walk through them serves every beat.
-    const starts: number[] = [];
-    const first = Math.max(now - BAR_WINDOW, this.grooveFrom, this.frames[0].t);
-    for (let t = beatAt; t >= first; t -= period) starts.unshift(t);
-    const beats: Beat[] = [];
-    let k0 = 0;
-    for (const t0 of starts) {
-      while (k0 < this.frames.length && this.frames[k0].t < t0 - 0.02) k0++;
-      const harmony: number[][] = HARMONY_BANDS.map(() => []);
-      let snare = 0, kick = -120;
-      for (let k = k0; k < this.frames.length && this.frames[k].t < t0 + period - 0.02; k++) {
-        const f = this.frames[k];
-        for (let h = 0; h < harmony.length; h++) harmony[h].push(f.harmony[h]);
-        if (f.t < t0 + period / 2) snare = Math.max(snare, f.snare);
-        if (f.t < t0 + period / 4 + 0.02) kick = Math.max(kick, f.kick);
-      }
-      beats.push({ harmony: harmony.map(median), snare, kick });
+    let startsCount = 0;
+    const first = Math.max(now - BAR_WINDOW, this.grooveFrom, this.frameT[frameHead]);
+    for (let t = beatAt; t >= first; t -= period) {
+      if (startsCount === this.starts.length) this.starts = growF64(this.starts);
+      this.starts[startsCount++] = t;
     }
-    if (beats.length < 2 * KERNEL + 2) { this.state = unsure; return; }
-    const last = beats.length - 1;
+    let beatCount = 0;
+    let k0 = 0;
+    for (let si = startsCount - 1; si >= 0; si--) {
+      const t0 = this.starts[si];
+      while (k0 < frameCount && this.frameT[(frameHead + k0) % frameCap] < t0 - 0.02) k0++;
+      let bandCount = 0;
+      let snare = 0, kick = -120;
+      for (let k = k0; k < frameCount; k++) {
+        const idx = (frameHead + k) % frameCap;
+        const ft = this.frameT[idx];
+        if (!(ft < t0 + period - 0.02)) break;
+        if (bandCount === this.bandBuf0.length) this.growBandBufs();
+        this.bandBuf0[bandCount] = this.frameH0[idx];
+        this.bandBuf1[bandCount] = this.frameH1[idx];
+        this.bandBuf2[bandCount] = this.frameH2[idx];
+        this.bandBuf3[bandCount] = this.frameH3[idx];
+        bandCount++;
+        if (ft < t0 + period / 2) snare = Math.max(snare, this.frameSnare[idx]);
+        if (ft < t0 + period / 4 + 0.02) kick = Math.max(kick, this.frameKick[idx]);
+      }
+      if (beatCount === this.beatH0.length) this.growBeats();
+      this.beatH0[beatCount] = medianSelect(this.bandBuf0, bandCount);
+      this.beatH1[beatCount] = medianSelect(this.bandBuf1, bandCount);
+      this.beatH2[beatCount] = medianSelect(this.bandBuf2, bandCount);
+      this.beatH3[beatCount] = medianSelect(this.bandBuf3, bandCount);
+      this.beatSnare[beatCount] = snare;
+      this.beatKick[beatCount] = kick;
+      beatCount++;
+    }
+    if (beatCount < 2 * KERNEL + 2) { this.setState(period, beatAt, null, null, beatConfidence, 0); return; }
+    const last = beatCount - 1;
 
     // Number the beats (see "The one", last paragraph).
     const moved = this.anchorAt === null ? NaN : (beatAt - this.anchorAt) / this.anchorPeriod;
     const agrees = Number.isFinite(moved) && Math.abs(moved - Math.round(moved)) <= SLIP && Math.abs(period - this.anchorPeriod) <= TEMPO_SLIP * period;
     if (this.anchorAt !== null && !agrees) {
       if (this.slipSince === null) this.slipSince = now;
-      if (now - this.slipSince < SLIP_HOLD) { this.state = unsure; return; }
+      if (now - this.slipSince < SLIP_HOLD) { this.setState(period, beatAt, null, null, beatConfidence, 0); return; }
       // A new grid: forget the old one's evidence, and read no beat from
       // before this one began (what came before is on another grid, at
       // another tempo, perhaps another song, and its kicks would set the
@@ -529,67 +708,80 @@ export class BarGrid {
     // The evidence of each beat not yet heard whose neighbours are all in:
     // the harmony's change wants KERNEL beats on either side, and the latest
     // is still going.
-    const js: number[] = [];
-    for (let j = KERNEL; j + KERNEL <= last; j++) js.push(j);
-    const span = (j0: number, j1: number): number[] => HARMONY_BANDS.map((_, h) => {
-      let s = 0;
-      for (let j = j0; j < j1; j++) s += beats[j].harmony[h];
-      return s / (j1 - j0);
-    });
-    const change = js.map(j => {
-      const before = span(j - KERNEL, j), after = span(j, j + KERNEL);
-      return before.reduce((s, v, h) => s + Math.abs(v - after[h]), 0);
-    });
-    const zc = standardise(change, 0);
-    const zs = standardise(js.map(j => beats[j].snare), SNARE_FLOOR);
-    const zk = standardise(js.map(j => beats[j].kick), KICK_FLOOR);
-    const kickMax = Math.max(...beats.map(f => f.kick));
-    const kicked = (j: number): boolean => j >= 0 && j <= last && beats[j].kick >= Math.max(KICK_FLOOR_DB, kickMax - KICK_THERE_DB);
-    js.forEach((j, i) => {
-      if (js.length < MIN_READ) return;
-      const at = this.anchorIndex - (last - j);
-      if (at <= this.heardTo) return;
-      this.heardTo = at;
-      if (!(kicked(j) || kicked(j - 1) || kicked(j + 1))) return;
-      const fillEnd = kicked(j) && !kicked(j - 1) && !kicked(j - 2) ? FILL_W : 0;
-      const score = HARMONY_W * zc[i] - SNARE_W * zs[i] + KICK_W * zk[i] + fillEnd;
-      const p = mod4(at);
-      for (let q = 0; q < 4; q++) {
-        this.sum[q] *= DECAY;
-        for (let r = 0; r < 4; r++) { this.pairSum[q][r] *= DECAY; this.pairSquares[q][r] *= DECAY; this.pairs[q][r] *= DECAY; }
+    const jsCount = Math.max(0, last - 2 * KERNEL + 1);
+    if (jsCount > this.changeBuf.length) this.growScoreBufs(jsCount);
+    const bh0 = this.beatH0, bh1 = this.beatH1, bh2 = this.beatH2, bh3 = this.beatH3;
+    for (let i = 0; i < jsCount; i++) {
+      const j = KERNEL + i;
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0;
+      for (let u = j - KERNEL; u < j; u++) { b0 += bh0[u]; b1 += bh1[u]; b2 += bh2[u]; b3 += bh3[u]; }
+      let a0 = 0, a1 = 0, a2 = 0, a3 = 0;
+      for (let u = j; u < j + KERNEL; u++) { a0 += bh0[u]; a1 += bh1[u]; a2 += bh2[u]; a3 += bh3[u]; }
+      this.changeBuf[i] = Math.abs(b0 / KERNEL - a0 / KERNEL)
+        + Math.abs(b1 / KERNEL - a1 / KERNEL)
+        + Math.abs(b2 / KERNEL - a2 / KERNEL)
+        + Math.abs(b3 / KERNEL - a3 / KERNEL);
+      this.snareBuf[i] = this.beatSnare[j];
+      this.kickBuf[i] = this.beatKick[j];
+    }
+    standardiseInto(this.changeBuf, this.zcBuf, jsCount, 0);
+    standardiseInto(this.snareBuf, this.zsBuf, jsCount, SNARE_FLOOR);
+    standardiseInto(this.kickBuf, this.zkBuf, jsCount, KICK_FLOOR);
+    let kickMax = -Infinity;
+    for (let i = 0; i < beatCount; i++) if (this.beatKick[i] > kickMax) kickMax = this.beatKick[i];
+    const kickFloor = Math.max(KICK_FLOOR_DB, kickMax - KICK_THERE_DB);
+    if (jsCount >= MIN_READ) {
+      for (let i = 0; i < jsCount; i++) {
+        const j = KERNEL + i;
+        const at = this.anchorIndex - (last - j);
+        if (at <= this.heardTo) continue;
+        this.heardTo = at;
+        if (!(this.kickedAt(j, last, kickFloor) || this.kickedAt(j - 1, last, kickFloor) || this.kickedAt(j + 1, last, kickFloor))) continue;
+        const fillEnd = this.kickedAt(j, last, kickFloor) && !this.kickedAt(j - 1, last, kickFloor) && !this.kickedAt(j - 2, last, kickFloor) ? FILL_W : 0;
+        const score = HARMONY_W * this.zcBuf[i] - SNARE_W * this.zsBuf[i] + KICK_W * this.zkBuf[i] + fillEnd;
+        const p = mod4(at);
+        for (let q = 0; q < 4; q++) {
+          this.sum[q] *= DECAY;
+          for (let r = 0; r < 4; r++) { this.pairSum[q][r] *= DECAY; this.pairSquares[q][r] *= DECAY; this.pairs[q][r] *= DECAY; }
+        }
+        this.sum[p] += score;
+        for (let ri = 0; ri < this.recentCount; ri++) {
+          const rIdx = (this.recentHead + ri) % 3;
+          const rAt = this.recentAt[rIdx];
+          if (at - rAt > 3) continue;
+          const q = mod4(rAt), dx = score - this.recentX[rIdx];
+          this.pairSum[p][q] += dx; this.pairSquares[p][q] += dx * dx; this.pairs[p][q] += 1;
+          this.pairSum[q][p] -= dx; this.pairSquares[q][p] += dx * dx; this.pairs[q][p] += 1;
+        }
+        if (this.recentCount === 3) {
+          this.recentAt[this.recentHead] = at;
+          this.recentX[this.recentHead] = score;
+          this.recentHead = (this.recentHead + 1) % 3;
+        } else {
+          const tail = (this.recentHead + this.recentCount) % 3;
+          this.recentAt[tail] = at;
+          this.recentX[tail] = score;
+          this.recentCount++;
+        }
       }
-      this.sum[p] += score;
-      for (const r of this.recent) {
-        if (at - r.at > 3) continue;
-        const q = mod4(r.at), dx = score - r.x;
-        this.pairSum[p][q] += dx; this.pairSquares[p][q] += dx * dx; this.pairs[p][q] += 1;
-        this.pairSum[q][p] -= dx; this.pairSquares[q][p] += dx * dx; this.pairs[q][p] += 1;
-      }
-      this.recent.push({ at, x: score });
-      if (this.recent.length > 3) this.recent.shift();
-    });
+    }
 
     // How far place p stands over place q: the paired t.
-    const over = (p: number, q: number): number => {
-      const m = this.pairs[p][q];
-      if (!(m > 2)) return 0;
-      const mean = this.pairSum[p][q] / m;
-      const spread = Math.sqrt(Math.max(1e-12, this.pairSquares[p][q] / m - mean * mean));
-      return mean / (spread / Math.sqrt(m));
-    };
-    const one = [0, 1, 2, 3].reduce((p, q) => (this.sum[q] > this.sum[p] ? q : p), 0);
-    const tOne = Math.min(...[1, 2, 3].map(k => over(one, mod4(one + k))));
-    const strong = [one, mod4(one + 2)], weak = [mod4(one + 1), mod4(one + 3)];
-    const tHalf = Math.min(...strong.flatMap(p => weak.map(q => over(p, q))));
+    let one = 0;
+    for (let q = 1; q < 4; q++) if (this.sum[q] > this.sum[one]) one = q;
+    const tOne = Math.min(this.over(one, mod4(one + 1)), this.over(one, mod4(one + 2)), this.over(one, mod4(one + 3)));
+    const s0 = one, s1 = mod4(one + 2), w0 = mod4(one + 1), w1 = mod4(one + 3);
+    const tHalf = Math.min(this.over(s0, w0), this.over(s0, w1), this.over(s1, w0), this.over(s1, w1));
     this.sureOfOne = tOne >= (this.sureOfOne ? BAR_SURE_OFF : BAR_SURE_ON);
     this.sureOfHalf = this.sureOfOne || tHalf >= (this.sureOfHalf ? BAR_SURE_OFF : BAR_SURE_ON);
     const place = mod4(this.anchorIndex - one);
-    this.state = {
-      period, beatAt, beatConfidence,
-      place: this.sureOfOne ? place : null,
-      half: this.sureOfHalf ? place % 2 : null,
-      barConfidence: Math.max(0, Math.min(1, tOne / (2 * BAR_SURE_ON))),
-    };
+    this.setState(
+      period, beatAt,
+      this.sureOfOne ? place : null,
+      this.sureOfHalf ? place % 2 : null,
+      beatConfidence,
+      Math.max(0, Math.min(1, tOne / (2 * BAR_SURE_ON))),
+    );
   }
 }
 

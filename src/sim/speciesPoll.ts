@@ -74,6 +74,24 @@ export class SpeciesPoller {
 }
 
 /**
+ * Active velocity field and scale handed to `samplePlateVelocity` during a
+ * synchronous `stepPlateBubbles` call, so no closure or tuple is allocated
+ * per step or per sample (PLAN 46j).
+ */
+let sampleVx: Float32Array | undefined;
+let sampleVy: Float32Array | undefined;
+let sampleQk = 0;
+
+function samplePlateVelocity(bx: number, by: number, out: [number, number]): void {
+  if (!sampleVx || !sampleVy) { out[0] = 0; out[1] = 0; return; }
+  const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
+  const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
+  const idx = ix + iy * GRID_SIZE;
+  out[0] = sampleVx[idx] * sampleQk;
+  out[1] = sampleVy[idx] * sampleQk;
+}
+
+/**
  * Step the plate's `BubbleField` for one simulation step, handing it the
  * species snapshot on a thin gap (and `null` otherwise), then applying each
  * bubble's footprint squeeze and pop collapse to the lead layer.
@@ -86,26 +104,29 @@ export function stepPlateBubbles(
   tiltX: number,
   tiltY: number,
 ): void {
-  const vx = lead?.readVx, vy = lead?.readVy;
-  const qk = particleFlowScale(lead, currentSettings);
   bubbles.gapMetres = lead?.gpu?.coverMetres ?? DISH_GAP_METRES;
   bubbles.liquid(currentSettings);
   const thinGap = (currentSettings.thinGap ?? 1) > 0 && !!lead?.thinGap;
   const snap = thinGap && lead ? lead.speciesPoll.latest : null;
   bubbles.species(snap, snap ? snap.poured : null);
-  bubbles.step(simStepS, (bx, by) => {
-    if (!vx || !vy) return [0, 0];
-    const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
-    const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
-    return [vx[ix + iy * GRID_SIZE] * qk, vy[ix + iy * GRID_SIZE] * qk];
-  }, tiltX, tiltY);
+  sampleVx = lead?.readVx;
+  sampleVy = lead?.readVy;
+  sampleQk = particleFlowScale(lead, currentSettings);
+  try {
+    bubbles.step(simStepS, samplePlateVelocity, tiltX, tiltY);
+  } finally {
+    sampleVx = undefined;
+    sampleVy = undefined;
+  }
   // A bubble is air between the plates: the dye cannot sit under
   // it. A standing squeeze on each footprint keeps pumping the
   // dye out to the rim, so the field flows round the bubbles
   // instead of sliding underneath them as if they were painted on.
   // The bubble's press, not the hand's (lib/squish.ts Presser): a held Blow's straw bubble is one, and `npm run tools` counts the hand's alone.
   if (lead) {
-    for (const b of bubbles.bubbles) {
+    const bs = bubbles.bubbles;
+    for (let i = 0; i < bs.length; i++) {
+      const b = bs[i];
       if (b.r < 1.2) continue;
       const bx = Math.round(b.x), by = Math.round(b.y);
       if (bx > 2 && by > 2 && bx < GRID_SIZE - 3 && by < GRID_SIZE - 3) lead.applySquish(bx, by, Math.max(1, b.r * 0.85 / GRID_SCALE), 0.0035, 0, false, 'press', 'bubble');

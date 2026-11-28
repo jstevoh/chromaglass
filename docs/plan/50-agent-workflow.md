@@ -29,7 +29,7 @@ with the frame. At 120 Hz a frame has 8.3 ms; the 11-13 audit measured one desk 
   2026-11-27); **46h** a MIDI fader or a Go
   fade renders every desk panel, ten to thirty times a second; **46p** the remote's whole
   snapshot is serialised every 80 ms with no phone connected; **46j** the frame's own
-  garbage. Each already names its check or the check Claude writes first. The cheapest
+  garbage (46j first three sites shipped). Each already names its check or the check Claude writes first. The cheapest
   smoothness there is, because the causes are found and placed.
 - **50b** *One smoothness number per look* (rank 2, S, Antigravity). Not a gate: an
   instrument. On the owner's Mac, every look for 30 s with the band: the 99th-percentile frame
