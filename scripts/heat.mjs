@@ -158,7 +158,8 @@ try {
   });
   check(
     'the lamp lights the liquid evenly: a dark pool off the axis warms as one on it does',
-    even.mid > 0.03 && Math.abs(even.off / even.mid - 1) < 0.03 && Math.abs(even.rim / even.mid - 1) < 0.03,
+    // It warms at all: half of line 1's budget for the same half second (0.03 K, 18f's millimetre at 0.24 K/s, until 38f-3).
+    even.mid > 0.5 * want1 && Math.abs(even.off / even.mid - 1) < 0.03 && Math.abs(even.rim / even.mid - 1) < 0.03,
     `on the axis ${even.mid.toFixed(4)} K, at (0.25, 0.25) ${even.off.toFixed(4)} K (${(even.off / Math.max(even.mid, 1e-6)).toFixed(3)}x), at (0.12, 0.5) near the rim ${even.rim.toFixed(4)} K (${(even.rim / Math.max(even.mid, 1e-6)).toFixed(3)}x)`
   );
 
@@ -428,9 +429,23 @@ try {
   */
   const clocks = await page.evaluate(async () => {
     const N = 64;
-    // The middle 5 × 5 cells' mean: each cell's heat is one of the two half floats either side of it (the dither).
-    const midOf = (v) => { let t = 0; for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) t += v[((N / 2 + j) * N + N / 2 + i) * 4 + 2]; return t / 25; };
+    /*
+      The patch's whole heat, as its mean over the cells it was laid warmer
+      than 1 K in: the sideways conduction (heatVisc) moves heat out of the
+      middle without losing any (the middle 5 × 5 cells lost 0.015 K more
+      than the budget in ten seconds, 25% of the radiation's 0.06), and each
+      cell's heat is one of the two half floats either side of it (the
+      dither), which a sum averages away.
+    */
+    let laid = null;
+    const midOf = (v) => {
+      if (!laid) laid = Array.from({ length: N * N }, (_, k) => v[k * 4 + 2] > 1);
+      let t = 0, n = 0;
+      for (let k = 0; k < N * N; k++) t += v[k * 4 + 2], n += laid[k] ? 1 : 0;
+      return t / Math.max(n, 1);
+    };
     const run = async (dt, heatDecay) => {
+      laid = null;
       await lab.create(N, N);
       lab.vel(0.5, 0.5, 0.25, [0, 0, 10.0, 0]);
       lab.flush();
@@ -446,7 +461,7 @@ try {
   check(
     'the cooling is the same on every look\'s clock: ten real seconds cool a 10 K patch to 10·exp(−10/τ), τ = C/(2·(h_air + h_rad)) (PLAN 38f-3)',
     Math.abs(off10(clocks.house, 0.98)) < 0.02 && Math.abs(off10(clocks.lava, 0.98)) < 0.02,
-    `from ${clocks.house.t0.toFixed(3)} K: at dt 0.004 ${clocks.house.t1.toFixed(3)} K, at dt 0.0013 ${clocks.lava.t1.toFixed(3)} K, against ${want10(clocks.house, 0.98).toFixed(3)} K (τ ${(1 / lossRate(0.98)).toFixed(1)} s; ${(off10(clocks.house, 0.98) * 100).toFixed(2)}% and ${(off10(clocks.lava, 0.98) * 100).toFixed(2)}% off)`
+    `the patch's mean from ${clocks.house.t0.toFixed(3)} K: at dt 0.004 ${clocks.house.t1.toFixed(3)} K, at dt 0.0013 ${clocks.lava.t1.toFixed(3)} K, against ${want10(clocks.house, 0.98).toFixed(3)} K (τ ${(1 / lossRate(0.98)).toFixed(1)} s; ${(off10(clocks.house, 0.98) * 100).toFixed(2)}% and ${(off10(clocks.lava, 0.98) * 100).toFixed(2)}% off)`
   );
   const lost11 = clocks.still.t0 - clocks.still.t1, want11 = clocks.still.t0 - want10(clocks.still, 1);
   check(
