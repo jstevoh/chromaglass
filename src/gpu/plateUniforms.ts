@@ -406,6 +406,11 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('projB', bankGains[4], bankGains[5], bankGains[6], bankGains[7]);
     // Each projector's focus (PLAN 51b), racked by a dissolve (51c): the box its defocus spreads a point into, in this frame's pixels (gpu/focus.ts).
     focusBoxPx(focusBox, s, two, Math.max(width, height), view.shot.zoom, view.rack);
+    // B with no light on the wall has no picture to blur (its share of every
+    // pixel is 0): a deck dissolve (51c-2) holds it melted while dark, and the
+    // pass sits out for it. Not A: where neither has light the Mixer's rows
+    // laid over both plates fall to A's share, so A's box still reaches them.
+    if (two && !(bankGains[4] + bankGains[5] + bankGains[6] > 0)) focusBox[2] = focusBox[3] = 0;
     pack.set('projFocus', focusBox[0], focusBox[1], focusBox[2], focusBox[3]);
     pack.set('paperA', pa.r, pa.g, pa.b);
     pack.set('paperB', pb.r, pb.g, pb.b);

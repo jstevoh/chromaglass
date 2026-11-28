@@ -15,7 +15,7 @@
  */
 
 import { walkShutters, type BankSettings } from './projectorBank';
-import { rackClock, startRack, walkRack, type DissolvePlan, type RackClock } from './focusDissolve';
+import { rackClock, startDeckRack, startRack, walkRack, type DissolvePlan, type RackClock } from './focusDissolve';
 import { showNow } from './showClock';
 
 export interface StageClocks {
@@ -51,4 +51,9 @@ export function turnClocks(c: StageClocks, realDt: number, s: { gelSpeed?: numbe
  */
 export function rackStage(c: StageClocks, seconds: number, back: boolean, backFollows: boolean, two: boolean): DissolvePlan {
   return startRack(c.rack, showNow(), seconds, !back || !two, back || backFollows);
+}
+
+/** A deck dissolve over `seconds` to projector `to` (PLAN 51c-2, lib/deckDissolve.ts): the other racks out, `to` racks in. */
+export function rackDeck(c: StageClocks, seconds: number, to: 0 | 1): void {
+  startDeckRack(c.rack, showNow(), seconds, to);
 }

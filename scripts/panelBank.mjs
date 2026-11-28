@@ -19,9 +19,10 @@ export function bankDrawn(root, mixerSrc, mixerOk, check) {
     'at the registry\'s range': /PIN_RANGE\.get\(k\)/.test(bankSrc) && /min=\{spec\.min\}/.test(bankSrc) && /max=\{spec\.max\}/.test(bankSrc),
     'offering the chips beside each slider': /chips\(k\)/.test(bankSrc),
   };
-  const keys = [...bankSrc.matchAll(/(?:slider|shutter)\('(proj[A-Za-z]+)'/g)].map(m => m[1]);
+  // The sliders, the shutters and Decks (PLAN 51c-2, a switch drawn as the shutters are: `toggle`).
+  const keys = [...bankSrc.matchAll(/(?:slider|shutter|toggle)\('(proj[A-Za-z]+)'/g)].map(m => m[1]);
   const broken = Object.entries(links).filter(([, ok]) => !ok).map(([k]) => k);
-  const ok = broken.length === 0 && mixerOk && keys.length === 8;
+  const ok = broken.length === 0 && mixerOk && keys.length === 9;
   check('and the projector bank at its top, from the registry', ok,
     broken.length ? `missing: ${broken.join('; ')}` : mixerOk ? keys.join(', ') : 'the Mixer\'s own chain is broken');
   return ok ? keys : [];

@@ -323,6 +323,7 @@
     "lampfield": "node scripts/lampfield.mjs",
     "projectors": "node scripts/projectors.mjs",
     "focus": "node scripts/focus.mjs",
+    "decks": "node scripts/decks.mjs",
     "litstage": "node scripts/litstage.mjs",
     "milk": "node scripts/milk.mjs",
     "colours": "node scripts/colours.mjs",

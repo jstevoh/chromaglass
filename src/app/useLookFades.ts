@@ -14,6 +14,7 @@ import type { MixSource } from '../lib/mixer';
 import { setGoDoor } from './setNow';
 import { bankHasTwo } from '../lib/projectorBank';
 import { focusDraws } from '../lib/projectorFocus';
+import { crossAt, deckPlan, dishOf, drawingOf } from '../lib/deckDissolve';
 
 /**
  * Taking a look to the stage over a fade, without a clear: Go on the armed
@@ -111,15 +112,22 @@ export function useLookFades({
     and so is a look on either side that the focus pass cannot blur (Glitter,
     the side lamp, the tank: `focusDraws`): there it is the plain fade.
   */
+  const twoOnWall = (s: VisualizerSettings) => bankHasTwo(s, Math.round(s.layerCount ?? 1), s.renderStyle === 'photo' ? 0 : s.lampGround ?? 0);
+  /** After `delayMs` on the show clock, on wait `w` (at once for none). */
+  const after = (w: RefObject<ShowIntervalHandle | null>, delayMs: number, fn: () => void) => {
+    stopWait(w);
+    if (!(delayMs > 0)) { fn(); return; }
+    const at = showNow() + delayMs;
+    w.current = showInterval(() => { if (showNow() < at) return; stopWait(w); fn(); }, 33, 'look-dissolve');
+  };
   const dissolve = (w: RefObject<ShowIntervalHandle | null>, seconds: number, back: boolean, to: Partial<VisualizerSettings>, change: (seconds: number) => void) => {
     stopWait(w);
     const s = settingsRef.current;
-    const two = bankHasTwo(s, Math.round(s.layerCount ?? 1), s.renderStyle === 'photo' ? 0 : s.lampGround ?? 0);
+    const two = twoOnWall(s);
     const blurs = focusDraws(s) && focusDraws({ ...s, ...to });
     const plan = (s.projRack ?? 0) > 0.005 && seconds > 0 && blurs ? visualizerRef.current?.rack(seconds, back, two) : null;
-    if (!plan || !(plan.delayMs > 0)) { change(plan ? plan.seconds : seconds); return; }
-    const at = showNow() + plan.delayMs;
-    w.current = showInterval(() => { if (showNow() < at) return; stopWait(w); change(plan.seconds); }, 33, 'look-dissolve');
+    if (!plan) { change(seconds); return; }
+    after(w, plan.delayMs, () => change(plan.seconds));
   };
 
   const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number, back = false, hold: readonly string[] = [], swapsRing = false) => {
@@ -159,6 +167,63 @@ export function useLookFades({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** A user look's dyes, for the back plate to register as the front's Go does. */
+  const backExtras = (id: string) => {
+    const up = isUserPresetId(id) ? userPresetsRef.current.find(p => p.id === id) : null;
+    return up ? { contract: up.contract ?? null, injectStyles: up.injectStyles ?? null, liquids: up.liquids ?? null } : undefined;
+  };
+
+  /*
+    Decks (PLAN 51c-2, lib/deckDissolve.ts): with two projectors on the wall,
+    a Go goes to the dark one. Its dish (the solver's settings and the dyes,
+    what a plate owns: 16a) changes while it is dark, the crossfade carries
+    the light over the fade's middle half, the rest of the look (drawn on both
+    plates by one pass) changes on the front over that same middle half, and
+    the racks, with Focus Dissolve up, take the leaving projector out and
+    bring the arriving one in. A hand on the crossfader takes it back from the
+    glide; a later Go to either plate cancels what of this one is still to go in.
+  */
+  const deckCross = useRef<ShowIntervalHandle | null>(null);
+  const deckBack = useRef<ShowIntervalHandle | null>(null);
+  /** What of a deck Go is still to come: its glide and its back plate's dish (a Back, a later Go). */
+  const stopDeck = () => { stopWait(deckCross); stopWait(deckBack); };
+  const deckGo = (next: ArmedLook, seconds: number) => {
+    const s = settingsRef.current;
+    const plan = deckPlan(s.projCross, seconds);
+    stopWait(frontWait); stopWait(backWait); stopDeck();
+    if ((s.projRack ?? 0) > 0.005 && focusDraws(s) && focusDraws({ ...s, ...next.settings })) visualizerRef.current?.deck(seconds, plan.to);
+    const x0 = s.projCross ?? 0.5, started = showNow(), ms = seconds * 1000;
+    deckCross.current = showInterval(() => {
+      if (laterWrites.wroteSince('projCross', started)) { stopWait(deckCross); return; }
+      const p = Math.min(1, (showNow() - started) / ms);
+      const x = crossAt(p, x0, plan.to);
+      setSettings(prev => (prev.projCross === x ? prev : { ...prev, projCross: x }));
+      if (p >= 1) stopWait(deckCross);
+    }, 33, 'deck-cross');
+    previousLook.current = { id: pinnedPresetId, settings: s };
+    // The rest of the look, on the front once the dish has landed (`deckPlan`).
+    const rest = () => fadeSettingsTo(drawingOf(targetLook(settingsRef.current, next.settings), settingsRef.current), plan.lookSeconds);
+    if (plan.to === 1) {
+      // To the back plate: its own look, the front's dish left where it is.
+      after(deckBack, plan.dishDelayMs, () => visualizerRef.current?.sendBack(next.id, targetLook(settingsRef.current, next.settings), plan.dishSeconds, next.name, backExtras(next.id)));
+      setBackLook({ id: next.id, name: next.name });
+      after(frontWait, plan.lookDelayMs, rest);
+      return;
+    }
+    // To the front: the back plate, lit, keeps what it shows as a look of its own.
+    const name = (pinnedPresetId && (userPresetsRef.current.find(p => p.id === pinnedPresetId)?.name ?? findPreset(pinnedPresetId)?.name)) || 'Projector B';
+    if (visualizerRef.current?.pinBack(pinnedPresetId ?? 'deck', name)) setBackLook({ id: pinnedPresetId ?? 'deck', name });
+    // The dish, then the rest: one fade at a time on the front.
+    after(frontWait, plan.dishDelayMs, () => {
+      adoptPreset(next.id);
+      const target = targetLook(settingsRef.current, next.settings);
+      visualizerRef.current?.handoff(Math.max(1, plan.dishSeconds), lookPhase(target));
+      fadeSettingsTo(dishOf(target, settingsRef.current), plan.dishSeconds, false, [], true);
+      after(frontWait, plan.lookDelayMs - plan.dishDelayMs, rest);
+    });
+  };
+  useEffect(() => () => stopDeck(), []);
+
   const sendLook = useCallback((next: ArmedLook, seconds: number) => {
     setLiveItemId(next.item ?? null);
     // A set item's own strip goes up with it.
@@ -168,9 +233,11 @@ export function useLookFades({
       sequencerRef.current?.startAt(next.sequence, 0);
       return;
     }
+    setCued(null);
+    stopDeck();
+    if ((settingsRef.current.projDeck ?? 0) > 0.5 && seconds > 0 && twoOnWall(settingsRef.current)) { deckGo(next, seconds); return; }
     const from = settingsRef.current;
     previousLook.current = { id: pinnedPresetId, settings: from };
-    setCued(null);
     // Pressing Go is a decision: the whole look, structure and all — and its
     // colours with it, handed over across the fade rather than left to
     // evaporate for minutes under the new ones. A cut still gets a second.
@@ -252,6 +319,7 @@ export function useLookFades({
   const sendBack = useCallback((next: ArmedLook | null, seconds: number) => {
     if (backLeavingTimer.current) { clearTimeout(backLeavingTimer.current); backLeavingTimer.current = null; }
     stopWait(backWait);
+    stopDeck();
     if (!next) {
       visualizerRef.current?.sendBack(null, null, seconds);
       // Kept on the stage while it fades back (see `leaving`), then let go.
@@ -260,10 +328,7 @@ export function useLookFades({
       return;
     }
     if (next.sequence) return;
-    const up = isUserPresetId(next.id) ? userPresetsRef.current.find(p => p.id === next.id) : null;
-    dissolve(backWait, seconds, true, next.settings, (seconds) => visualizerRef.current?.sendBack(next.id, targetLook(settingsRef.current, next.settings), seconds, next.name, up
-      ? { contract: up.contract ?? null, injectStyles: up.injectStyles ?? null, liquids: up.liquids ?? null }
-      : undefined));
+    dissolve(backWait, seconds, true, next.settings, (seconds) => visualizerRef.current?.sendBack(next.id, targetLook(settingsRef.current, next.settings), seconds, next.name, backExtras(next.id)));
     setBackLook({ id: next.id, name: next.name });
     setCued(null);
   }, []);
@@ -295,6 +360,8 @@ export function useLookFades({
     const prev = previousLook.current;
     if (!prev) return;
     previousLook.current = null;
+    // A Back puts the crossfade back too (the room, lib/lookFade's backStep): a deck Go's glide stops.
+    stopDeck();
     evolveLetsGo();
     if (prev.id) adoptPreset(prev.id);
     visualizerRef.current?.handoff(Math.max(1, fadeSeconds), lookPhase(prev.settings));
