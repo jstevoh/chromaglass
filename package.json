@@ -225,6 +225,7 @@
     "splitcarry": "node scripts/splitcarry.mjs",
     "beads": "node scripts/beads.mjs",
     "pinch": "node scripts/pinch.mjs",
+    "droplaw": "node scripts/droplaw.mjs",
     "filmhold": "node scripts/filmhold.mjs",
     "dropcolour": "node scripts/dropcolour.mjs",
     "dropwindow": "node scripts/dropwindow.mjs",
@@ -232,6 +233,7 @@
     "microscope": "node scripts/microscope.mjs",
     "ferrolook": "node scripts/ferrolook.mjs",
     "maze": "node scripts/maze.mjs",
+    "bondmaze": "node scripts/bondmaze.mjs",
     "spikes": "node scripts/spikes.mjs",
     "slump": "node scripts/slump.mjs",
     "disc": "node scripts/disc.mjs",
@@ -425,7 +427,13 @@
     "glow": "PW_WEBGPU=1 node scripts/glow.mjs",
     "linearlight": "node scripts/linearlight.mjs",
     "watchconfig": "node scripts/watchconfigtest.mjs",
-    "watchmode": "node scripts/watchmodetest.mjs"
+    "watchmode": "node scripts/watchmodetest.mjs",
+    "watchreport": "node scripts/watchreporttest.mjs",
+    "watchshots": "node scripts/watchshotstest.mjs",
+    "watchbatch": "node scripts/watchbatchtest.mjs",
+    "ratepage": "node scripts/ratepagetest.mjs",
+    "reelset": "node scripts/reelsettest.mjs",
+    "reelpack": "node scripts/reelreaderpacktest.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

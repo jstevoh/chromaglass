@@ -4,8 +4,9 @@
  *
  *   npm run watch -- <file or URL> [--out DIR] [--frames 24] [--from S] [--to S]
  *                                  [--at 3.5,12] [--rate 10] [--per-sheet 12] [--vs REF_OUT]
- *                                  [--crop x,y,w,h] [--keep NAME [--note TEXT]] [--liquid | --general]
+ *                                  [--crop x,y,w,h] [--keep NAME [--note TEXT]] [--liquid | --general] [--no-report]
  *   npm run watch -- --before A --after B [--out DIR]  |  --refs  |  --selftest
+ *   npm run watch -- --batch FOLDER|PLAYLIST|LIST.txt [--rank score|colour|motion|pace|beat]  |  --refit [ratings.json]  |  --notes [ratings.json]
  *
  * Asked for: "a skill or agent that is able to better watch video … it will make
  * the evaluation of both the app better and looking at examples online". Claude
@@ -31,6 +32,8 @@
  *                  forty rows and names the dominant hues.
  *   still-*.png    full-resolution frames at the times given with --at, for the
  *                  close look after the sheets say where to look.
+ *   report.html    one page a person reads, with best.mp4 and best.png, the
+ *   best.mp4/png   strongest 10-15 s and frame (`watchreport.mjs`, 47p-4).
  *   design.json    the design read (`watchdesign.mjs`): palette, colourfulness,
  *   palette.png    hue harmony, contrast, edge width, form scale, flow lines,
  *                  forms, symmetry and composition, in the summary's "Design"
@@ -70,6 +73,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { fileURLToPath } from 'node:url';
 import { physicsAcc, physicsFrame, physicsSummary, physicsLines, physicsGaps, comparePhysics, techniqueLines } from './watchphysics.mjs';
 import { designFrame, designSummary, designLines, designGaps, compareDesign, paletteAcc, paletteStrip } from './watchdesign.mjs';
 import { readSelftest, dissolveClips } from './watchreadtest.mjs';
@@ -82,10 +86,12 @@ import { detectAutocrop, analyseFootage, footageLines, footageOut } from './watc
 import { reportCard, loadRatings, formatSideBySideCards } from './watchcard.mjs';
 import { loadConfig, useConfig, settingsMapFor, macFetch, fetchElsewhere } from './watchconfig.mjs';
 import { readMode, cueNumbers, generalMotionLines } from './watchmode.mjs';
+import { bestMoment, exportBest, writeReport } from './watchreport.mjs';
+import { shotList, shotsOut, shotSection } from './watchshots.mjs';
 
 // ─── arguments ───────────────────────────────────────────────────────────────
 
-const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', before: '', after: '', selftest: false, quiet: false, crop: null, noAutocrop: false, vs: '', keep: '', note: '', refs: false, settings: null, config: '', liquid: null };
+const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', before: '', after: '', selftest: false, quiet: false, crop: null, noAutocrop: false, vs: '', keep: '', note: '', refs: false, settings: null, config: '', liquid: null, report: true, batch: '', rank: '', refit: false, notes: false };
 const opt = { ...DEFAULTS };
 
 /** A failure the caller can report: a harness catches it, the command line prints it and exits with `code`. */
@@ -125,6 +131,13 @@ function parseArgs(argv) {
     // Where the reference library, the fetch folder and the settings map are
     // (scripts/watchconfig.mjs, PLAN 47p-1); by default reelreader.config.json.
     else if (a === '--config') { opt.config = v(); try { useConfig(opt.config); } catch (e) { fail(e.message, 2); } }
+    // report.html, best.mp4 and best.png (scripts/watchreport.mjs, 47p-4).
+    else if (a === '--no-report') opt.report = false;
+    // A folder, a playlist or a list of links as one ranked table and a rating page; refit the card to the ratings; what the notes say (watchbatch.mjs, 47p-5).
+    else if (a === '--batch') opt.batch = v();
+    else if (a === '--rank') opt.rank = v();
+    else if (a === '--refit') opt.refit = true;
+    else if (a === '--notes') opt.notes = true;
     else if (a === '--selftest') opt.selftest = true;
     else if (a === '--help' || a === '-h') { printHelp(); process.exit(0); }
     else if (!opt.input) opt.input = a;
@@ -133,7 +146,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(fs.readFileSync(new URL(import.meta.url), 'utf8').split('\n').slice(2, 9).map(l => l.replace(/^ \* ?/, '')).join('\n'));
+  console.log(fs.readFileSync(new URL(import.meta.url), 'utf8').split('\n').slice(2, 10).map(l => l.replace(/^ \* ?/, '')).join('\n'));
 }
 
 // ─── tools ───────────────────────────────────────────────────────────────────
@@ -509,7 +522,7 @@ async function watch() {
   const out = path.resolve(opt.out || path.join(os.tmpdir(), loadConfig().scratch,
     (/^https?:/.test(opt.input) ? opt.input.replace(/^https?:\/\//, '') : path.basename(opt.input)).replace(/[^\w.-]+/g, '_').slice(0, 60)));
   fs.mkdirSync(out, { recursive: true });
-  for (const f of fs.readdirSync(out)) if (/^(sheet-\d+|timeline|palette|still-.*)\.png$|^(stats\.tsv|summary\.md|design\.json)$/.test(f)) fs.rmSync(path.join(out, f));
+  for (const f of fs.readdirSync(out)) if (/^(sheet-\d+|timeline|palette|still-.*|best)\.png$|^(stats\.tsv|summary\.md|design\.json|report\.html|best\.mp4)$/.test(f)) fs.rmSync(path.join(out, f));
 
   let info = null;
   if (/^https?:\/\//.test(opt.input)) ({ file: opt.file, info } = download(opt.input, out));
@@ -615,9 +628,9 @@ async function watch() {
 
   // Loudness over the same window each motion value covers: the motion at
   // sample k is the change from k-1 to k, so its sound is [t(k-1), t(k)).
-  let loud = null;
+  let loud = null, pcm = null;
   if (pr.audio) {
-    const a = await decodeAudio(), per = 8000 / rate;
+    const a = pcm = await decodeAudio(), per = 8000 / rate;
     loud = rows.map((_, k) => {
       const s0 = Math.max(0, Math.round((k - 1) * per)), s1 = Math.min(a.length, Math.round(Math.max(k, 1) * per));
       let e = 0; for (let i = s0; i < s1; i++) e += a[i] * a[i];
@@ -880,30 +893,42 @@ async function watch() {
   const readForText = { out, rows: useRows, cuts: activeCuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, sheets, tiles, picks, timeline, span: activeSpan, pr, w, h, rate };
   const words = describe(readForText, { liquid });
   const ov = overall({ ...readForText, words });   // the whole film's arc and feel, before the words one measure at a time (47x-8)
-  const { ratings, libDirs } = loadRatings();
-  const card = liquid ? reportCard({ ...readForText, overall: ov }, { ratings, libDirs }) : null;
+  // A card fitted to the user's own ratings (--refit, watchfit.mjs) grades any footage.
+  const rated = loadRatings();
+  const card = liquid || rated.cal ? reportCard({ ...readForText, overall: ov }, rated) : null;
   if (card && refDoc) {
     const refCard = refDoc.card?.canons?.length ? refDoc.card : reportCard(refDoc);
     designOut.push('', ...formatSideBySideCards(card, refCard, refTitle));
   }
   const cardOut = card ? { canons: card.canons, verdict: card.verdict, agreement: card.agreement, lines: card.lines } : null;
-  const result = { out, rows, cuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, mode, words, overall: ov, card: cardOut, sheets, tiles, picks, timeline, span, pr, w, h, rate };
-  fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds, shape: sh, overall: ov, card: cardOut, sync, footage: ftOut, mode, words }, null, 1) + '\n');
+  // The strongest 10-15 s and frame, saved beside the report (47p-4).
+  const moment = opt.report ? bestMoment(rows, { rate }) : null;
+  const bestFiles = moment ? exportBest({ ff: ff(), file: opt.file, out, best: moment, crop: c, hasAudio: !!pr.audio }) : {};
+  // Cuts to the frame, each shot's length and palette, cuts on a beat (47p-5).
+  const shots = await shotList({ rows, cuts, dissolves, rate, pcm, ff: ff(), seek: seekArgs(), pre, from: opt.from, end: opt.from + span, out });
+  const result = { file: opt.file, shots, out, rows, cuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, mode, words, overall: ov, card: cardOut, best: moment, bestFiles, sheets, tiles, picks, timeline, span, pr, w, h, rate };
+  const bestOut = moment && { from: moment.from, to: moment.to, at: moment.at, cuts: moment.cuts, why: moment.why };
+  fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds, shape: sh, overall: ov, card: cardOut, sync, footage: ftOut, mode, words, best: bestOut, shots: shotsOut(shots) }, null, 1) + '\n');
   const palettePng = path.join(out, 'palette.png');
   if (ds.palette.length) writePng(palettePng, 960, 96, paletteStrip(ds.palette));
 
-  const lines = [
-    `# ${info?.title ?? path.basename(opt.file)}`,
-    '',
-    ...(info ? [`${info.uploader ?? ''} · ${info.url}`, info.description ? `> ${info.description}` : '', ''] : []),
+  const numbers = [
     `- file: ${opt.file}`,
     `- ${w}x${h} as decoded (stored ${pr.stored}), ${pr.fps ?? '?'} fps, ${pr.duration != null ? `${pr.duration.toFixed(1)} s` : 'no duration in the header'}; watched ${stamp(opt.from)} to ${stamp(opt.from + span)} at ${rate} samples/s (${n} samples)`,
     `- brightness ${mean(r => r.lum).toFixed(2)}; near black ${pct(mean(r => r.dark))} of the frame; blown ${pct(mean(r => r.bright))}; saturation ${mean(r => r.sat).toFixed(2)}`,
     `- colour: ${pct(mean(r => r.colour))} of pixels are coloured; of those ${hues.map(([nme, v]) => `${nme} ${pct(v)}`).join(', ') || 'none'}`,
     `- motion (mean % change between samples): median ${q(motions, 0.5)?.toFixed(2) ?? 0}, 90th ${q(motions, 0.9)?.toFixed(2) ?? 0}, max ${q(motions, 1)?.toFixed(2) ?? 0}`,
     `- cuts: ${cuts.length ? cuts.map(k => stamp(rows[k].t) + (rows[k].dissolve ? ' (dissolve)' : '')).join(', ') : 'none'}${dissolves.length ? `; ${dissolves.length} of them dissolves, ${dissolves.map(v => `${((v.to - v.from) / rate).toFixed(1)} s`).join(', ')}` : ''}`,
+    ...shots.lines,
     ...shapeLines,
     sync ? `- sound: loudness median ${q(loud, 0.5).toFixed(0)} dB; motion vs loudness r = ${sync.r0.toFixed(2)} at no lag, best ${sync.best.toFixed(2)} with motion ${sync.lag >= 0 ? 'following' : 'leading'} the sound by ${Math.abs(sync.lag).toFixed(2)} s` : '- sound: no audio track',
+    ...(moment ? [`- best moment: ${stamp(moment.from)} to ${stamp(moment.to)} (${moment.why}); its frame at ${stamp(moment.at)}`] : []),
+  ];
+  const lines = [
+    `# ${info?.title ?? path.basename(opt.file)}`,
+    '',
+    ...(info ? [`${info.uploader ?? ''} · ${info.url}`, info.description ? `> ${info.description}` : '', ''] : []),
+    ...numbers,
     '',
     ...footageLines(footage),
     '',
@@ -926,6 +951,8 @@ async function watch() {
     ...sheets.map(s => `- ${s.f} (${s.count} frames, ${stamp(s.from)} to ${stamp(s.to)}, ${s.SW}x${s.SH})`),
     ...stills.map(f => `- ${f}`),
     ...(ds.palette.length ? [`- ${palettePng} (the palette, each colour as wide as its share)`] : []),
+    ...(opt.report ? [`- ${path.join(out, 'report.html')} (all of it on one page, for a person)`] : []),
+    ...[bestFiles.clip, bestFiles.still].filter(Boolean).map(f => `- ${f} (the best moment)`),
     `- ${path.join(out, 'stats.tsv')} (every sample)`,
     '',
     ...designOut,
@@ -933,6 +960,11 @@ async function watch() {
     ...table,
   ];
   fs.writeFileSync(path.join(out, 'summary.md'), lines.join('\n') + '\n');
+  if (opt.report) {
+    result.report = writeReport({ out, title: info?.title ?? path.basename(opt.file), meta: info ? [[info.uploader, info.url].filter(Boolean).join(' · '), info.description].filter(Boolean) : [],
+      numbers: numbers.map(l => l.replace(/^- file: .*/, `- file: ${path.basename(opt.file)}`)), footage: footageLines(footage), readAs: [mode.line], overall: ov.lines, card: card?.lines ?? [], words: words.lines,
+      refWords: refWords?.lines ?? null, refTitle, detail: designOut, table, timeline, sheets, stills, palette: ds.palette.length ? palettePng : null, best: moment, bestFiles, hasAudio: !!pr.audio }, { ff: ff(), extra: [shotSection(shots)] });
+  }
   if (!opt.quiet) console.log(lines.join('\n'));
   if (opt.keep) {
     const kept = keepRef(out, opt.keep, { title: info?.title ?? path.basename(opt.file), url: info?.url ?? (/^https?:/.test(opt.input) ? opt.input : null),
@@ -1564,14 +1596,17 @@ export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg, pickSource, ffmpegLocation
 // Run as a command only when this file is the one node was given: a harness
 // that imports it, or bundles it (gig.mjs goes through esbuild, where
 // import.meta.url is the bundle's own path), must not start a watch.
+// The file's own path, decoded (a URL's pathname keeps a space as %20, so in a
+// folder with a space the two never matched and the command did nothing).
 const main = !!process.argv[1] && path.basename(process.argv[1]) === 'watch.mjs'
-  && path.resolve(process.argv[1]) === new URL(import.meta.url).pathname;
+  && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (main) {
   (async () => {
     try {
       parseArgs(process.argv.slice(2));
       if (opt.selftest) await selftest();
       else if (opt.refs) console.log(listRefs().join('\n'));
+      else if (opt.batch || opt.refit || opt.notes) await (await import('./watchbatch.mjs')).command({ ...opt }, watchVideo);
       else if (opt.before || opt.after) {
         if (!opt.before || !opt.after) fail('--before and --after are used together', 2);
         const { watchPair } = await import('./watchpair.mjs');

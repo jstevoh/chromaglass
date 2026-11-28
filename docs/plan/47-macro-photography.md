@@ -461,7 +461,7 @@ a curling head need).
 
 The owner asked (2026-11-22) for the watch tool to say what it sees, not only measure it,
 and to tell what changed between a before and an after film. The vocabulary is
-`docs/watch-words.md`: Laban's Effort factors for motion, Itten's contrasts for colour,
+`reelreader/skill/watch-words.md`: Laban's Effort factors for motion, Itten's contrasts for colour,
 Ching's ordering principles and Greenberg's all-over against centred for composition,
 Arnheim's balance, and the wet show's own words (cells, beads, threads, marbling, a wash,
 a bloom, a turned dish, a pour). Every word carries the number that chose it, a word from
@@ -477,7 +477,7 @@ an unsteady measure says "may vary from take to take", and every word names its 
   second across phases of one drift, so a ratio between two takes of a picture that only slides
   can still reach most of a step (0.87 at worst of eight). Take the floor out of it as carried
   does (47v-5), or let the words compare a show measure under its floor as held.
-- **47x-15** refit the card's bands from the owner's ratings once there are enough.
+- **47x-15** refit the card's bands from the owner's ratings once there are enough. The refit itself shipped in 47p-5 (`npm run watch -- --refit`, scripts/watchfit.mjs); what is left is the owner's ratings in, 47p-5f.
 - **47x-16** calibrate `REAL_SHOW_CARDS` (`scripts/watchcard.mjs`) with more real optical liquid-show
   references so leave-one-out scoring (`(f2)` in `npm run watchcard`) passes `>= 6` on at least
   five canons per row; today three rows leave each film outside one or two peers' bands.
@@ -557,17 +557,33 @@ The physics, in the order to build (each its own thread and PR):
     thins, the two oils are one phase holding both colours, and they multiply. Real ones keep a
     water film between them: 47z-3's films, or a second oil phase.
 - **47z-2. Drops of every size, from a stir.** A real oil layer stirred or swirled breaks into
-  a crowd: a drop sheared past the critical capillary number (Ca = μ γ̇ R / σ, near 0.5 for
-  equal viscosities) stretches and splits, its pieces split again until each is under the
-  critical size, so the sizes spread over a decade or more; threads between them bead at the
-  Rayleigh–Plateau wavelength (**47k**). Whether that happens on our plate depends on the
-  tension in real units and the capillary cap that bites at the moment of break-up (**38e**).
-  Specks under three cells are the beads' (**28k-3**). *Build:* first measure: stir a pool of
-  oil in the lab at three rates and count the drops and their sizes after five seconds; then
-  fix what stops it in that order (38e's cap, 47k's gap curvature, 28k-3's specks).
-  *Measure:* the count rises with the stir rate, the largest surviving drop's radius falls as
-  σ / (μ γ̇) within 30% (the free-shear law; a drop squashed in the gap may follow a
-  confined variant, which the build PR names before it measures), and the size distribution spans at least a factor of ten.
+  a crowd: a drop sheared past the critical capillary number stretches and splits, its pieces
+  split again until each is under the critical size, so the sizes spread over a decade or
+  more; threads between them bead at the Rayleigh–Plateau wavelength (**47k**).
+  *Measured first (2026-11-28, `npm run droplaw`), and the first fault fixed (38e-2):* stirred
+  in the lab (Turbulence 0.5, five seconds), a pool a quarter of the dish across stayed one
+  body; under a laid shear, drops from R 8 to 48 cells at 512² stretched into ribbons
+  whatever their size. The half-cell cap on the capillary force bound on every drop under
+  about 45 cells' radius at the Mac's grid (a drop rounded at 2% of the law at R 10, 18% at
+  R 40), so a sheared drop had no tension to hold its shape. Wide bodies on the open thin
+  gap now have six caps (`OIL_WIDE_CELLS`): at rest 0.93, 0.80 and 0.67 of the law at R 10,
+  20 and 40, falling as R^−3.2; in a shear R 12 and R 16 hold a steady shape while R 32
+  stretches on (with the old cap, R 8 too stretched on). **The law the PR names:** between
+  two glasses the drop is confined, and its shape is held by Darcy's flow, not the free
+  drop's stress: ε = γ̇R³/(6Mσ), M = h²/12μ, so the critical size goes as γ̇^(−1/3), not as
+  σ/(μγ̇). A ribbon wider than the gap is stable between two glasses (the 2/h across the gap
+  is the same along it), so it breaks only once stretched thinner than the gap, where 47k's
+  thread curvature takes it: the crowd's sizes are set by the gap and the stretch, not by a
+  free-shear cascade.
+  - **47z-2b. Sheared small drops hold at about twice the law's ε** (R 12: 2.1, R 16: 1.7 at
+    γ̇ 2.9 per plate width), and a big drop's rounding slows as it goes (R 40: 0.76 of the law
+    over its first fifteen steps, 0.67 over forty), where the at-rest rate of the small ones is
+    the law's. Both look like the diffuse edge's spurious current, which 38e-2b takes out.
+  - **47z-2c. The count from a stir.** With 38e-2 in, stir a pool at three rates and count
+    the drops and their sizes after five seconds; the count rises with the rate, the largest
+    surviving drop's radius falls as γ̇^(−1/3) within 30%, and the sizes span a factor of ten
+    (the beads at the gap's scale, the bodies the stir could not stretch). What a ribbon
+    thinned to the gap does next is 47k's; what dissolves under three cells is 28k-3's.
 - **47z-3. Drops that touch and wait.** A crowd stays a crowd because the water film between
   two drops must drain before they merge, a time that grows with the drop's size and the
   viscosity; Film Hold holds a film until pressed, which is the threshold without the timing.
@@ -639,14 +655,64 @@ order; the README is `docs/watch.md`, the plugin's layout `docs/watch-plugin-pla
   21 s) did, and a drained or frozen take fails the light or motion cue. Our own films are
   liquid by construction: have `film.mjs`, `gig.mjs`, `moving.mjs` and the 5b/7a bad-take
   set pass `liquid: true`, or let a take carry its own sidecar that says it is the app's.
+  A real show can too: one minute (2:00 to 3:00) of the 1969 *Liquid Loops* film reads general
+  on 3 hard cuts a minute from its splices (the test set's linked show, 47p-5b).
 - **47p-3c** footage that is continuous, coloured, on a dark ground and moving by itself reads
   liquid though it is not (a night street with neon on a tripod, a VJ loop, a fish tank).
   A fourth cue (rigid motion: the flow's blocks moving as solid pieces) would tell them apart.
-- **47p-4** an HTML report and the best moment: one self-contained page per run (sheets,
-  timeline, numbers, the words), and the strongest moment saved as a still and a 10-15 s clip.
-- **47p-5** a shot list and batch runs: cut and dissolve times, each shot's length, the average
-  shot length, a palette per shot and the share of cuts on a beat (CSV and in the summary);
-  `--batch <folder|playlist>` with a table across the videos.
+- **47p-4b** the best moment judged on real footage: chosen and checked on made clips only.
+  Watch three or four of the library's films (a real show, an edited film, an app take) and
+  look at whether `best.mp4` is the moment a person would pick; a liquid take may want the
+  swell's peak (shape()'s swells) weighted over colour.
+- **47p-5f** the owner's own ratings (the phone rating page, its shared store) into a refit: export
+  its rows as ratings.json and give each film a read the refit can find (watch each of the 21
+  films with `--keep` under the page's key, or add `read` from a batch run), then
+  `npm run watch -- --refit` (47x-15 and 7d, which can now run on the tool's own refit).
+- **47p-5g** a shot's palette is its share of the 64 colour bins the cut test keeps (4 levels a
+  channel): it tells shots apart and says which is warmer, but two greens a colourist would call
+  different read as one. The design read's palette per shot would be finer, at a pass's cost.
+- **47p-5h** the beat comes only from music with a steady pulse: ambient music, rubato or a live
+  band's drift reads "no steady beat" (the tracker needs eight onsets of 3 dB and a period that
+  correlates), so the on-beat share is silent on most of the demo music. A beat from the motion's
+  own swells, against the sound's, would read those.
+- **47p-5i** the notes' themes read English words from a fixed list of fault names (froze,
+  drained, flicker, …): another language, or a fault no word on the list names, comes up only as a
+  plain repeated word. Claude reads the notes themselves as well (the skill's evals.md says so).
+- **47p-5c** a freeze is filed as a title card: on the test set's frozen take the Footage read
+  drops 0:04.8 to 0:10.2 as a "title span", so the motion reads never meet it, Overall says
+  "holds one steady pace from start to end", and the summary never prints what `freezes()`
+  finds (4.7 to 10.3 s). Print the freezes in the summary and keep a still span that is the
+  picture itself (not a card) in the reads. Feeds the fault reads (handoff 7a).
+- **47p-5d** a whole-picture turn reads as the liquid's own flow: the turned take (the whole
+  picture inside a fixed rim, clockwise once every 8 s) reads own flow 17.2%/s, "fast,
+  churning", over every real show, whole-field only 31%, and "about one turn in 22 s". The
+  affine fit takes out too little of a rotation inside a round mask; name a rigid turn and
+  its true period. Feeds 7a and the owner's rule of no whole-frame motion from sound.
+- **47p-5e** the Footage read misfires on a slow dark liquid take: the test set's good take
+  gets four "still overlays" masked (one the left quarter of the frame) and three 0.4 s
+  "title spans" dropped, with no overlay or title on the sheets.
+
+- ~~**47p-6**~~ the release build (shipped, this PR). reelreader's public repository is a build
+  of this one, never edited by hand: `scripts/reelreaderpack.mjs --out DIR [--demo] [--zip]
+  [--test]` copies every watch module but the settings map (and every file they import, so
+  watchreadtest.mjs goes too), the tests that need only node and ffmpeg, the skill as
+  `skills/reelreader/` with its helper again as `agents/`, and `reelreader/release/` (README,
+  package.json, MIT licence, `.claude-plugin/` plugin + marketplace, the `/reelreader` command, CI
+  and a tag-driven release workflow that puts the skill zip on the GitHub release and the
+  package on npm). `npm run reelpack` (14 checks, each shown failing on a wrong build) holds that
+  every import resolves, npm packs no test, clip or demo, one version everywhere, no home
+  folder, address or model name, and the command runs through a bin link as npx runs it.
+- **47p-6b** publish: the public repository jstevoh/reelreader (the owner creates it empty and
+  adds it to the project; a cloud session cannot create one), the `NPM_TOKEN` secret there (the
+  owner's npm account), then push the build and the tag `v0.1.0`; deploy the omnibrains.org card
+  and its demo report from the Mac (source /mnt/project-files/omnibrains-site/, card added
+  2026-11-28).
+- **47p-6c** community lists: submissions drafted, posted only with the owner's OK.
+- **47p-6d** native Windows untried: watch.mjs's run-as-command test compares a URL's pathname
+  with a resolved path, which differs on a drive letter. macOS, Linux and WSL work.
+- **47p-6e** the copy ships without watchmodetest (it proves "Settings to try" goes with the
+  liquid read, which needs the app's settings map); a version of its other cases with no map
+  would cover the general-versus-liquid choice in the public CI too.
 
 Later, not now: photosensitivity (flash) screening, real units (mm/s), dance and pose, "what is
 in it". The reference library stays private and ships empty (watch-plugin-plan.md, point 3).
@@ -657,7 +723,7 @@ in it". The reference library stays private and ships empty (watch-plugin-plan.m
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q; 47d-1 shipped), 47a, 47e (its glitter half shipped; 47e-1, 47e-2), 47f, 47k; 47b-2 and 47b-3 after 47b-1; 47g,
-47h, 47i and 47n when wanted; 47p-4 and 47p-5 in that order (the owner's pick, 2026-11-28), 47p-3b and 47p-3c when the watch tool is next touched; 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
+47h, 47i and 47n when wanted; the release build shipped (47p-6), publishing next (47p-6b, waiting on the owner's empty repository and npm token), 47p-6c with the owner's OK, 47p-5f with the owner's ratings, 47p-4b when the watch tool next watches real films, 47p-3b and 47p-3c when the watch tool is next touched; 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
 as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4 in that order (the owner asked
 for the drops' physics and their colour, 2026-11-12; ~~47z-5~~ shipped early, 2026-11-13, as Foam
 Cells), then 47z-7 after 47z-3, 47z-8 and 47z-6 after 28k-2 (a). Each its own thread

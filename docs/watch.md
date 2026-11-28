@@ -9,8 +9,10 @@ from the sheets itself.
 It began as ChromaGlass's way of judging its own plate against real liquid light shows, and is
 being packaged for anyone who studies moving pictures as **reelreader**, under the MIT licence
 (PLAN §47p; this repository's own licence is separate). This page is its front page;
-[watch-words.md](watch-words.md) is the vocabulary its words come from, and
-[watch-plugin-plan.md](watch-plugin-plan.md) the plan for shipping it as a Claude Code plugin.
+[watch-words.md](../reelreader/skill/watch-words.md) is the vocabulary its words come from, and
+[watch-plugin-plan.md](watch-plugin-plan.md) the plan for shipping it as a Claude Code plugin. Its judging skill (how to read what it makes, honestly, for an editor, a colourist,
+a VJ or anyone), with a test set of clips with known answers, is
+[reelreader/skill/](../reelreader/skill/SKILL.md).
 
 ## What it makes
 
@@ -24,6 +26,30 @@ From one clip, in its out folder:
   symmetry, composition); a physics read (flow speed, turning, spreading, lifetime, detail);
   how motion follows the sound; and a plain-language account.
 - `design.json`, `palette.png`: the reads as data, for comparing two films.
+- `report.html`: all of it on one page for a person, best moment first, then the timeline,
+  the read, the words, the numbers and every sheet. Self-contained (pictures inside it), so it
+  can be mailed or opened on a phone; it names no folder of the machine that made it.
+- `best.mp4` and `best.png`: the clip's strongest 12 s (10 to 15) and its strongest frame. The
+  moment is the stretch with most motion, colour, lit area and (with sound) loudness, each
+  ranked within the clip, never a title card, and one shot when it can be
+  (`scripts/watchreport.mjs`). `--no-report` skips these three.
+- `shots.csv`: the shot list. Every hard cut found again to the frame, each shot's start,
+  length and palette, and whether the cut landed on a beat of the music (within 70 ms of one,
+  the beat tracked from the sound itself); the summary says how many did against what chance
+  would give, and the report has the list after the timeline (`scripts/watchshots.mjs`).
+
+From a folder, a playlist or a list file of paths and links (`--batch`, `scripts/watchbatch.mjs`):
+every clip in its own folder as above, and `batch.md`, `batch.csv` and `batch.json` (one table,
+ranked by the measure its heading names: `--rank score|colour|motion|pace|beat`), `index.html`
+(the table, linking each clip's report) and `rate.html`, a page to rate the clips on: a mark
+1 to 5, optional marks per canon, a note, notes pinned to moments on the timeline, and "keep
+aside". It runs from the disk with no server and saves `ratings.json`
+(`scripts/watchrate.mjs`). `--refit ratings.json` merges it into the reference library's
+ratings.json, fits the report card's bands to the clips rated highest, prints how far the fit
+agrees on clips left out of it, and writes `card-fit.json`, which later runs grade with (on
+any footage) only when that agreement holds (`scripts/watchfit.mjs`). `--notes` lists what the
+notes keep saying, and flags themes on three clips or more as candidate fault checks
+(`scripts/watchnotes.mjs`).
 
 ```
 node scripts/watch.mjs <file or URL> [--out DIR] [--from S] [--to S] [--crop x,y,w,h]
@@ -31,10 +57,15 @@ node scripts/watch.mjs <file> --vs <reference>          # the gaps against a ref
 node scripts/watch.mjs --before A --after B             # what changed between two films
 node scripts/watch.mjs <file> --keep NAME               # keep it in the reference library
 node scripts/watch.mjs <file> --liquid | --general      # the liquid or the general read, whatever the footage shows
+node scripts/watch.mjs <file> --no-report               # no report.html, best.mp4 or best.png
+node scripts/watch.mjs --batch <folder | playlist | list.txt> [--rank pace]   # one ranked table and a rating page
+node scripts/watch.mjs --refit [ratings.json]           # fit the card to your ratings
+node scripts/watch.mjs --notes [ratings.json]           # what the notes keep saying
 node scripts/watch.mjs --refs | --selftest
 ```
 
-In this repository `npm run watch -- …` runs the same thing.
+In this repository `npm run watch -- …` runs the same thing. The public copy (`npx reelreader …`, the Claude Code plugin, the
+skill zip) is built from here by `scripts/reelreaderpack.mjs` ([reelreader/README.md](../reelreader/README.md)).
 
 ## Liquid or general
 

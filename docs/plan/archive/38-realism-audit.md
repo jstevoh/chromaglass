@@ -206,6 +206,19 @@ written first. Line numbers are as read on main at d07ac31.
   Oil a look lays with no bottle (its bodies, a lava lamp's wax) stays at 0.0239, the
   tension the looks were tuned at: with sunflower's 27 for it, `lavacycle`'s no-cool-glass
   control fell 0.88 to 0.71 by 40 s on the Mac (main holds it), so only poured bottles change.
+- ~~**38e-2**~~ The cap on a wide body, on the open thin gap: shipped 2026-11-28 (47z-2,
+  `npm run droplaw`). At the Mac's 512² the half-cell cap bound on every drop under about
+  45 cells' radius (a drop rounded at 2% of the law at R 10); a wide body (no thread
+  curvature) on the open thin gap is now capped at six times it (`OIL_WIDE_CELLS`, three
+  cells a step), at 0.93, 0.79 and 0.60 of Darcy's rounding at R 10, 20, 40 (bar 0.5–1.3) and as R^−3.3. Film
+  Hold takes the blur's waist pull back out in a film (from PR #624): `filmhold` 35 → 33
+  held. Only a body two gaps across along its edge's normal and as broad a gap in takes it
+  (`WIDE_ACROSS`): with every non-thread body at six caps a thread's beads outpulled the
+  slowed neck and `pinch` read 8.18 widths a bead; the normal's width alone 6.70; both
+  4.40 (the law 4.7). A curvature gate stretched ovals (capped tips, free flanks). A thread and its beads keep OIL_CELLS and THREAD_PULL, the sealed bottle SEALED_CELLS (27f-9q),
+  the old plate OIL_CELLS. Not none: with no cap the edge read half again as wide (cells
+  0.1–0.45 oil 890 against the cap's 590) and a faint halo grew three times as fast, the
+  spurious current the cap had clipped; six caps 710 and a halo under two thirds of none's.
 - ~~**38h-14**~~ *shipped 2026-11-08.* The projector's bubble film at Film Physics 0 is
   the light through it, cp·(1 − 0.55·k·filmC) (`projectorFilm`, bubbleFilm.ts), a
   transmittance in 0.67..1 per channel, never over the lamp: 54 levels over to 0.

@@ -25,10 +25,8 @@
  *   2. a bigger magnet at the same gap is stronger at the glass, and reaches
  *      further (the deepened dipole's axis field was the same at every Size)
  *   3. at the tool's own size it raises spikes as far out, and as strongly,
- *      as the dipole did: the default keeps today's look; every look's own
- *      magnet, held further off, still raises none; and the liquid's own
- *      onset, the target the plate's lab-set one moves to (PLAN 38k-7), is
- *      Cowley and Rosensweig's field for EFH1 under water
+ *      as the dipole did: the default keeps today's look; and the onset is
+ *      Cowley and Rosensweig's field for EFH1 under water (PLAN 38k)
  *   4. the solver's own energy (magnetFieldEnergy) is the field-unit law on
  *      that field, so a big magnet's pull at the edge of its spikes is a real
  *      magnet's (main's deepened dipole at Size 0.9 pulled about a third of
@@ -37,7 +35,8 @@
  *      the integrals) stands on a bound that holds (the magnet's field there is
  *      under 1.25 times its dipole's) and never drops a point past the onset
  *   6. the TypeScript the solver ramps on (fieldOnAxis) is the shader's field
- *   7. several magnets add as fields, not as energies (PLAN 38k)
+ *   7. several magnets add as fields, not as energies (PLAN 38k), and the
+ *      spikes' onset (3) is the liquid's own, Cowley and Rosensweig's
  */
 import { openLab } from './lab.mjs';
 
@@ -130,7 +129,7 @@ const { page, close } = await openLab();
 try {
   const ready = await page.evaluate(() => typeof lab.SPIKES_WGSL === 'string');
   if (!ready) throw new Error('the lab has no SPIKES_WGSL: scripts/lab-entry.ts must expose it');
-  const consts = await page.evaluate(() => ({ onset: lab.SPIKE_ONSET, real: lab.SPIKE_ONSET_REAL, full: lab.SPIKE_FULL, bRef: lab.SPIKE_B_REF, radius: lab.MAGNET_RADIUS }));
+  const consts = await page.evaluate(() => ({ onset: lab.SPIKE_ONSET, full: lab.SPIKE_FULL, bRef: lab.SPIKE_B_REF, radius: lab.MAGNET_RADIUS }));
   for (const [k, v] of Object.entries(consts)) if (!Number.isFinite(v) || v <= 0) throw new Error(`the lab's ${k} is ${v}`);
 
   /*
@@ -215,14 +214,27 @@ fn magnetRadius() -> f32 { return R; }
   }
 
   // ── 2, 3. a bigger magnet at the same gap: stronger at the glass, reaching further; the default as it was ──
-  const reachOf = async (a, h, w = W) => {
-    const rs = Array.from({ length: 400 }, (_, i) => i * 0.001);
+  /*
+    How far out a magnet raises spikes: where its share falls under the onset.
+    Searched to a whole plate out: at the real onset (PLAN 38k, five times
+    under the lab's old 0.18) Magnet Size's biggest reaches past the 0.4 this
+    stopped at, and read 0.4 there. Not found at all is NaN, which no bar passes.
+  */
+  const reachOf = async (a, h, w = W, onset = consts.onset) => {
+    const rs = Array.from({ length: 1000 }, (_, i) => i * 0.001);
     const got = await run(rs.map((r) => at(r, h, a, w)));
     if (!got.every((g) => Number.isFinite(g.share))) return { axis: NaN, reach: NaN, peak: NaN };
-    const i = got.findIndex((g) => g.share < consts.onset);
-    return { axis: got[0].share, peak: Math.max(...got.map((g) => g.share)), reach: i < 0 ? 0.4 : rs[i] };
+    const i = got.findIndex((g) => g.share < onset);
+    return { axis: got[0].share, peak: Math.max(...got.map((g) => g.share)), reach: i < 0 ? NaN : rs[i] };
   };
-  const dipReach = (h, w) => { for (let r = 0; r < 0.6; r += 0.001) if (dipoleShare(r, h, w) < consts.onset) return r; return 0.6; };
+  const dipReach = (h, w, onset = consts.onset) => { for (let r = 0; r < 1; r += 0.001) if (dipoleShare(r, h, w) < onset) return r; return NaN; };
+  /*
+    PLAN 9v's onset, 0.18 of the hand's field: the contour the cylinder was
+    held to the dipole on when it replaced it, so the default kept its look.
+    That is a claim about the two fields' shapes there, and 3 still asks it
+    there; the onset itself moved in 38k, on purpose, and is asked below.
+  */
+  const ONSET_9V = 0.18;
   {
     const sizes = [0.5, 1, 2].map((k) => ({ k, a: consts.radius * k }));
     const now = [];
@@ -233,33 +245,27 @@ fn magnetRadius() -> f32 { return R; }
     const further = (rows) => rows[1].reach > rows[0].reach * 1.8 && rows[2].reach > rows[1].reach * 1.8;
     check('a bigger magnet at the same gap is stronger at the glass, and reaches further', stronger(now) && further(now) && !stronger(before),
       `on its axis, as a share of the hand's field, and how far out it raises spikes: ${line(now)} (main's deepened dipole, the same at every Size on its axis: ${line(before)})`);
-    const own = now[1], was = before[1];
+    const own = { ...now[1], reach: (await reachOf(sizes[1].a, HELD, W, ONSET_9V)).reach };
+    const was = { ...before[1], reach: dipReach(HELD, W, ONSET_9V) };
     check('at the tool\'s own size it raises spikes as far out and as strongly as the dipole did', Math.abs(own.reach / was.reach - 1) < 0.05 && Math.abs(own.axis / was.axis - 1) < 0.05,
-      `held to the glass at Ferrofluid Scale 0.35: axis ${own.axis.toFixed(3)} against ${was.axis.toFixed(3)}, spikes out to ${own.reach.toFixed(3)} against ${was.reach.toFixed(3)}`);
+      `held to the glass at Ferrofluid Scale 0.35: axis ${own.axis.toFixed(3)} against ${was.axis.toFixed(3)}, out to ${own.reach.toFixed(3)} against ${was.reach.toFixed(3)} at 9v's onset (${ONSET_9V}); at the real one, ${now[1].reach.toFixed(3)} against ${before[1].reach.toFixed(3)}`);
     /*
-      Every look's own magnet, held further off, still raises none: each
-      gathers its pool flat, as a real one would, until a hand brings the
-      magnet up. With the strength a field now (the pull far off goes as its
-      square), Ferro Maze's went 0.3 → 0.45 and Ferro Paint's 0.5 → 0.6 to
-      gather as they did; this asks they stayed under the onset doing it,
-      anywhere round the magnet, at the depth the app holds it (magnetDepth).
+      Until PLAN 38k this asked that every look's own magnet, held further
+      off, raised no spikes, against an onset of 0.18 set in the lab for it.
+      The onset is the liquid's now (the next check), 4 mT, and a magnet
+      strong enough to pull a pool across the dish stands it up (PLAN 9u):
+      so each look's own magnet is asked to be past it (the opposite of the
+      old line, turned on purpose), and the two looks that carry one are
+      still asked to be found, so a lab that finds none is red.
     */
     const looks = await page.evaluate(() => lab.lookIds().map((id) => ({ id, s: lab.look(id).settings }))
       .filter((l) => (l.s.magnetStrength ?? 0) > 0 && (l.s.phaseAmount ?? 0) > 0)
       .map((l) => ({ id: l.id, w: l.s.magnetStrength, h: lab.magnetDepth(l.s.magnetHeight, l.s.phaseScale) })));
     const peaks = [];
     for (const l of looks) peaks.push((await reachOf(consts.radius, l.h, l.w)).peak);
-    /*
-      The guard that this does not pass on an empty list was "at least three
-      looks": Magnet Garden, Ferro Paint and Ferro Maze. Ferro Maze retired in
-      PLAN 28i-1 (into Magnet Garden), so two looks carry a magnet; the guard is
-      those two, by name, which is as tight as three was (a look that loses its
-      magnet, or a lab that finds none, still reads red), and the bar on the
-      spikes below is as it was.
-    */
     const MAGNET_LOOKS = ['magnet-garden', 'ferro-paint'];
-    check('every look\'s own magnet, held further off, still raises no spikes', MAGNET_LOOKS.every((id) => looks.some((l) => l.id === id)) && peaks.every((p) => p < consts.onset),
-      looks.map((l, i) => `${l.id} ${peaks[i].toFixed(3)}`).join(', ') + ` at most, the onset ${consts.onset}`);
+    check('the looks that carry a magnet are found, and each one\'s magnet is past the onset', MAGNET_LOOKS.every((id) => looks.some((l) => l.id === id)) && peaks.length >= 2 && peaks.every((p) => p > consts.onset),
+      looks.map((l, i) => `${l.id} ${peaks[i].toFixed(3)} at most (${(peaks[i] / consts.onset).toFixed(1)}× the onset)`).join(', '));
 
     /*
       The onset is the liquid's (PLAN 38k), worked out here on its own from
@@ -272,9 +278,6 @@ fn magnetRadius() -> f32 { return R; }
       bisect M in (0, Ms), H = (Ms / 3χ) L⁻¹(M / Ms) by Newton, and the
       applied field is μ0 (H + M), since B is continuous through a sheet.
       Within 1%: the share is the shader's own scale (SPIKE_B_REF of Br).
-      It is held against SPIKE_ONSET_REAL, the target: the plate still runs
-      on the lab's 0.18 until the standing film has its pull (PLAN 9t-2,
-      then 38k-7), and the line prints how far that shortcut is from it.
     */
     {
       const MU0 = 4e-7 * Math.PI, ms = 0.044 / MU0, chi = 2.64, br = 1.45;
@@ -291,12 +294,11 @@ fn magnetRadius() -> f32 { return R; }
       let lo = 1, hi = ms * 0.999;
       for (let i = 0; i < 100; i++) { const mid = (lo + hi) / 2; if (need(mid) < 0) lo = mid; else hi = mid; }
       const b0 = MU0 * (innerH(hi) + hi);
-      const real = consts.real * consts.bRef * br;
-      check('the liquid\'s onset (the target) is Cowley and Rosensweig\'s field for EFH1 under water', Math.abs(real / b0 - 1) < 0.01,
-        `${(b0 * 1e3).toFixed(2)} mT worked out here (Mc ${(hi / 1e3).toFixed(2)} kA/m, the layer's inner field ${(innerH(hi) / 1e3).toFixed(2)} kA/m), spikes.ts's ${(real * 1e3).toFixed(2)} mT (a share of ${consts.real.toFixed(4)}); the plate's onset, the lab's ${consts.onset}, is ${(consts.onset * consts.bRef * br * 1e3).toFixed(1)} mT, ${(consts.onset / consts.real).toFixed(1)}× it until PLAN 38k-7`);
+      const solver = consts.onset * consts.bRef * br;
+      check('the spikes\' onset is Cowley and Rosensweig\'s field for EFH1 under water', Math.abs(solver / b0 - 1) < 0.01,
+        `${(b0 * 1e3).toFixed(2)} mT worked out here (Mc ${(hi / 1e3).toFixed(2)} kA/m, the layer's inner field ${(innerH(hi) / 1e3).toFixed(2)} kA/m), the solver's ${(solver * 1e3).toFixed(2)} mT (a share of ${consts.onset.toFixed(4)}); the lab's old 0.18 was ${(0.18 * consts.bRef * br * 1e3).toFixed(1)} mT`);
     }
   }
-
 
   // ── 4. the solver's energy is the field-unit law, so a big magnet's pull at its edge is a real magnet's ──
   {

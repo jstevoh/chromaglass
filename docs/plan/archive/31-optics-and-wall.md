@@ -83,3 +83,15 @@ story in `docs/plan-shipped.md` §31p-3; `npm run polar`).
   shadowgraph of a sharp interface draws: line 13 asks the turnover inside 0.8 R (975 of 1018)
   and that no pixel anywhere is brighter both sides (0). Not yet replaced (each an item below):
   the in-focus pupil loss (31s-2b) and the dense slope stencil (31s-3).
+- ~~**31s-2f. `npm run caustics` line 7 (ripple) on Metal**~~ shipped 2026-11-28. The ripple read
+  6.1% against its 6% bar on the owner's Mac and 4.8% in the cloud because the trace's light hung
+  on how each GPU rounds: the sampler that read the path (free to filter a half-float texture at
+  16 bits), the sub-texel grid a rasteriser puts corners on before it interpolates a splat's tent
+  (a sixteenth of a texel in SwiftShader: a CPU copy of the trace matched the cloud's light to
+  0.1% only with corners rounded to it), and which of two neighbouring cells covers a texel
+  centre that grid moves across. The trace now reads the path with four textureLoads mixed in
+  f32, weighs each tent from the texel's own centre, and draws each triangle as its box with the
+  centres it holds chosen exactly in the fragment stage (shared edges tested in one order, ties
+  to the left). Line 7: Mac 6.1% to 5.0%, cloud 4.8% to 4.7%; caustics 10/10 on both; the bar
+  stays 6%. Still owed from it: the one black frame at Focus 0.8 (3.17 s into branch2-f08), with
+  31s-2d.

@@ -158,6 +158,97 @@ through cords and preset patches, and the plate shader is untouched.
   verification of our app for the `youtube` scope (a privacy policy, a review of
   weeks) and us running the sign-in. Decide after the owner has used it for a few
   uploads. Not in the store, and not named on the site while undecided.
+  **Decided 2026-11-28 (the owner): publish it as `sendreel`, MIT**, the reelreader
+  pattern (its own repository, npm, a Claude Desktop extension, a page on the owner's
+  other site, never chromaglass.art), for YouTube, Vimeo and TikTok drafts. Name
+  checked 2026-11-28: no US register mark, free on npm, no repository or product by it.
+  Not in YouTube's API, so left to Studio: copyright and public-domain disputes, end
+  screens, cards, community posts. Instagram and a multi-network scheduler, later.
+  - **44i-2a. Runs on any computer, and says what setup is left.** **Built 2026-11-28**
+    (`npm run youtube`): the hourly drain in each system's own scheduler (LaunchAgent,
+    systemd user timer, Task Scheduler) and notifier (osascript, notify-send,
+    PowerShell), `settings.json` (time zone for release times, default category),
+    `SENDREEL_*` variables beside the old ones, the folder `~/.config/sendreel/youtube`
+    unless the owner's old one exists, and `setup`, which walks the Google steps and
+    prints the fix for the first not done. Modules in `mcp/youtube/`.
+  - **44i-2a-1.** The drain's job keeps the old `art.chromaglass.youtube-drain` label so
+    the owner's Mac keeps one agent; the release renames it and removes the old one.
+  - **44i-2a-2.** The Windows drain's output has nowhere to go (Task Scheduler takes no
+    redirect without a shell); `upload_status` is the record there.
+  - **44i-2b. Captions, chapters, credits, other languages.** **Built 2026-11-28**
+    (`npm run youtube`, `scripts/youtubeText.mjs`): `captions` at upload and
+    `add_captions` / `list_captions` later (`.srt`/`.vtt` looked at before a job is made,
+    `captions.insert` multipart, 400 units); `chapters` written into the description and
+    refused unless YouTube would make them (from 0:00, three or more, ten seconds each, the
+    last ten seconds before the end on an update), a new list replacing the old; `credits`
+    in `settings.json` at the foot of every new description, `{music}` filled per upload
+    and read back from an old description on a replacement, never twice; `localizations`
+    (needs `language`, an update keeps the languages it does not name). All also from the
+    upload card. Modules `mcp/youtube/describe.js`, `mcp/youtube/captions.js`.
+  - **44i-2b-1.** The owner's own `settings.json` on the Mac gets its credits line
+    (`{music} by Scott Buckley – released under CC-BY 4.0. www.scottbuckley.com.au`, the
+    artist's wording) once the Mac's checkout has this change: an older server refuses the
+    unknown key and stops at start.
+  - **44i-2b-2.** Chapters at upload cannot be held to the film's length (no probe of the
+    file; the server has no packages). An update checks it; reading an MP4's `mvhd`
+    duration in Node would close it. **Closed 2026-11-28 by 44i-2c** (`youtube/probe.js`
+    reads it; `npm run youtube`, line `uploadChapters`).
+  - **44i-2b-4.** The check's mutants ran all at once, so lines waiting on a fixed timeout
+    failed on unchanged copies and "caught" mutants by load (found by the check's review
+    2026-11-28); now eight at a time beside an unchanged copy that must fail nothing. The
+    fixed timeouts themselves (`loopback`, `setup`, `settingsKeys`) still wait a set time
+    rather than on an exit.
+  - **44i-2b-3.** A film with several pieces credits one `{music}`; an album film needs a
+    credits line of its own, or a list form of `music`.
+  - **44i-2c. Shorts, and a whole folder queued at once.** **Built 2026-11-28**
+    (`npm run youtube`, `scripts/youtubeShorts.mjs`): `short: true` (call or card) is refused
+    unless the file itself reads 3:00 or less and square or vertical as shown (YouTube's rule
+    since 2024-10-15, its help page read 2026-11-28; a phone's quarter turn counted), and
+    `#Shorts` ends the description's own text once; a short tall film not marked says YouTube
+    will make it a Short anyway, and a Short over a minute names YouTube's Content ID block.
+    Length and shape are read by hand from an MP4/MOV/M4V's boxes (moov found box by box, so
+    a camera's moov-last file is read without its media) or a WebM/MKV's EBML; a browser
+    recording, which writes no length, is refused as a Short, not guessed. `queue_folder`
+    queues every film directly in a folder, in name order, each card winning over the shared
+    fields, all or nothing unless `skip_refused`, with `dry_run` and `title_from_name`; asked
+    again it queues only new films. Modules `mcp/youtube/{probe,shorts,folder}.js`.
+  - **44i-2c-1.** reelreader's `best.mp4` is the clip's own shape (landscape for the owner's
+    films), so the Shorts check refuses it; reelreader's side is to cut a 9:16 copy of its
+    best moment (with a `best.youtube.json` card carrying `short: true`), which is also what
+    37c needs. Its own thread, in reelreader's files, after 47p-5.
+  - **44i-2c-2.** **Done 2026-11-28** (a pure move: the server 97,833 bytes before, 85,243
+    after; `mcp/youtube/manifest.js` 8,510 and `release.js` 7,081; `npm run youtube` unchanged).
+    `mcp/youtube-mcp.js` was about 96 KB of the 100 KB ceiling. 44i-2d's analytics
+    cannot land in it: first a pure move (the manifest, or the release plan, into
+    `youtube/`), then 2d beside it.
+  - **44i-2c-3.** AVI and other kinds are not read, so a Short in one is refused ("export it
+    as MP4"), and its chapters are not held to its length.
+  - **44i-2d. Analytics.** **Built 2026-11-28** (`npm run youtube`,
+    `scripts/youtubeAnalytics.mjs`): the `analytics` tool reads the YouTube Analytics API after
+    `login --add analytics`, which asks for `yt-analytics.readonly` on top of the saved sign-in's
+    scopes (a later plain `login` asks for it again, so it is never dropped; unticked on Google's
+    page, the login fails and says so). For one video (`video_id` or manifest `key`, a replaced
+    video's key refused): views, watch minutes, average view, share watched, likes, comments,
+    shares, subscribers; retention at the start and each tenth as clock times with the steepest
+    drop (`detail` for all 100 points; "no curve yet" in words for a thin video); traffic sources
+    in Studio's words with shares; the YouTube search terms that found it. With none: the
+    channel's totals, its videos by watch time (25, at most 200, named by manifest key) and its
+    sources. Dates are YouTube's Pacific days, 28 ending today by default; an end after today or
+    a start after the end refused. Refused before any request when the key lacks the scope; the
+    API turned off names the console page. `setup` says whether it is on. Module
+    `mcp/youtube/analytics.js`.
+  - **44i-2d-1.** Analytics per look: the manifest's keys name films, not looks. A look's name in
+    the card (or the manifest) would let the channel report sum watch time by look, which is
+    the owner's own question; wants the owner's word on where the look name lives.
+  - **44i-2d-2.** Retention by audience (`audienceType` ORGANIC vs ads) and by day (`day`
+    dimension) are supported by the API and not asked for yet.
+  - **44i-2e.** Comments: list and reply (its own scope, also asked only when wanted).
+  - **44i-2g.** Vimeo: upload (tus, resumable), edit, privacy, showcases, on a personal
+    access token (no app review).
+  - **44i-2h.** TikTok drafts: the Content Posting API's upload mode, which lands a clip
+    in the TikTok inbox to finish on the phone (public posting waits on TikTok's audit
+    of an app; each user makes their own developer app once).
+  - **44i-2f.** The release: `jstevoh/sendreel`, npm, the Desktop extension, the page.
 - **44i-3. The channel from claude.ai on the web and the phone.** A local server is
   reachable only from the Mac's own assistant apps. Once 44h's Worker exists, the
   same tools can ride it (the Mac's server doing the upload, since the films are on

@@ -1,6 +1,14 @@
 # Sharing the watch tool as a Claude Code plugin (PLAN 47x-4)
 
-A plan, not built. The owner decides on packaging after the test on real films (47x-3).
+Built as reelreader (PLAN 47p-6, 2026-11-28): one repository that is the npm package, the plugin
+and its own marketplace, built from this one by `scripts/reelreaderpack.mjs`. What follows is the
+plan as it was written; check-skeptic and the second wave were not shipped with it.
+
+Since 47p-5b (2026-11-28) the skill's public half is built: `reelreader/skill/` holds the
+skill, the words guide, the helper, a worked example, the eval-set guide and the test set,
+self-contained and held by `npm run reelset`. The release copies that folder as the plugin's
+`skills/reelreader/` (and its helper as `agents/video-watcher.md`); ChromaGlass's own layer
+stays in `.claude/skills/watch/`.
 
 ## What goes in the first plugin
 
@@ -32,7 +40,7 @@ chromaglass-watch/            (the plugin's own repository, or a folder in a mar
   skills/watch/SKILL.md       the skill, made general (below)
   skills/watch/scripts/       watch.mjs, watchdesign.mjs, watchphysics.mjs, watchcuts.mjs,
                               watchrefs.mjs, watchwords.mjs, watchpair.mjs, the self-tests
-  skills/watch/watch-words.md the vocabulary page (docs/watch-words.md)
+  skills/watch/watch-words.md the vocabulary page (reelreader/skill/watch-words.md)
   agents/video-watcher.md     watches long or several videos in its own context
   agents/check-skeptic.md
   commands/watch.md           /watch <link or file> [--vs ref] [--before A --after B]

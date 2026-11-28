@@ -3224,3 +3224,27 @@ of being darkened and brightened in place. The judging films are on the thread's
 
 To put it back: `causticDz` in `src/gpu/caustic.ts` returns 0 (the display falls back to the
 first-order shadowgraph it drew before).
+
+## 154. The ferrofluid on its real onset (PLAN 9t-2, 38k-7)
+
+Filmed on the owner's Mac before and after (2026-11-01); the films are on one page in the
+project. `spikes`, `standing`, `ferrodrag`, `ferrohold` and `ferropour` check the physics
+in the lab; only the Mac shows whether it reads as ferrofluid.
+
+1. Magnet Garden: the look's own magnet stands the layer up into a field of separate black
+   domes, each lit on top, where it used to gather one flat pool.
+2. Ferro Paint: domes stand up and light under the walking magnet as it passes.
+3. Bad: domes that sit on a grid, flicker, or stand up under a look with no magnet.
+4. Not this change (9t-12): a wide pool dragged by the Magnet turns to worms and creeps,
+   the same before and after.
+
+## 155. The ferrofluid maze's period from the coil, the looks as thin as before (PLAN 38d-1)
+
+The labyrinth's period now follows Labyrinth (the coil's field) through the magnetic Bond
+number. Magnet Garden and Ferro Paint sit at the top of the dial, where the period is 0.042
+of the plate (was a fixed 0.045), so their fingers should be as thin as before or a touch
+thinner, never the wide blobs of this item's first cut. Judge on both looks, with music:
+the maze no wider than on the previous deploy, through quiet passages too (the coil swings
+about the setting, 0.75 + the music, and the period follows its 4 s mean). Then drag
+Labyrinth down on Ferro Paint: past about 0.6 the stripes should widen fast, and under about
+0.47 the pools stay pools. The thin, branched fingers of the photos are still open (38d-1b).

@@ -42,15 +42,20 @@
  */
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { port } from './ports.mjs';
+import { captionRoutes, textScenario } from './youtubeText.mjs';
+import { shortsScenario } from './youtubeShorts.mjs';
+import { ANALYTICS_MUTANTS, analyticsRoutes, analyticsScenario } from './youtubeAnalytics.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const SERVER = resolve(import.meta.dirname, '../mcp/youtube-mcp.js');
+// The server's own modules (44i-2a), named as a path so the reach trace counts them as read here.
+const MODULES = resolve(import.meta.dirname, '../mcp/youtube');
 const MUTANTS_ON = !process.argv.includes('--no-mutants');
 const BASE_PORT = port(5381, 'YOUTUBE_PORT');
 const CHUNK = 256 * 1024;
@@ -66,7 +71,9 @@ function standIn(gport) {
     codes: new Map(), refresh: new Set(), access: new Set(), refreshes: 0, rejected401: 0,
     sessions: [], videos: new Map(), playlistItems: [], thumbnails: [], updates: 0, wire: 0,
     faults: new Map([[2, 'stall'], [4, 'expire'], [5, 'drop'], [7, '503']]), refreshesAtExpiry: null, stalled: false, secrets: new Set([CLIENT_SECRET]),
-    pkceOk: false, authAsked: null,
+    pkceOk: false, authAsked: null, auths: 0,
+    // Scopes (44i-2d): what each code, refresh key and access key was granted, and the ones a person unticks on the consent page.
+    rtScope: new Map(), scopeOf: new Map(), untick: new Set(),
     requests: 0, limitNext: 0, pageSize: 50, playlistPages: 0, startCalls: 0, holdStart: null, onStartEnter: null,
     playlists: [{ id: 'PL1', snippet: { title: 'Films' }, status: { privacyStatus: 'public' } }],
   };
@@ -74,13 +81,15 @@ function standIn(gport) {
   const err = (res, status, reason, message) => json(res, status, { error: { code: status, message, errors: [{ reason, message }] } });
   const body = (req) => new Promise((r) => { const b = []; req.on('data', (c) => b.push(c)); req.on('end', () => r(Buffer.concat(b))); req.on('error', () => r(Buffer.concat(b))); });
   const authed = (req) => g.access.has((req.headers.authorization ?? '').replace(/^Bearer /, ''));
-  const issue = () => { const a = `at-${randomBytes(8).toString('hex')}`; g.access.add(a); g.secrets.add(a); return a; };
+  const issue = (scope = 'https://www.googleapis.com/auth/youtube') => { const a = `at-${randomBytes(8).toString('hex')}`; g.access.add(a); g.secrets.add(a); g.scopeOf.set(a, scope); return a; };
   const finish = (s) => {
     const id = `vid${g.videos.size + 1}`;
     const v = {
       id, snippet: { ...s.meta.snippet, publishedAt: new Date().toISOString(), channelId: 'UC1', thumbnails: {} },
       // Since 2026-11-02 an upload that names no privacy goes up public.
       status: { uploadStatus: 'uploaded', privacyStatus: s.meta.status?.privacyStatus ?? 'public', ...s.meta.status },
+      // A part the request's `part` does not name is not written (44i-2b: the localizations ride only when named).
+      ...(s.meta.localizations && s.parts.includes('localizations') ? { localizations: s.meta.localizations } : {}),
       statistics: { viewCount: '0', likeCount: '0' }, contentDetails: { duration: 'PT1M' }, bytes: s.data,
     };
     if (!s.meta.status?.privacyStatus) v.status.privacyStatus = 'public';
@@ -90,6 +99,16 @@ function standIn(gport) {
     return v;
   };
   const resource = ({ bytes, ...v }) => v;
+  /* What YouTube refuses in the words (its pages, 2026-11-28): < or > in a title or description, a
+     description past 5,000 bytes, and localizations on a video with no default language. */
+  const wordsRefused = (snippet, localizations, parts) => {
+    const texts = [snippet?.title, snippet?.description, ...Object.values(localizations ?? {}).flatMap((l) => [l?.title, l?.description])];
+    if (texts.some((t) => /[<>]/.test(t ?? ''))) return 'invalidDescription';
+    if ([snippet, ...Object.values(localizations ?? {})].some((l) => Buffer.byteLength(l?.description ?? '') > 5000)) return 'descriptionTooLong';
+    if ([snippet, ...Object.values(localizations ?? {})].some((l) => (l?.title ?? '').length > 100)) return 'invalidTitle';
+    if (localizations && parts.includes('localizations') && !snippet?.defaultLanguage) return 'defaultLanguageNotSet';
+    return null;
+  };
 
   const srv = createServer(async (req, res) => {
     g.requests++;
@@ -97,11 +116,11 @@ function standIn(gport) {
     const p = u.pathname; const q = u.searchParams;
     try {
       if (p === '/auth') {
-        g.authAsked = Object.fromEntries(q);
+        g.authAsked = Object.fromEntries(q); g.auths++;
         const ok = q.get('client_id') === 'cid' && /^http:\/\/127\.0\.0\.1:\d+\/$/.test(q.get('redirect_uri') ?? '') && q.get('code_challenge_method') === 'S256' && q.get('access_type') === 'offline' && (q.get('scope') ?? '').includes('youtube');
         if (!ok) return json(res, 400, { error: 'invalid_request' });
         const code = `code-${randomBytes(6).toString('hex')}`;
-        g.codes.set(code, { challenge: q.get('code_challenge'), redirect: q.get('redirect_uri') });
+        g.codes.set(code, { challenge: q.get('code_challenge'), redirect: q.get('redirect_uri'), scope: q.get('scope') });
         res.writeHead(302, { location: `${q.get('redirect_uri')}?code=${code}&state=${encodeURIComponent(q.get('state'))}&scope=youtube` }).end();
         return;
       }
@@ -115,12 +134,15 @@ function standIn(gport) {
           if (createHash('sha256').update(verifier).digest('base64url') !== c.challenge) return json(res, 400, { error: 'invalid_grant', error_description: 'code_verifier' });
           g.codes.delete(f.get('code')); g.pkceOk = true;
           const rt = `rt-${randomBytes(8).toString('hex')}`; g.refresh.add(rt); g.secrets.add(rt);
-          return json(res, 200, { access_token: issue(), expires_in: 3599, refresh_token: rt, scope: 'https://www.googleapis.com/auth/youtube', token_type: 'Bearer' });
+          // What was asked less what the person unticked, as Google's granular consent answers.
+          const scope = c.scope.split(' ').filter((x) => !g.untick.has(x)).join(' ');
+          g.rtScope.set(rt, scope);
+          return json(res, 200, { access_token: issue(scope), expires_in: 3599, refresh_token: rt, scope, token_type: 'Bearer' });
         }
         if (f.get('grant_type') === 'refresh_token') {
           if (!g.refresh.has(f.get('refresh_token'))) return json(res, 400, { error: 'invalid_grant' });
           g.refreshes++;
-          return json(res, 200, { access_token: issue(), expires_in: 3599, token_type: 'Bearer' });
+          return json(res, 200, { access_token: issue(g.rtScope.get(f.get('refresh_token'))), expires_in: 3599, token_type: 'Bearer' });
         }
         return json(res, 400, { error: 'unsupported_grant_type' });
       }
@@ -158,6 +180,8 @@ function standIn(gport) {
         return res.writeHead(308, { range: `bytes=0-${s.have - 1}` }).end();
       }
       if (!authed(req)) { g.rejected401++; await body(req); return err(res, 401, 'authError', 'Invalid Credentials'); }
+      if (await captionRoutes(g, req, res, p, q, { json, err, body })) return;
+      if (analyticsRoutes(g, req, res, p, q, { json, err })) return;
       if (p === '/upload/youtube/v3/videos' && req.method === 'POST' && q.get('uploadType') === 'resumable') {
         g.startCalls++;
         if (g.onStartEnter) g.onStartEnter();
@@ -170,7 +194,10 @@ function standIn(gport) {
         const meta = JSON.parse((await body(req)).toString());
         const size = Number(req.headers['x-upload-content-length']);
         if (!size) return err(res, 400, 'missingContentLength', 'X-Upload-Content-Length');
-        const n = g.sessions.push({ meta, size, data: Buffer.alloc(size), have: 0 }) - 1;
+        const parts = (q.get('part') ?? '').split(',');
+        const bad = wordsRefused(meta.snippet, meta.localizations, parts);
+        if (bad) return err(res, 400, bad, bad);
+        const n = g.sessions.push({ meta, parts, size, data: Buffer.alloc(size), have: 0 }) - 1;
         const at = `http://127.0.0.1:${gport}/upload/session/${n}`; g.secrets.add(at);
         return res.writeHead(200, { location: at }).end();
       }
@@ -208,7 +235,12 @@ function standIn(gport) {
       }
       if (p === '/youtube/v3/videos' && req.method === 'GET') {
         const ids = (q.get('id') ?? '').split(',');
-        return json(res, 200, { items: ids.map((i) => g.videos.get(i)).filter(Boolean).map(resource) });
+        // YouTube takes at most 50 ids a call (44i-2d's review: the channel report's titles must be asked in fifties).
+        if (ids.length > 50) return err(res, 400, 'badRequest', 'At most 50 ids.');
+        // Only the parts named come back, as YouTube's do (44i-2b: a read without localizations has none to keep).
+        const named = (q.get('part') ?? '').split(',');
+        const only = (v) => Object.fromEntries(Object.entries(resource(v)).filter(([k]) => k === 'id' || named.includes(k)));
+        return json(res, 200, { items: ids.map((i) => g.videos.get(i)).filter(Boolean).map(only) });
       }
       if (p === '/youtube/v3/videos' && req.method === 'PUT') {
         const b = JSON.parse((await body(req)).toString());
@@ -216,7 +248,12 @@ function standIn(gport) {
         if (!v) return err(res, 404, 'videoNotFound', b.id);
         // A snippet replaces the whole snippet, and must carry its title and category.
         if (b.snippet && (!b.snippet.title || !b.snippet.categoryId)) return err(res, 400, b.snippet.title ? 'invalidCategoryId' : 'invalidTitle', 'The request metadata specifies an invalid video title or category.');
+        const parts = (q.get('part') ?? '').split(',');
+        const bad = wordsRefused(b.snippet ?? v.snippet, b.localizations, parts);
+        if (bad) return err(res, 400, bad, bad);
         if (b.snippet) v.snippet = { ...b.snippet, publishedAt: v.snippet.publishedAt };
+        // Every part named is replaced whole: named with no localizations in the body, they are wiped.
+        if (parts.includes('localizations')) v.localizations = b.localizations ?? {};
         if (b.status) { g.lastStatusSent = b.status; v.status = { uploadStatus: v.status.uploadStatus, madeForKids: v.status.madeForKids, ...b.status }; }
         g.updates++;
         return json(res, 200, resource(v));
@@ -273,7 +310,16 @@ async function scenario(server, gport) {
   mkdirSync(binDir, { recursive: true });
   writeFileSync(join(binDir, 'launchctl'), `#!/bin/sh\necho "$@" > "${join(dir, 'launchctl-ran')}"\nexit 0\n`, { mode: 0o755 });
   writeFileSync(join(binDir, 'osascript'), `#!/bin/sh\necho "$@" > "${join(dir, 'osascript-ran')}"\nexit 0\n`, { mode: 0o755 });
-  const env = { PATH: `${binDir}:${process.env.PATH}`, CHROMAGLASS_YOUTUBE_DIR: conf, CHROMAGLASS_YOUTUBE_GOOGLE: `http://127.0.0.1:${gport}`, CHROMAGLASS_YOUTUBE_NO_BROWSER: '1', CHROMAGLASS_YOUTUBE_CHUNK: String(CHUNK), CHROMAGLASS_YOUTUBE_WAIT_MS: '800', CHROMAGLASS_YOUTUBE_BACKOFF_MS: '40', CHROMAGLASS_YOUTUBE_NO_NOTIFY: '1' };
+  // Linux's and Windows' notifier and schedulers too (PLAN 44i-2a): the cloud runs this check on
+  // Linux, where the server's notifier is notify-send, so a fake osascript alone would let a
+  // mutant without the notify guard pass there unseen.
+  for (const b of ['notify-send', 'powershell', 'systemctl', 'schtasks']) writeFileSync(join(binDir, b), `#!/bin/sh\necho "$@" > "${join(dir, `${b}-ran`)}"\nexit 0\n`, { mode: 0o755 });
+  // Release times are read in the settings' zone (44i-2a), and the DST line below is written in
+  // Pacific; every server here runs with TZ=UTC, so this file is what makes that line pass, which proves the
+  // server reads it (the settingsZone mutant pins the zone and must fail there).
+  mkdirSync(conf, { recursive: true, mode: 0o700 });
+  writeFileSync(join(conf, 'settings.json'), JSON.stringify({ timeZone: 'America/Los_Angeles', categoryId: '10' }));
+  const env = { TZ: 'UTC', PATH: `${binDir}:${process.env.PATH}`, CHROMAGLASS_YOUTUBE_DIR: conf, CHROMAGLASS_YOUTUBE_GOOGLE: `http://127.0.0.1:${gport}`, CHROMAGLASS_YOUTUBE_NO_BROWSER: '1', CHROMAGLASS_YOUTUBE_CHUNK: String(CHUNK), CHROMAGLASS_YOUTUBE_WAIT_MS: '800', CHROMAGLASS_YOUTUBE_BACKOFF_MS: '40', CHROMAGLASS_YOUTUBE_NO_NOTIFY: '1' };
   const logs = [];
   try {
     // The override names another host: the server stops before anything.
@@ -316,7 +362,7 @@ async function scenario(server, gport) {
     const init = await a.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'check', version: '1' } });
     const list = await a.rpc('tools/list', {});
     const names = (list.result?.tools ?? []).map((t) => t.name);
-    line('protocol', `it speaks MCP: initialize with a guide, and its fourteen tools listed (${names.join(', ')})`, init.result?.serverInfo?.name === 'youtube' && /PRIVATE/.test(init.result?.instructions ?? '') && names.length === 14);
+    line('protocol', `it speaks MCP: initialize with a guide, and its eighteen tools listed (${names.join(', ')})`, init.result?.serverInfo?.name === 'youtube' && /PRIVATE/.test(init.result?.instructions ?? '') && names.length === 18 && names.includes('analytics') && names.includes('queue_folder') && names.includes('add_captions') && names.includes('list_captions'));
     const before = g.refreshes;
     const ch = await a.tool('channel');
     line('refresh', 'an access key Google refuses is refreshed once and the call goes through', !ch.error && ch.v.title === 'Stand-in Channel' && g.refreshes === before + 1 && g.rejected401 >= 1, ch.text.slice(0, 160));
@@ -409,7 +455,7 @@ async function scenario(server, gport) {
     const lastA = storeA.lastUploadAt ? Date.parse(storeA.lastUploadAt) : 0;
     const statusA = await c.tool('upload_status', { job: qJob?.id });
     line('limitQueue', 'an upload refused by the daily limit a minute after the last upload waits exactly lastUploadAt + 24 h 10 min',
-      !resA.error && g.sessions.length === sessionsBeforeA && qJob?.state === 'queued' && g.limitNext === 0 && lastA > 0 && nbA === lastA + 24 * 3600_000 + 10 * 60_000 && nbA >= t0 + 2 * 3600_000 && /queued, the Mac retries after/.test(resA.text) && Boolean(statusA.v?.not_before || statusA.v?.[0]?.not_before),
+      !resA.error && g.sessions.length === sessionsBeforeA && qJob?.state === 'queued' && g.limitNext === 0 && lastA > 0 && nbA === lastA + 24 * 3600_000 + 10 * 60_000 && nbA >= t0 + 2 * 3600_000 && /queued, this computer retries after/.test(resA.text) && Boolean(statusA.v?.not_before || statusA.v?.[0]?.not_before),
       `state ${qJob?.state}, nb ${nbA}, last+24h ${lastA + 24 * 3600_000}, now+2h ${t0 + 2 * 3600_000}`);
 
     // (b) drain before notBefore sends nothing to the stand-in
@@ -536,29 +582,67 @@ async function scenario(server, gport) {
     mkdirSync(fakeBin, { recursive: true });
     writeFileSync(join(fakeBin, 'launchctl'), `#!/bin/sh\necho "$@" > "${launchMarker}"\nexit 0\n`, { mode: 0o755 });
     writeFileSync(join(fakeBin, 'osascript'), `#!/bin/sh\necho "$@" > "${notifyMarker}"\nexit 0\n`, { mode: 0o755 });
-    const agentEnv = { ...env, HOME: fakeHome, PATH: `${fakeBin}:${process.env.PATH}`, CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL: '1' };
-    const inst = start(server, agentEnv, ['install-agent']);
-    logs.push(inst.out);
-    const instCode = await Promise.race([inst.exited, sleep(5000).then(() => 'timeout')]);
-    if (instCode === 'timeout') await inst.kill();
+    const ran = (b) => { try { statSync(join(dir, `${b}-ran`)); return true; } catch { return false; } };
+    // Each system's plan, written for real into a fake home under the switch that keeps every
+    // scheduler command printed and not run (44i-2a): the cloud is Linux and nobody's CI is
+    // Windows, so PLATFORM is how one machine reads all three.
+    const agentRun = async (platform, cmd) => {
+      const p = start(server, { ...env, HOME: fakeHome, XDG_CONFIG_HOME: join(fakeHome, '.config'), PATH: `${fakeBin}:${process.env.PATH}`, CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL: '1', CHROMAGLASS_YOUTUBE_PLATFORM: platform }, [cmd]);
+      logs.push(p.out);
+      const code = await Promise.race([p.exited, sleep(5000).then(() => 'timeout')]);
+      if (code === 'timeout') await p.kill();
+      return { code, err: p.out.stderr };
+    };
+    const exists = (f) => { try { statSync(f); return true; } catch { return false; } };
+    const inst = await agentRun('darwin', 'install-agent');
+    const instCode = inst.code;
     const plistFile = join(fakeHome, 'Library', 'LaunchAgents', 'art.chromaglass.youtube-drain.plist');
     const plistText = readText(plistFile);
-    let launchRan = false;
-    try { statSync(launchMarker); launchRan = true; } catch { /* expected */ }
-    const uninst = start(server, agentEnv, ['uninstall-agent']);
-    logs.push(uninst.out);
-    const uninstCode = await Promise.race([uninst.exited, sleep(5000).then(() => 'timeout')]);
-    if (uninstCode === 'timeout') await uninst.kill();
-    let plistRemoved = false;
-    try { statSync(plistFile); } catch { plistRemoved = true; }
-    try { statSync(launchMarker); launchRan = true; } catch { /* expected */ }
-    // No mutant for this line, on purpose. A mutant that dropped the NO_LAUNCHCTL guard would
-    // run the real launchctl on whatever machine runs the check; the fake one on PATH should
-    // catch it, but a server that called launchctl by its full path would load a real agent
-    // that drains the real queue every hour. The line reads the plist and the marker file.
+    const uninstCode = (await agentRun('darwin', 'uninstall-agent')).code;
+    const plistRemoved = !exists(plistFile);
+    const unitDir = join(fakeHome, '.config', 'systemd', 'user');
+    const lin = await agentRun('linux', 'install-agent');
+    const svcText = readText(join(unitDir, 'art.chromaglass.youtube-drain.service'));
+    const timerText = readText(join(unitDir, 'art.chromaglass.youtube-drain.timer'));
+    const linUn = await agentRun('linux', 'uninstall-agent');
+    const unitsRemoved = !exists(join(unitDir, 'art.chromaglass.youtube-drain.service')) && !exists(join(unitDir, 'art.chromaglass.youtube-drain.timer'));
+    const win = await agentRun('win32', 'install-agent');
+    const launchRan = ran('launchctl');
     line('plist', 'install-agent writes a plist naming drain, the real script path and StartInterval 3600 without running launchctl under the env var',
       instCode === 0 && uninstCode === 0 && !launchRan && plistRemoved && plistText.includes('<string>drain</string>') && plistText.includes(realpathSync(server)) && plistText.includes('<key>StartInterval</key><integer>3600</integer>'),
       `inst ${instCode}, uninst ${uninstCode}, launchRan ${launchRan}, removed ${plistRemoved}`);
+    line('agentLinux', 'install-agent on Linux writes a systemd user service running drain on the real script and an hourly persistent timer, enables it (printed, not run), and uninstall removes both',
+      lin.code === 0 && linUn.code === 0 && !ran('systemctl') && unitsRemoved && svcText.includes(`"${realpathSync(server)}" drain`) && /OnUnitActiveSec=1h/.test(timerText) && /Persistent=true/.test(timerText) && /would run: systemctl "--user" "enable" "--now" "art\.chromaglass\.youtube-drain\.timer"/.test(lin.err),
+      `inst ${lin.code}, uninst ${linUn.code}, removed ${unitsRemoved}, timer ${/OnUnitActiveSec=1h/.test(timerText)}`);
+    line('agentWindows', 'install-agent on Windows makes an hourly Task Scheduler task running drain on the real script (printed, not run)',
+      win.code === 0 && !ran('schtasks') && /would run: schtasks "\/Create" "\/F" "\/SC" "HOURLY"/.test(win.err) && win.err.includes(`"/TR" ${JSON.stringify(`"${process.execPath}" "${realpathSync(server)}" drain`)}`),
+      `inst ${win.code}, ${win.err.split('\n').find((l) => l.includes('schtasks')) ?? 'no schtasks line'}`);
+
+    // setup (44i-2a): with nothing set up it names the client file as the first thing to do and
+    // exits 1; signed in against the stand-in it finds the channel and exits 0.
+    const setupRun = async (extra) => {
+      const p = start(server, { ...env, ...extra }, ['setup']);
+      logs.push(p.out);
+      const code = await Promise.race([p.exited, sleep(8000).then(() => 'timeout')]);
+      if (code === 'timeout') await p.kill();
+      return { code, text: p.out.all };
+    };
+    const emptyConf = join(dir, 'empty-conf');
+    const setupEmpty = await setupRun({ CHROMAGLASS_YOUTUBE_DIR: emptyConf });
+    const setupFull = await setupRun({});
+    line('setup', 'setup with no client file exits 1 naming the client file and the Cloud console pages; signed in, it exits 0 and names the channel',
+      setupEmpty.code === 1 && /TODO {2}Google client file/.test(setupEmpty.text) && setupEmpty.text.includes('youtube.googleapis.com') && !/TODO/.test(setupFull.text) && setupFull.code === 0 && /ok {4}YouTube channel: /.test(setupFull.text),
+      `empty ${setupEmpty.code}, full ${setupFull.code}: ${setupFull.text.split('\n').filter((l) => /TODO|channel/.test(l)).join(' | ').slice(0, 200)}`);
+
+    // settings.json with a key this version does not know stops the server at start, naming it.
+    const badConf = join(dir, 'bad-conf');
+    mkdirSync(badConf, { recursive: true, mode: 0o700 });
+    writeFileSync(join(badConf, 'settings.json'), JSON.stringify({ timezone: 'Europe/London' }));
+    const badSettings = start(server, { ...env, CHROMAGLASS_YOUTUBE_DIR: badConf });
+    const badCode = await Promise.race([badSettings.exited, sleep(3000).then(() => 'running')]);
+    if (badCode === 'running') await badSettings.kill();
+    line('settingsKeys', 'a settings.json key the server does not know stops it at start with the key named',
+      badCode === 2 && /timezone/.test(badSettings.out.stderr) && /Known: timeZone, categoryId/.test(badSettings.out.stderr), `exit ${badCode}`);
 
     // ── Replace, sidecar card, release plan, progress, notify (PLAN 44i-4, 44i-7..10) ─
     const c2 = start(server, { ...env, CHROMAGLASS_YOUTUBE_NOW: String(tF + 60_000) });
@@ -620,7 +704,7 @@ async function scenario(server, gport) {
     const drainReplCode = await Promise.race([drainRepl.exited, sleep(15_000).then(() => 'timeout')]);
     if (drainReplCode === 'timeout') await drainRepl.kill();
     let notifyRan = false;
-    try { statSync(notifyMarker); notifyRan = true; } catch { /* expected */ }
+    notifyRan = ['osascript', 'notify-send', 'powershell'].some((b) => { try { statSync(join(dir, `${b}-ran`)); return true; } catch { return false; } });
     const vNew = g.sessions.slice(sessionsBeforeJ).map((s) => s.video).find((vv) => vv && sha(vv.bytes) === sha(bytesRepl));
     const manifestAfterJ = readJson(join(conf, 'manifest.json'));
     const oldAfterJ = (manifestAfterJ.videos ?? []).find((e) => e.videoId === 'vidOld');
@@ -630,7 +714,9 @@ async function scenario(server, gport) {
     line('replaceVideo', 'replace_video queues old metadata and replaces without uploading yet; drain adds new id to all old playlists and marks manifest old replaced, new ok',
       queuedOkJ && drainReplCode === 0 && Boolean(vNew?.id) && inPl1 && inPl2 && oldAfterJ?.status === 'replaced' && oldAfterJ?.replacedBy === vNew?.id && newAfterJ?.status === 'ok' && newAfterJ?.key === 'old-ambient' && newAfterJ?.replaces === 'vidOld',
       `queued ${queuedOkJ}, drain ${drainReplCode}, vNew ${vNew?.id}, pl1 ${inPl1}, pl2 ${inPl2}, old ${oldAfterJ?.status}, new ${newAfterJ?.status}`);
-    line('notifyGuard', 'drain never invokes osascript when CHROMAGLASS_YOUTUBE_NO_NOTIFY=1 is set',
+    // What this holds is the guard as a whole (a drain against a stand-in Google never notifies); the
+    // NO_NOTIFY switch alone is not separable here, since every drain in the check names the stand-in.
+    line('notifyGuard', 'drain never invokes a notifier (osascript, notify-send, powershell) when run against a stand-in Google with CHROMAGLASS_YOUTUBE_NO_NOTIFY=1',
       drainReplCode === 0 && !notifyRan,
       `drain ${drainReplCode}, notifyRan ${notifyRan}`);
 
@@ -691,6 +777,15 @@ async function scenario(server, gport) {
     c2.child.stdin.end();
     await Promise.race([c2.exited, sleep(3000)]);
 
+    // (m) the words around a video (44i-2b): credits, chapters, captions, other languages (scripts/youtubeText.mjs)
+    await textScenario({ server, start, env, conf, dir, g, line, logs, chunk: CHUNK });
+
+    // (n) Shorts and folders (44i-2c): real MP4 and WebM headers, read by the server's own probe (scripts/youtubeShorts.mjs)
+    await shortsScenario({ server, start, env, conf, dir, g, line, logs });
+
+    // (o) analytics (44i-2d): the opt-in scope, the four reports, Pacific dates (scripts/youtubeAnalytics.mjs)
+    await analyticsScenario({ server, start, env, conf, dir, g, line, logs });
+
     // (i) nothing secret in any reply, the log, the manifest, uploads.json or the plist
     const manifestRaw = readText(join(conf, 'manifest.json'));
     const uploadsRaw = readText(join(conf, 'uploads.json'));
@@ -735,24 +830,116 @@ const MUTANTS = [
   { rule: 'limitFloor', find: 'return Math.max(now + 2 * 3600_000, afterLast);', replace: 'return afterLast || now + 2 * 3600_000;' },
   // The check's old video has no manifest entry yet when its replacement finishes, so
   // the server takes the push branch (the entry made on the spot), and that is the one cut.
-  { rule: 'manifestReplace', find: "status: 'replaced', replacedBy: video.id, updatedAt: finishedAt });", replace: "status: 'replaced', updatedAt: finishedAt });" },
-  { rule: 'leakFiles', find: 'writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos }, null, 2));', replace: 'writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos, t: loadToken()?.refresh_token }, null, 2));' },
+  { rule: 'manifestReplace', in: 'youtube/manifest.js', find: "status: 'replaced', replacedBy: video.id, updatedAt: finishedAt });", replace: "status: 'replaced', updatedAt: finishedAt });" },
+  // The manifest moved to youtube/manifest.js (44i-2c-2), where the server's loadToken is out of
+  // reach, so this leak reads the refresh key from token.json beside the manifest: the same secret
+  // written into the same file, which is what leakFiles must catch.
+  { rule: 'leakFiles', in: 'youtube/manifest.js', find: 'writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos }, null, 2));', replace: "writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos, t: JSON.parse(readFileSync(MANIFEST_FILE.replace(/manifest\\.json$/, 'token.json'), 'utf8')).refresh_token }, null, 2));" },
   { rule: 'progress', find: 'if (moved) { onProgress?.(job.sent, job.size); fails = 0; continue; }', replace: 'if (moved) { fails = 0; continue; }' },
   { rule: 'replaceVideo', find: 'const playlists = Array.isArray(oldEntry?.playlists) ? oldEntry.playlists : await findVideoPlaylists(oldId);', replace: 'const playlists = [];' },
   { rule: 'sidecar', find: 'if (unknown.length) {', replace: 'if (false) {' },
-  { rule: 'notifyGuard', find: "if (process.platform !== 'darwin' || process.env.CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL === '1' || process.env.CHROMAGLASS_YOUTUBE_NO_NOTIFY === '1' || process.env.CHROMAGLASS_YOUTUBE_GOOGLE) return;", replace: '' },
-  { rule: 'manifestViews', find: '...(v?.statistics ? { views: Number(v.statistics.viewCount ?? 0), likes: Number(v.statistics.likeCount ?? 0) } : {}),', replace: '' },
-  { rule: 'releasePlan', find: 'const slotMs = every % 24 === 0\n      ? pacificWallToMs(y, mo, d + i * (every / 24), h, min, 0)\n      : slot0Ms + i * every * 3600_000;', replace: 'const slotMs = slot0Ms + i * every * 3600_000;' },
+  { rule: 'notifyGuard', find: "if (env('NO_SCHEDULER') === '1' || env('NO_LAUNCHCTL') === '1' || env('NO_NOTIFY') === '1' || env('GOOGLE')) return;", replace: '' },
+  // The regression that matters is a server reading the computer's zone instead of the settings';
+  // the servers run with TZ=UTC, so on the owner's Pacific Mac too this mutant reads UTC and fails.
+  { rule: 'releasePlan', find: 'const ZONE = SETTINGS.timeZone;', replace: 'const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;', as: 'settingsZone' },
+  { rule: 'agentLinux', find: "const dryScheduler = () => env('NO_SCHEDULER') === '1' || env('NO_LAUNCHCTL') === '1';", replace: 'const dryScheduler = () => false;' },
+  { rule: 'setup', find: 'process.exit(r.ok ? 0 : 1);', replace: 'process.exit(0);' },
+  { rule: 'settingsKeys', find: 'try { SETTINGS = readSettings(DIR); } catch (e) { log(e.message); process.exit(2); }', replace: "try { SETTINGS = readSettings(DIR); } catch (e) { SETTINGS = { timeZone: 'UTC', categoryId: '22' }; }" },
+  { rule: 'manifestViews', in: 'youtube/manifest.js', find: '...(v?.statistics ? { views: Number(v.statistics.viewCount ?? 0), likes: Number(v.statistics.likeCount ?? 0) } : {}),', replace: '' },
+  // The words around a video (44i-2b): the server's wiring, then the rules in youtube/describe.js and youtube/captions.js.
+  { rule: 'credits', find: 'const credits = creditsLine(SETTINGS.credits, a.credits, a.music, a.description);', replace: "const credits = '';" },
+  { rule: 'updateChapters', in: 'youtube/describe.js', find: 'if (credits) text = text.split(credits).join', replace: 'if (false) text = text.split(credits).join', as: 'creditsOnce' },
+  { rule: 'creditsNeedMusic', in: 'youtube/describe.js', find: "if (!piece) throw new Error('The credits line", replace: "if (false) throw new Error('The credits line" },
+  { rule: 'replaceCredits', in: 'youtube/describe.js', find: "if (!piece) piece = musicIn(line, body) ?? '';", replace: '' },
+  { rule: 'chapterRules', in: 'youtube/describe.js', find: 'if (list[0].at !== 0) throw', replace: 'if (false) throw', as: 'chapterZero' },
+  { rule: 'chapterRules', in: 'youtube/describe.js', find: 'if (list[i].at - list[i - 1].at < 10) throw', replace: 'if (false) throw', as: 'chapterGap' },
+  { rule: 'updateChapters', in: 'youtube/describe.js', find: 'if (chapters) text = stripChapters(text);', replace: '', as: 'chapterStrip' },
+  { rule: 'updateChapters', in: 'youtube/describe.js', find: 'if (Number.isFinite(durationSec) && durationSec > 0 && durationSec - list[list.length - 1].at < 10)', replace: 'if (false)', as: 'chapterEnd' },
+  { rule: 'captions', find: 'for (const c of job.captions ?? []) job.after.push(', replace: 'for (const c of []) job.after.push(' },
+  { rule: 'captions', find: "query: { part: 'snippet', uploadType: 'multipart' }", replace: "query: { part: 'snippet' }", as: 'captionsMultipart' },
+  { rule: 'captionFiles', in: 'youtube/captions.js', find: '} else if (!SRT_CUE.test(body)) {', replace: '} else if (false) {' },
+  { rule: 'localizations', find: "part: job.meta.localizations ? 'snippet,status,localizations' : 'snippet,status'", replace: "part: 'snippet,status'" },
+  { rule: 'localizationsLanguage', in: 'youtube/describe.js', find: "if (!validLanguage(language)) throw new Error('Titles in other languages", replace: "if (false) throw new Error('Titles in other languages" },
+  { rule: 'updateLocalizations', find: 'localizations = { ...(cur.localizations ?? {}) };', replace: 'localizations = {};' },
+  { rule: 'addCaptions', find: "const [c] = captionsFor({ captions: [{ file: a.file, language: a.language, name: a.name, draft: a.draft }] });", replace: "const c = { file: a.file, language: 'en' };" },
+  { rule: 'cardWords', find: "const here = (f) => resolve(dir,", replace: 'const here = (f) => String(f) || resolve(dir,' },
+  { rule: 'creditsFalse', in: 'youtube/describe.js', find: "if (own === false || own === 'false') return '';", replace: '' },
+  { rule: 'creditsFalse', find: 'catch { lenient = { credits: false }; }', replace: 'catch { /* none */ }', as: 'lenientUpdate' },
+  { rule: 'drainedWords', find: 'if (raw.credits !== undefined) out.credits = raw.credits === false ? false : String(raw.credits);', replace: '', as: 'cardCredits' },
+  { rule: 'updateLocalizations', find: "part: 'snippet,status,statistics,contentDetails,localizations'", replace: "part: 'snippet,status,statistics,contentDetails'", as: 'readLocalizations' },
+  { rule: 'updateLocalizations', find: "part: localizations ? 'snippet,status,localizations' : 'snippet,status'", replace: "part: 'snippet,status,localizations'", as: 'alwaysPart' },
+  { rule: 'updateLocalizations', find: "part: localizations ? 'snippet,status,localizations' : 'snippet,status'", replace: "part: 'snippet,status'", as: 'neverPart' },
+  { rule: 'updateLocalizations', find: 'if (v === null) delete localizations[lang]; else localizations[lang] = v;', replace: 'localizations[lang] = v;', as: 'nullRemoves' },
+  { rule: 'chapterRules', in: 'youtube/describe.js', find: 'if (list.length < 3) throw', replace: 'if (false) throw', as: 'chapterThree' },
+  { rule: 'processingLength', in: 'youtube/describe.js', find: 'durationSec > 0 && ', replace: '' },
+  { rule: 'limits', in: 'youtube/describe.js', find: 'if (ANGLE.test(out)) throw', replace: 'if (false) throw', as: 'descAngle' },
+  { rule: 'limits', in: 'youtube/describe.js', find: 'if (bytes > DESCRIPTION_BYTES) throw', replace: 'if (false) throw', as: 'descBytes' },
+  { rule: 'limits', in: 'youtube/describe.js', find: 'if (t.length > TITLE_CHARS) throw', replace: 'if (false) throw', as: 'titleChars' },
+  { rule: 'limits', in: 'youtube/describe.js', find: 'if (ANGLE.test(t)) throw', replace: 'if (false) throw', as: 'titleAngle' },
+  { rule: 'captionFiles', in: 'youtube/captions.js', find: 'if (!/^WEBVTT', replace: 'if (false && !/^WEBVTT', as: 'vttHeader' },
+  { rule: 'captionFiles', in: 'youtube/captions.js', find: 'if (!VTT_CUE.test(body)) throw', replace: 'if (false) throw', as: 'vttCue' },
+  { rule: 'captionFiles', in: 'youtube/captions.js', find: "new TextDecoder('utf-8', { fatal: true })", replace: "new TextDecoder('utf-8', { fatal: false })", as: 'utf8' },
+  { rule: 'captionFiles', in: 'youtube/captions.js', find: 'if (size > MAX_BYTES) throw', replace: 'if (false) throw', as: 'captionSize' },
+  { rule: 'captions', find: "query: { part: 'snippet', uploadType: 'multipart' }", replace: "query: { uploadType: 'multipart' }", as: 'captionsPart' },
+  { rule: 'addCaptions', find: 'language: t.snippet?.language,', replace: '', as: 'listLanguage' },
+  { rule: 'addCaptions', find: "...(o.draft ? { draft: true } : {})", replace: '', as: 'captionDraft' },
+  // Shorts and folders (44i-2c): the server's wiring, then youtube/shorts.js, youtube/probe.js and youtube/folder.js.
+  { rule: 'shortLength', find: 'if (a.short) checkShort(shape, basename(file));', replace: '', as: 'shortWired' },
+  { rule: 'shortLength', in: 'youtube/shorts.js', find: 'const over = p.durationSec > SHORT_MAX_SEC', replace: 'const over = false' },
+  { rule: 'shortShape', in: 'youtube/shorts.js', find: 'wide = p.width > p.height', replace: 'wide = false' },
+  { rule: 'shortShape', in: 'youtube/probe.js', find: 'const turned = rotation === 90 || rotation === 270;', replace: 'const turned = false;', as: 'shortTurn' },
+  { rule: 'shortTag', find: "a.short ? tagShort(a.title, a.description) : a.description ?? ''", replace: "a.description ?? ''" },
+  { rule: 'tagOnce', in: 'youtube/shorts.js', find: "if (TAGGED.test(String(title ?? '')) || TAGGED.test(d)) return d;", replace: '' },
+  { rule: 'shortUnknown', in: 'youtube/shorts.js', find: 'if (!p.durationSec) {', replace: 'if (false) {' },
+  { rule: 'webmLength', in: 'youtube/probe.js', find: 'if (f.id === ID.SCALE) scale = uint(buf, f);', replace: 'if (false) scale = uint(buf, f);' },
+  { rule: 'shortsNote', find: '...(a.short ? { short: true } : {}), ...(shorts ? { shorts } : {}),', replace: '...(a.short ? { short: true } : {}),' },
+  { rule: 'shortsNote', in: 'youtube/shorts.js', find: 'return is ? `YouTube will show', replace: 'return false ? `YouTube will show', as: 'notAsked' },
+  { rule: 'shortsNote', in: 'youtube/shorts.js', find: '${p.durationSec > 60 ?', replace: '${false ?', as: 'contentId' },
+  { rule: 'mp4Read', in: 'youtube/probe.js', find: 'size = Number(h.readBigUInt64BE(8)); head = 16; }', replace: '}', as: 'mp4Large' },
+  { rule: 'mp4Read', in: 'youtube/probe.js', find: '(moov[tkhd.start] === 1 ? 32 : 20)', replace: '20', as: 'tkhdVersion' },
+  { rule: 'mp4Read', in: 'youtube/probe.js', find: 'const scale = v === 1 ? moov.readUInt32BE(mvhd.start + 20) : moov.readUInt32BE(mvhd.start + 12);', replace: 'const scale = moov.readUInt32BE(mvhd.start + 12);', as: 'mvhdVersion' },
+  { rule: 'mp4Read', in: 'youtube/probe.js', find: "!== 'vide') continue;", replace: "!== 'vide' && false) continue;", as: 'videoTrack' },
+  { rule: 'uploadChapters', find: 'wordsFor(a, shape?.durationSec)', replace: 'wordsFor(a)', all: true },
+  { rule: 'cardShort', find: 'if (raw.short !== undefined) out.short = raw.short;', replace: '' },
+  { rule: 'cardShort', find: "if (a.short !== undefined && typeof a.short !== 'boolean') throw", replace: 'if (false) throw', as: 'shortType' },
+  { rule: 'shortsNote', in: 'youtube/shorts.js', find: 'return p.durationSec <= SHORT_MAX_SEC && p.height >= p.width;', replace: 'return p.height >= p.width;', as: 'notAskedLen' },
+  { rule: 'shortsNote', in: 'youtube/shorts.js', find: 'return p.durationSec <= SHORT_MAX_SEC && p.height >= p.width;', replace: 'return p.durationSec <= SHORT_MAX_SEC;', as: 'notAskedShape' },
+  { rule: 'mp4Read', in: 'youtube/probe.js', find: 'size = Number(h.readBigUInt64BE(8));', replace: 'size = h.readUInt32BE(12);', as: 'lowWord' },
+  { rule: 'webmLength', in: 'youtube/probe.js', find: 'let value = keepMarker ? first : first & (0xff >> len);', replace: 'let value = keepMarker ? first : first & (0x7f >> len);', as: 'vintMask' },
+  { rule: 'shortTag', find: "composeDescription(a.short ? tagShort(a.title, a.description) : a.description ?? '', chapters, credits)", replace: "(a.short ? (x) => tagShort(a.title, x) : (x) => x)(composeDescription(a.description ?? '', chapters, credits))", as: 'tagAfter' },
+  { rule: 'folderAgain', find: "if (done) return { ...row, title: m.title, state: 'already up'", replace: "if (false) return { ...row, title: m.title, state: 'already up'", as: 'alreadyUp' },
+  { rule: 'probeKinds', in: 'youtube/probe.js', find: 'if (width && height && (rotation === 90 || rotation === 270)) [width, height] = [height, width];', replace: '', as: 'webmRoll' },
+  { rule: 'probeKinds', in: 'youtube/probe.js', find: 'width = get(ID.DW) ?? get(ID.PW); height = get(ID.DH) ?? get(ID.PH);', replace: 'width = get(ID.PW); height = get(ID.PH);', as: 'displaySize' },
+  { rule: 'probeKinds', in: 'youtube/probe.js', find: 'if (mehd) whole =', replace: 'if (false) whole =', as: 'mehd' },
+  { rule: 'probeKinds', in: 'youtube/probe.js', find: 'if (stsd && stsd.start + 8 + 36 <= stsd.end)', replace: 'if (false)', as: 'stsd' },
+  { rule: 'folderWhole', find: 'const go = !a.dry_run && (!refused || a.skip_refused === true);', replace: 'const go = !a.dry_run;' },
+  { rule: 'folderDry', find: 'const go = !a.dry_run && (!refused || a.skip_refused === true);', replace: 'const go = !refused || a.skip_refused === true;' },
+  { rule: 'folderSkip', find: ' || a.skip_refused === true);', replace: ');' },
+  { rule: 'folderCard', find: 'mergeArgsWithCard(readUploadCard(path), shared)', replace: 'mergeArgsWithCard(shared, readUploadCard(path))' },
+  { rule: 'folderAgain', find: "if (pending) return { ...row", replace: "if (false) return { ...row" },
+  { rule: 'folderOrder', in: 'youtube/folder.js', find: "{ numeric: true, sensitivity: 'base' }", replace: "{ sensitivity: 'base' }" },
+  { rule: 'folderOrder', in: 'youtube/folder.js', find: "replace(/[-_.]+/g, ' ')", replace: "replace(/[_.]+/g, ' ')", as: 'titleFromName' },
+  { rule: 'folderFilms', in: 'youtube/folder.js', find: "!n.startsWith('.') && ", replace: '' },
+  { rule: 'folderFilms', in: 'youtube/folder.js', find: 'try { if (!statSync(p).isFile()) continue; } catch { continue; }', replace: '', as: 'folderIsFile' },
+  { rule: 'folderHidden', in: 'youtube/folder.js', find: 'if (/[\\/\\\\]\\.[^\\/\\\\]/.test(under)) throw', replace: 'if (false) throw' },
+  { rule: 'folderMax', in: 'youtube/folder.js', find: 'if (films.length > FOLDER_MAX) throw', replace: 'if (false) throw' },
+  { rule: 'releasePlan', in: 'youtube/release.js', find: 'const slotMs = every % 24 === 0\n      ? zoneWall(y, mo, d + i * (every / 24), h, min, 0)\n      : slot0Ms + i * every * 3600_000;', replace: 'const slotMs = slot0Ms + i * every * 3600_000;' },
+  ...ANALYTICS_MUTANTS,
 ];
 
 function mutant(m) {
-  const dir = join(ROOT, 'scratch', 'youtube-mutants', m.rule);
+  const dir = join(ROOT, 'scratch', 'youtube-mutants', m.as ?? m.rule);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
-  const src = readFileSync(SERVER, 'utf8');
-  if (!src.includes(m.find)) return { why: `its text is not in mcp/youtube-mcp.js: "${m.find}"` };
   const file = join(dir, 'youtube-mcp.js');
-  writeFileSync(file, src.replace(m.find, m.replace));
+  // The server's own modules beside it (44i-2a), so the copy imports what the original does;
+  // a mutant that names a module (`in`, 44i-2b) is cut there instead of in the server.
+  cpSync(MODULES, join(dir, 'youtube'), { recursive: true });
+  const target = m.in ? join(dir, m.in) : file;
+  const src = readFileSync(m.in ? join(MODULES, '..', m.in) : SERVER, 'utf8');
+  if (!src.includes(m.find)) return { why: `its text is not in mcp/${m.in ?? 'youtube-mcp.js'}: "${m.find}"` };
+  if (m.in) writeFileSync(file, readFileSync(SERVER, 'utf8'));
+  writeFileSync(target, m.all ? src.split(m.find).join(m.replace) : src.replace(m.find, m.replace));
   return { file };
 }
 
@@ -762,17 +949,44 @@ const failures = [];
 const say = (ok, l) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${l}`); if (!ok) failures.push(l); };
 
 const src = readFileSync(SERVER, 'utf8');
-say(!/^import .* from '\.\.?\//m.test(src), 'the server imports nothing from the repo (it can be lifted out on its own, 44i-2)');
+// It imports only Node's own modules and its own folder (mcp/youtube/, 44i-2a), and that folder
+// imports only Node's and its own siblings, so the server and the folder lift out together.
+const modDir = MODULES;
+// Every static, re-export, bare and dynamic form, either quote, any indent; the sample below must
+// yield each of its five specifiers, so a narrowed pattern fails here rather than passing quietly.
+const importsOf = (text) => [...text.matchAll(/(?:\bfrom|\bimport)\s*\(?\s*(['"])([^'"]+)\1/g)].map((m) => m[2]);
+const sampleImports = importsOf(`import a from "../a.js";\n  export { b } from '../b.js';\nimport '../c.js';\nconst d = await import('../d.js');\nimport {\n  e,\n} from '../e.js';`);
+say(['../a.js', '../b.js', '../c.js', '../d.js', '../e.js'].every((x) => sampleImports.includes(x)), `the import reader finds every import form (${sampleImports.join(', ')})`);
+const serverForeign = importsOf(src).filter((p) => !p.startsWith('node:') && !/^\.\/youtube\/[a-z]+\.js$/.test(p));
+const modFiles = readdirSync(modDir).filter((f) => f.endsWith('.js'));
+const modForeign = modFiles.flatMap((f) => importsOf(readFileSync(join(modDir, f), 'utf8')).filter((p) => !p.startsWith('node:') && !/^\.\/[a-z]+\.js$/.test(p)).map((p) => `${f}: ${p}`));
+say(serverForeign.length === 0 && modForeign.length === 0 && modFiles.length > 0, `the server imports nothing from the repo but its own folder, so the two lift out on their own (44i-2)${serverForeign.length || modForeign.length ? `: ${[...serverForeign, ...modForeign].join(', ')}` : ''}`);
 
 console.log('\nThe scenario, against mcp/youtube-mcp.js:');
 for (const l of await scenario(SERVER, BASE_PORT)) say(l.ok, `${l.name}${l.ok ? '' : `  [${l.detail}]`}`);
 
 if (MUTANTS_ON) {
   console.log('\nThe mutants (each must fail its own line):');
-  const results = await Promise.all(MUTANTS.map(async (m, i) => {
-    const { file, why } = mutant(m);
-    return { m, why, lines: file ? await scenario(file, BASE_PORT + 1 + i) : [] };
+  /* A few at a time, not all at once. With every scenario started together (46 of them by 44i-2b)
+     the lines that wait on a fixed timeout (a server's exit, a drain) failed on copies that changed
+     nothing, so those rules' mutants were "caught" by load, not by the rule (a review of the check,
+     2026-11-28: 20 unchanged copies in parallel each failed some of loopback, setup, settingsKeys,
+     progress, agentLinux). So at most POOL run together, and the first copy is the server
+     unchanged, which must fail no line at all: any line it fails makes the verdicts void. */
+  const POOL = Number(process.env.YOUTUBE_POOL ?? 8);
+  const jobs = [{ rule: '(control)', control: true, find: '', replace: '', as: 'control' }, ...MUTANTS];
+  const results = new Array(jobs.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(POOL, jobs.length) }, async () => {
+    for (let i = next++; i < jobs.length; i = next++) {
+      const m = jobs[i];
+      const { file, why } = m.control ? mutant({ ...m, find: '', replace: '' }) : mutant(m);
+      results[i] = { m, why, lines: file ? await scenario(file, BASE_PORT + 1 + i) : [] };
+    }
   }));
+  const control = results.shift();
+  const controlFailed = control.lines.filter((l) => !l.ok);
+  say(!control.why && control.lines.length > 0 && controlFailed.length === 0, `an unchanged copy, run beside the mutants, fails no line${controlFailed.length ? `: ${controlFailed.map((l) => l.name.slice(0, 60)).join(' | ')}` : ''}`);
   for (const { m, why, lines } of results) {
     if (why) { say(false, `mutant without ${m.rule}: ${why}`); continue; }
     const crashed = lines.find((l) => l.rule === 'crash' && !l.ok);

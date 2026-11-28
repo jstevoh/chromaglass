@@ -179,3 +179,27 @@ blur.
   words (low-key, linear, clustered, colour field). Measured: Big Buck Bunny graded Arc
   9.0/10 against the real shows before, now reads general with no card; the Joshua Light
   Show, glow ink and four app takes read liquid. `npm run watchmode` 21/21.
+- ~~**47p-4** an HTML report and the best moment~~ (shipped, this PR): every run writes
+  `report.html` (one self-contained page: the best moment, the timeline, the read, the words,
+  the numbers and palette, every sheet, the detail; pictures inside it as JPEG, the clip too
+  under 8 MB; no folder of the machine, the video page's words escaped; reads on a phone),
+  `best.mp4` (the strongest 12 s, H.264 with sound) and `best.png` (its strongest frame), from
+  `scripts/watchreport.mjs`; `--no-report` turns them off. The moment is the window with most
+  motion, colour, lit area and loudness by rank, with no title card and a cost per hard cut.
+  `npm run watchreport` 41/41; each choice rule and both seeks shown to catch a mutant.
+- ~~**47p-5b**~~ the public judging skill (shipped, 2026-11-28): `reelreader/skill/`, a
+  self-contained skill folder the release copies: honesty rules first, the reading order, a
+  content read from the sheets, lenses for anyone, an editor, a colourist and a VJ or liquid
+  artist, the helper agent and the words guide (moved here from `docs/`), a worked example,
+  an eval-set guide on `ratings.json`, and a test set of four clips with known answers (an
+  edited cartoon, a good liquid take, the same take frozen and the same take turned as a
+  whole, both bad takes run with `--liquid`) plus a linked real show. `npm run reelset` holds
+  the folder whole, free of this project's names, and the key's measured half true.
+  ChromaGlass's layer stays on top in `.claude/skills/watch/` (our faults, the Mac route, the
+  settings map, the real shows). The agreement line now says "your ratings", not the owner's.
+- ~~**47p-5**~~ a shot list and batch runs: cut and dissolve times, each shot's length, the average
+  shot length, a palette per shot and the share of cuts on a beat (CSV and in the summary);
+  `--batch <folder|playlist>` with a table across the videos. Shipped (this PR), with the rating
+  page, the refit and the notes' themes (handoff "Ratings for everyone"): `scripts/watchshots.mjs`,
+  `watchbatch.mjs`, `watchrate.mjs`, `watchfit.mjs`, `watchnotes.mjs`; checks `npm run watchshots`,
+  `npm run watchbatch`, `npm run ratepage`.
