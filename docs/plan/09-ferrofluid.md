@@ -207,15 +207,13 @@ Open, from building 9i:
     face is a fixed 0.06 above it (`MAGNET_FACE`), clamped 0.01 under the liquid.
     Saying the setting as the gap itself would be plainer, but changes every
     saved look's magnet; worth doing with a look version bump.
-- **9z. The dye at its own grid across a new solver.** Found while doing 9w: the
-  dye and the flow cross a move of the grid through the CPU's 192² arrays
-  (`FluidSimulation.attachGpu`, `pullStateFromGpu`), so a plate on 384² to 1024²
-  is carried at 192² and upsampled back: anything finer than about two cells of
-  the old grid is smoothed away at every move, and the copy is a frame old.
-  Carry the dye and the velocity on the GPU as 9w carries the phase (an area
-  mean for the dye, which is an amount; the velocity resampled and projected),
-  keeping the CPU path only for a lost device. Measure it first: the dye's fine
-  structure (the `grating` or `microscope` measures) before and after one move.
+- ~~**9z. The dye at its own grid across a new solver.**~~ (**done** 2026-11-28) `handOver`
+  and `takeOver` (`src/gpu/fluid/inputs.ts`, `src/gpu/fluid/constants.ts`, `src/gpu/fluid.ts`)
+  now carry `dye` (`carryArea`) and `vel` (`carryArea` + `project` + copy to `velForced`) on
+  the GPU at each solver's native resolution, zeroing CPU dye/flow arrays via
+  `clearCarriedArrays` (`src/sim/solverLay.ts`) unless the solver fell back to the CPU (`dropGpu`).
+  Measured across `384² → 256² → 384²`: `dyeSum` `18266 → 18266` (exact), `ke` `294.10 → 293.20`
+  (`maxDiv` `0.00386`), 1-cell dye thread peak `3.4947 → 2.8299`, and `npm run regrid` `7/7`.
 
 - **9ac. The ferrofluid is weightless when the plate tips or stands** (S; Medium, a live bug).
   `hsBody` (`thinGap.ts:306-358`) tilts only the dye's weight and the oil's lift; the phase

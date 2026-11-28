@@ -30,7 +30,7 @@ import { PH_WGSL } from '../../lib/phIndicator';
 import { LAMP_FIELD_WGSL, STAGE_METRES } from './lampField';
 import { DROP_LENS_WGSL } from './dropLens';
 import { EDGE_LIGHT_WGSL, TRANSMIT_WGSL } from './plateTransmit';
-import { INTERFACE_WGSL } from './plateInterface';
+import { INTERFACE_WGSL, OIL_DECODE_WGSL } from './plateInterface';
 import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
 import { BUBBLE_FILM_WGSL } from './bubbleFilm';
 import { VIEW_OPTICS } from './platePolar';
@@ -1304,14 +1304,10 @@ fn oplAt(dyeN: f32, uv: vec2f) -> f32 {
  * the helpers, then the pass's own main.
  */
 export function plateWgsl(main: string, bindings = DISPLAY_BINDINGS): string {
-  // `PARTICLE_FOLD` only where the bindings carry the splat: a slice that
-  // binds its own shorter list has no `parts0` for it to read. It goes after
-  // MACRO because WGSL wants a function declared before it is called and
-  // `decodeFluidDof`, which it falls back to, is declared in there.
+  const oil = bindings === DISPLAY_BINDINGS ? OIL_DECODE_WGSL : '';
   const particles = bindings === DISPLAY_BINDINGS ? FINE_WINDOW_WGSL + PARTICLE_FOLD : '';
-  // The closeup's ferrofluid drop reads the packed flow and the dye, so it comes with the display's own bindings.
   const view = bindings === DISPLAY_BINDINGS ? VIEW + FERRO_DROP_WGSL : '';
-  return `${HEAD}${bindings}${SAMPLING}${DECODE}${NOISE}${CELLS}${GEOMETRY}${LIGHTING}${MACRO}${particles}${view}${FINISH_WGSL}${VERT}${main}`;
+  return `${HEAD}${bindings}${SAMPLING}${DECODE}${NOISE}${CELLS}${GEOMETRY}${LIGHTING}${MACRO}${oil}${particles}${view}${FINISH_WGSL}${VERT}${main}`;
 }
 
 /** The pieces, for the slices still being ported to build on. */
@@ -1454,13 +1450,8 @@ export const DISPLAY_BINDINGS = /* wgsl */ `
 /** The air field (H6): coverage in 0–1, where a bubble has pushed the dye out. */
 @group(0) @binding(15) var air0: texture_2d<f32>;
 @group(0) @binding(16) var air1: texture_2d<f32>;
-/**
- * The front plate's own physics and chemistry, packed (see packView in
- * wgsl/fluid.ts): the ferrofluid, oil, acidity, soap, the BZ reaction,
- * Liesegang's precipitate and the gap, in the one binding the ferrofluid
- * used to have, because this pass is at WebGPU's limit of sixteen.
- */
 @group(0) @binding(17) var view0: texture_2d<u32>;
+@group(0) @binding(21) var<storage, read> oilDyeBuf: array<u32>;
 `;
 
 /** Reading view0, between its texels. Only with the display's own bindings. */
@@ -1731,7 +1722,11 @@ fn foldRaw(raw: vec4f, pt: texture_2d<f32>, uv: vec2f) -> vec4f {
 */
 fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool, dof: f32, layer: i32) -> vec4f {
   let fine = layer == 0 && U.fineWin.z > 0.0;
-  if (U.particles <= 0.001 && !fine) { return decodeFluidDof(t, fuv, blurFluid, useBlur, dof); }
+  let oilN = oilDyeBuf[u32(layer) * 2u + 1u];
+  if (U.particles <= 0.001 && !fine) {
+    if (oilN > 0u) { return decodeFluidBodies(t, fuv, dof, layer, vec4f(0.0)); }
+    return decodeFluidDof(t, fuv, blurFluid, useBlur, dof);
+  }
   var raw: vec4f;
   let r = select(dof * 0.022 / (1.5 * U.camZoom), 0.0, dof < 0.02);
   if (r == 0.0) {
@@ -1742,8 +1737,13 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
          + tex2(t, fuv + vec2f(r, 0.0)) + tex2(t, fuv - vec2f(r, 0.0))
          + tex2(t, fuv + vec2f(0.0, r)) + tex2(t, fuv - vec2f(0.0, r))) * 0.2;
   }
-  if (fine) { return decodeFluidRaw(fineRaw(raw, pt, fuv, r)); }
-  return decodeFluidRaw(foldRaw(raw, pt, fuv));
+  var folded: vec4f;
+  if (fine) { folded = fineRaw(raw, pt, fuv, r); } else { folded = foldRaw(raw, pt, fuv); }
+  if (oilN > 0u) {
+    let extra = max(folded * folded * DENSITY_SCALE - raw * raw * DENSITY_SCALE, vec4f(0.0));
+    return decodeFluidBodies(t, fuv, dof, layer, extra);
+  }
+  return decodeFluidRaw(folded);
 }
 
 /*

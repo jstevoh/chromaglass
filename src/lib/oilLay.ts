@@ -104,7 +104,7 @@ export const SPLOD_DROPS = 120;
 export const SPLOD_TRIES = 60;
 export const SPLOD_MEDIAN = 0.032, SPLOD_SIGMA = 0.5, SPLOD_MIN = 0.016, SPLOD_MAX = 0.11;
 export const SPLOD_GAP = 0.02;
-export const SPLOD_WASH = 0.5;
+export const SPLOD_WASH = 0.18;
 /*
   How much of each oil: the photograph is yellow most of all, then green,
   red and pink about alike (shares of the drops, by the dyes after the

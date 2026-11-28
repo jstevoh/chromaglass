@@ -25,8 +25,8 @@ import { groupOf, viewOf } from './groupCache';
 /** x, y, radius (all as a fraction of the grid) and opacity. */
 const STRIDE = 4 * 4;
 
-/** The bubbles as the field was last stamped from them (38h-15): discs (x, y, r, opacity) and rims (fingering, count, phase, film). */
-export type AirGeo = { readonly discs: GPUBuffer; readonly rims: GPUBuffer };
+/** The bubbles as the field was last stamped from them (38h-15): interleaved disc (x, y, r, opacity) and rim (fingering, count, phase, film) pairs. */
+export type AirGeo = { readonly data: GPUBuffer };
 
 /**
  * The splat's pipeline, apart from the class so `WebGPUAir.prepare` builds
@@ -112,6 +112,8 @@ export class WebGPUAir {
   private readonly fields: [GPUTexture, GPUTexture];
   /** The bubbles as the field was last stamped from them, for the plate. */
   readonly geo: AirGeo;
+  private readonly geoStaging: GPUBuffer;
+  private readonly geoCpu: Float32Array;
   private which = 0;
   private live = 0;
   private clearLeft = 0;
@@ -154,11 +156,18 @@ export class WebGPUAir {
       handed over since may have lost a bubble and moved every index after it.
     */
     if (capacity > AIR_LOOK_SPAN) throw new Error(`WebGPUAir: room for ${capacity} bubbles, and the field's index holds ${AIR_LOOK_SPAN}`);
-    const geo = (label: string) => this.disposer.track(device.createBuffer({
-      label, size: Math.max(1, capacity) * STRIDE,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    const cap = Math.max(1, capacity);
+    this.geoCpu = new Float32Array(cap * 8);
+    this.geoStaging = this.disposer.track(device.createBuffer({
+      label: 'air geo staging', size: cap * 2 * STRIDE,
+      usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
     }));
-    this.geo = { discs: geo('air discs stamped'), rims: geo('air rims stamped') };
+    this.geo = {
+      data: this.disposer.track(device.createBuffer({
+        label: 'air geo stamped', size: cap * 2 * STRIDE,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      })),
+    };
     this.uniform = this.disposer.track(device.createBuffer({
       label: 'air uniforms',
       size: 16,
@@ -209,6 +218,14 @@ export class WebGPUAir {
       // Round when nobody says otherwise.
       const f = finger && finger.length >= this.live * 4 ? finger : this.emptyFingers;
       this.device.queue.writeBuffer(this.fingers, 0, f, 0, this.live * 4);
+      for (let i = 0; i < this.live; i++) {
+        const dst = i * 8, src = i * 4;
+        this.geoCpu[dst] = packed[src]; this.geoCpu[dst + 1] = packed[src + 1];
+        this.geoCpu[dst + 2] = packed[src + 2]; this.geoCpu[dst + 3] = packed[src + 3];
+        this.geoCpu[dst + 4] = f[src]; this.geoCpu[dst + 5] = f[src + 1];
+        this.geoCpu[dst + 6] = f[src + 2]; this.geoCpu[dst + 7] = f[src + 3];
+      }
+      this.device.queue.writeBuffer(this.geoStaging, 0, this.geoCpu, 0, this.live * 8);
     }
     if (this.any) this.clearLeft = 2;
     this.uniformU32[0] = this.live;
@@ -264,8 +281,7 @@ export class WebGPUAir {
     // there is last frame's air, which is what the push differences against.
     this.which = 1 - this.which;
     if (this.live > 0) {
-      enc.copyBufferToBuffer(this.buffer, 0, this.geo.discs, 0, this.live * STRIDE);
-      enc.copyBufferToBuffer(this.fingers, 0, this.geo.rims, 0, this.live * STRIDE);
+      enc.copyBufferToBuffer(this.geoStaging, 0, this.geo.data, 0, this.live * 2 * STRIDE);
     }
     const pass = enc.beginRenderPass({
       label: 'air splat',

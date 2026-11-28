@@ -205,10 +205,8 @@ export class WebGPUFluid extends FluidCover {
       // built behind the show; waited for at the open, `npm run startup`
       // fails it as asked for by none.
       ['phaseCarry', [R32], false],
-      // The ferrofluid and the mix carried onto a new grid (takeOver, PLAN
-      // 9w): only when the governor moves the grid, a few seconds into a
-      // show at the earliest, so built behind it.
-      ['carryArea', [R32, RGBA32], false],
+      // Fields carried across a grid change (takeOver, PLAN 9w, 9z): built behind the show.
+      ['carryArea', [R32, RGBA32, VEL], false],
       // The clear film (§20b), if a look lays one (Opening.film).
       ['filmAdvect', [RGBA32], open.film],
       ['filmMu', [R32], open.film],

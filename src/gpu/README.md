@@ -21,7 +21,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 ## Files
 
 - `beadMask.ts`: the beads' mask drawn on the GPU from the list (14ab-6), and `rings`, that list's buffers for the plate to read the rings at the screen's resolution (PLAN 38h-17; null for drops or once a picture stands in).
-- `air.ts`: bubbles as a field the solver carries, and `geo` (type `AirGeo`), the list as the field was last stamped from it, which the plate draws each bubble's outline from (PLAN 38h-15; the solver's `fields.airGeo`, the plate's `draw` fields).
+- `air.ts`: bubbles as a field the solver carries, and `geo` (type `AirGeo`, `{ data: GPUBuffer }`), the interleaved discs and rims as the field was last stamped from it, which the plate draws each bubble's outline from (PLAN 38h-15, freed slot 21 for PLAN 47z-1b; the solver's `fields.airGeo`, the plate's `draw` fields).
 - `camera.ts`: refraction, depth of field, bloom, grain.
 - `device.ts`: `requestGpu`, `requestGpuEarly`, `classifyAdapter`.
 - `displayLean.ts`: the plate's display compiled for the opening look (PLAN 14v-12): `leanDisplayWgsl` (each optional effect's uniform test the mask leaves out written as `false`, so the compiler drops its branch; `leanDisplayWgslCounted` says how many places, for `npm run leandisplay`), `displayMayMask` (the effects a look's settings and cords can reach), `displayNeeds` (the effects a draw's uniform bytes turn on), `displayGateTests`, `leanCovers`, `WHOLE_DISPLAY`. `plate.ts` draws lean while it covers the draw and whole otherwise (`setLeanDisplay`, `lastDisplayName` for a harness).

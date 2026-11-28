@@ -112,3 +112,122 @@ fn crispInterface(p: vec2f, px: f32) -> vec2f {
   return p + (g / gl) * eps * (ut - u) * clamp(U.crispEdges, 0.0, 1.0) * real;
 }
 `;
+
+/**
+ * Per-pixel side-by-side light averaging for Oil Bodies (PLAN 47z-1b):
+ * splits the whole dye into oil (`oilDyeBuf`) and water (`whole - oil`) in
+ * the pixel's column at `c = oilFrac`, decodes each liquid independently at
+ * the pixel's `gapScale` / `filmWater`, and averages their light rather than
+ * summing their absorbances across the grid-broadened interface.
+ */
+export const OIL_DECODE_WGSL = /* wgsl */ `
+struct OilSample {
+  whole: vec4f,
+  oil: vec4f,
+  c: f32,
+};
+
+struct BodyDecode {
+  lt: vec3f,
+  through: vec3f,
+  alpha: f32,
+};
+
+fn dyeTexelVal(t: texture_2d<f32>, p: vec2i, n: u32) -> vec4f {
+  let c = clamp(p, vec2i(0), vec2i(i32(n) - 1));
+  let v = textureLoad(t, c, 0);
+  return v * v * DENSITY_SCALE;
+}
+
+fn oilBufTexelVal(p: vec2i, off: u32, n: u32) -> array<vec4f, 2> {
+  let c = clamp(p, vec2i(0), vec2i(i32(n) - 1));
+  let k = off + 2u * (u32(c.y) * n + u32(c.x));
+  let raw = unpack4x8unorm(oilDyeBuf[k]);
+  let f = unpack2x16unorm(oilDyeBuf[k + 1u]).x;
+  return array<vec4f, 2>(raw * raw * DENSITY_SCALE, vec4f(clamp(f, 0.0, 1.0), 0.0, 0.0, 0.0));
+}
+
+fn sampleBodiesBilin(t: texture_2d<f32>, fuv: vec2f, off: u32, n: u32) -> OilSample {
+  let q = fuv * f32(n) - 0.5;
+  let i = vec2i(floor(q));
+  let f = q - floor(q);
+  let w00 = dyeTexelVal(t, i, n);
+  let w10 = dyeTexelVal(t, i + vec2i(1, 0), n);
+  let w01 = dyeTexelVal(t, i + vec2i(0, 1), n);
+  let w11 = dyeTexelVal(t, i + vec2i(1, 1), n);
+  let o00 = oilBufTexelVal(i, off, n);
+  let o10 = oilBufTexelVal(i + vec2i(1, 0), off, n);
+  let o01 = oilBufTexelVal(i + vec2i(0, 1), off, n);
+  let o11 = oilBufTexelVal(i + vec2i(1, 1), off, n);
+  let k00 = (1.0 - f.x) * (1.0 - f.y);
+  let k10 = f.x * (1.0 - f.y);
+  let k01 = (1.0 - f.x) * f.y;
+  let k11 = f.x * f.y;
+  let whole = w00 * k00 + w10 * k10 + w01 * k01 + w11 * k11;
+  let oil = min(o00[0], w00) * k00 + min(o10[0], w10) * k10 + min(o01[0], w01) * k01 + min(o11[0], w11) * k11;
+  let c = o00[1].x * k00 + o10[1].x * k10 + o01[1].x * k01 + o11[1].x * k11;
+  return OilSample(whole, min(oil, whole), c);
+}
+
+fn decodeBodyLiquid(d: vec4f) -> BodyDecode {
+  if (d.a < 0.001 / DENSITY_SCALE) { return BodyDecode(vec3f(0.0), vec3f(1.0), 0.0); }
+  let norm = 1.0 / d.a;
+  let unit = exp(-d.rgb * norm);
+  let lt = lightThrough(unit, d.a);
+  let darkness = 1.0 - max(lt.r, max(lt.g, lt.b));
+  let exposed = max(0.0, d.a - U.filmLevel) * U.filmGain;
+  let m = clamp(U.macroOn, 0.0, 1.0);
+  let body = clamp(U.colourBody, 0.0, 1.0);
+  let depth = mix(mix(d.a * 2.8, exposed, U.exposure), exposed, m) * gapScale * (1.0 + 3.0 * body);
+  var through = vec3f(1.0);
+  if (U.lampGround > 0.001) { through = lampThrough(unit, depth); }
+  let thickness = mix(mix(d.a * 2.8, exposed, U.exposure), exposed, m) * (1.0 + darkness * 1.7) * gapScale * (1.0 + 3.0 * body);
+  let alpha = min(mix(0.95, 0.995, m), 1.0 - exp(-thickness));
+  var ltBody = lt;
+  if (body > 0.001) {
+    let l = dot(lt, vec3f(0.299, 0.587, 0.114));
+    ltBody = clamp(vec3f(l) + (lt - vec3f(l)) * (1.0 + 0.8 * body), vec3f(0.0), vec3f(1.0));
+  }
+  return BodyDecode(ltBody, through, alpha);
+}
+
+fn decodeFluidBodies(t: texture_2d<f32>, fuv: vec2f, dof: f32, layer: i32, extra: vec4f) -> vec4f {
+  let off = oilDyeBuf[u32(layer) * 2u];
+  let n = oilDyeBuf[u32(layer) * 2u + 1u];
+  var s: OilSample;
+  if (dof < 0.02) {
+    s = sampleBodiesBilin(t, fuv, off, n);
+  } else {
+    let r = dof * 0.022 / (1.5 * U.camZoom);
+    let s0 = sampleBodiesBilin(t, fuv, off, n);
+    let s1 = sampleBodiesBilin(t, fuv + vec2f(r, 0.0), off, n);
+    let s2 = sampleBodiesBilin(t, fuv - vec2f(r, 0.0), off, n);
+    let s3 = sampleBodiesBilin(t, fuv + vec2f(0.0, r), off, n);
+    let s4 = sampleBodiesBilin(t, fuv - vec2f(0.0, r), off, n);
+    s = OilSample(
+      (s0.whole + s1.whole + s2.whole + s3.whole + s4.whole) * 0.2,
+      (s0.oil + s1.oil + s2.oil + s3.oil + s4.oil) * 0.2,
+      (s0.c + s1.c + s2.c + s3.c + s4.c) * 0.2,
+    );
+  }
+  let whole = s.whole + extra;
+  let oil = min(s.oil, whole);
+  let c = clamp(s.c, 0.0, 1.0);
+  if (c <= 0.001) {
+    let w = decodeBodyLiquid(whole);
+    dyeThrough = w.through;
+    return vec4f(w.lt, w.alpha);
+  }
+  if (c >= 0.999) {
+    let o = decodeBodyLiquid(whole);
+    dyeThrough = o.through;
+    return vec4f(o.lt, o.alpha);
+  }
+  let oOut = decodeBodyLiquid(oil / c);
+  let wOut = decodeBodyLiquid(max(whole - oil, vec4f(0.0)) / (1.0 - c));
+  dyeThrough = mixLight(wOut.through, oOut.through, c);
+  let aOut = c * oOut.alpha + (1.0 - c) * wOut.alpha;
+  let lit = c * oOut.lt * oOut.alpha + (1.0 - c) * wOut.lt * wOut.alpha;
+  return vec4f(select(vec3f(0.0), lit / max(aOut, 1e-4), aOut > 1e-4), aOut);
+}
+`;

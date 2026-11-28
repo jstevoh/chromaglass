@@ -1162,8 +1162,11 @@ export class FluidInputs extends FluidPasses {
     const carry: FieldCarry = {
       n: this.N,
       device: this.device,
+      dye: copy(this.dye, true),
+      vel: copy(this.vel, true),
       phase: copy(this.phase, this.phaseLive),
       mix: copy(this.mix, this.mixLive),
+      oilDye: copy(this.oilDye, !!this.oilDye && !this.oilDyeStale && (this.bodiesWanted || this.mixLive)),
       rxn: copy(this.rxn, this.rxnLive),
       lies: copy(this.lies, this.liesLive),
       surfaceHeight: copyTex(this.surfaceHeight?.live ? this.surfaceHeight.field : null),
@@ -1199,8 +1202,19 @@ export class FluidInputs extends FluidPasses {
   takeOver(c: SolverCarry): boolean {
     const carry = c as FieldCarry;
     if (carry.device !== this.device || this.disposed) return false;
+    this.simF[0] = this.N; this.simF[1] = this.L;
+    this.device.queue.writeBuffer(this.sim, 0, this.simData);
     const enc = this.device.createCommandEncoder({ label: 'take over' });
     const pass = enc.beginComputePass({ label: 'take over' });
+    if (carry.dye) {
+      this.run(pass, 'carryArea', this.dye.write, [carry.dye], this.arg('carry dye', [carry.n, this.N, 0, 0]));
+      this.dye.swap();
+    }
+    if (carry.vel) {
+      this.run(pass, 'carryArea', this.vel.write, [carry.vel], this.arg('carry vel', [carry.n, this.N, 0, 0]));
+      this.vel.swap();
+      this.project(pass);
+    }
     if (carry.phase) {
       this.run(pass, 'carryArea', this.phase.write, [carry.phase], this.arg('carry phase', [carry.n, this.N, 0, 0]));
       this.phase.swap();
@@ -1214,7 +1228,21 @@ export class FluidInputs extends FluidPasses {
       this.mixLive = true;
       this.oilPoured = carry.oilPoured;
       this.oilSigma = carry.oilSigma;
-      this.oilDyeStale = true;
+      if (carry.oilDye) {
+        const od = this.ensureOilDye();
+        this.run(pass, 'carryArea', od.write, [carry.oilDye], this.arg('carry oil dye', [carry.n, this.N, 0, 0]));
+        od.swap();
+        this.oilDyeStale = false;
+        this.bodiesWanted = true;
+      } else {
+        this.oilDyeStale = true;
+      }
+    } else if (carry.oilDye) {
+      const od = this.ensureOilDye();
+      this.run(pass, 'carryArea', od.write, [carry.oilDye], this.arg('carry oil dye', [carry.n, this.N, 0, 0]));
+      od.swap();
+      this.oilDyeStale = false;
+      this.bodiesWanted = true;
     }
     let carriedSurf: GPUTexture | null = null;
     if (carry.surfaceHeight) {
@@ -1280,6 +1308,7 @@ export class FluidInputs extends FluidPasses {
     };
     if (carry.rxn && same(carry.rxn, this.ensureRxn())) this.rxnLive = true;
     if (carry.lies && same(carry.lies, this.ensureLies())) this.liesLive = true;
+    if (carry.vel) enc.copyTextureToTexture({ texture: this.vel.read }, { texture: this.velForced }, [this.N, this.N]);
     this.submit(enc);
     carriedSurf?.destroy();
     return true;

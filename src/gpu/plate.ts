@@ -228,6 +228,10 @@ export class WebGPUPlate {
   private readonly blankBeads: GPUBuffer;
   /** The same, for the species field (rgba32float). */
   private readonly blankSpecies: GPUTexture;
+  private oilBuf: GPUBuffer | null = null;
+  private oilBufBytes = 0;
+  private oilKey = '';
+  private readonly oilPackArgs: [GPUBuffer, GPUBuffer];
   /** The lamp's light traced through the liquid to the wall (PLAN 31s-2), or null when this frame traced none. */
   private readonly caustics: PlateCaustics;
   private causticLight: GPUBuffer | null = null;
@@ -263,7 +267,8 @@ export class WebGPUPlate {
           cache.renderPrep(displayName(format, false), displayRecipe(device, format, false), true),
         ]),
       cache.computePrep('packVel', PACK_KERNELS.packVel),
-      cache.computePrep('packDyeBodies', PACK_KERNELS.packDyeBodies, !open.oilBodies),
+      cache.computePrep('packOil', PACK_KERNELS.packOil, !open.oilBodies),
+      cache.computePrep('packDyeBodies', PACK_KERNELS.packDyeBodies, true),
       ...PlateCaustics.prepare(cache, device),
       cache.renderPrep('derive', deriveRecipe(device)),
       ...BeadMask.prepare(cache),
@@ -309,6 +314,11 @@ export class WebGPUPlate {
       label: 'pack args', size: PACK_ARGS,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     }));
+    const mkOilArgs = (i: number) => this.disposer.track(device.createBuffer({
+      label: `pack oil args ${i}`, size: 16,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    }));
+    this.oilPackArgs = [mkOilArgs(0), mkOilArgs(1)];
     this.blank = this.disposer.track(device.createTexture({
       label: 'blank', size: [1, 1], format: 'rgba8unorm',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
@@ -503,13 +513,42 @@ export class WebGPUPlate {
       const { oilDye, mix } = f;
       return !!oilDye && !!mix && oilDye.width === f.dye.width && mix.width === f.dye.width;
     });
+    const oilOffs = [0, 0], oilNs = [0, 0];
+    let oilWords = 4;
+    for (let i = 0; i < fields.length; i++) {
+      if (!bodiesOf[i]) continue;
+      oilOffs[i] = oilWords;
+      oilNs[i] = fields[i].dye.width;
+      oilWords += 2 * oilNs[i] * oilNs[i];
+    }
+    const oilKey = bodiesOf.some(Boolean) ? `${oilOffs[0]}:${oilNs[0]}:${oilOffs[1]}:${oilNs[1]}` : '';
+    const oilBytes = oilWords * 4;
+    if (oilKey && (!this.oilBuf || this.oilBufBytes < oilBytes)) {
+      if (this.oilBuf) this.disposer.release(this.oilBuf);
+      this.oilBuf = this.disposer.track(this.device.createBuffer({
+        label: 'oil dye pack', size: Math.max(16, oilBytes),
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      }));
+      this.oilBufBytes = Math.max(16, oilBytes);
+      this.oilKey = '';
+    }
+    const oilLayoutDirty = !!oilKey && oilKey !== this.oilKey;
+    if (oilLayoutDirty) {
+      this.device.queue.writeBuffer(this.oilBuf!, 0, new Uint32Array([oilOffs[0], oilNs[0], oilOffs[1], oilNs[1]]));
+      this.oilKey = oilKey;
+    }
     const packLayer = fields.map((f, i) => {
       const prev = this.packedState[i];
       if (f.writes === undefined || !prev) return true;
-      if (prev.writes !== f.writes || prev.bodies !== bodiesOf[i]) return true;
+      if (prev.writes !== f.writes || (bodiesOf[i] && oilLayoutDirty)) return true;
       return i === 0 && (dropWanted || prev.drop);
     });
     if (dropWanted || packLayer.some(Boolean)) {
+      for (let i = 0; i < fields.length; i++) {
+        if (packLayer[i] && bodiesOf[i]) {
+          this.device.queue.writeBuffer(this.oilPackArgs[i], 0, new Uint32Array([oilNs[i], oilOffs[i], 0, 0]));
+        }
+      }
       const packPass = encoder.beginComputePass({ label: 'pack' });
       const groups = Math.ceil(grid / 8);
       const height = dropWanted ? this.drop.solve(packPass, leadView!, this.pack.get('macroRelief')[0], this.pack.get('magnets'), fields[0].coverMetres) : null;
@@ -522,23 +561,22 @@ export class WebGPUPlate {
           packPass.dispatchWorkgroups(groups, groups);
         }
         /*
-          Where the oil carries its own colour (Oil Bodies), a cell part oil
-          and part water lets through the two liquids' light side by side, not
-          one through the other (packDyeBodies, PLAN 47z-1). The oil's share
-          and the mix are on the dye's grid (bodyPartition reads all three).
+          Where Oil Bodies keeps oil and water separate, packOil stores each
+          cell's oil dye and oil share for display to decode side-by-side at
+          the pixel's own gap (PLAN 47z-1b). Whole dye remains in layers[i].dye.
         */
         const bodies = bodiesOf[i];
-        let pipeDye: GPUComputePipeline | null = null;
-        if (bodies) {
-          pipeDye = this.pipelines.computePipeline('packDyeBodies', PACK_KERNELS.packDyeBodies);
-          if (pipeDye) {
-            packPass.setPipeline(pipeDye);
-            packPass.setBindGroup(0, groupOf(this.device, pipeDye, [this.packArgs, fields[i].dye, fields[i].oilDye!, fields[i].mix!, this.layers[i].dye]));
+        let pipeOil: GPUComputePipeline | null = null;
+        if (bodies && this.oilBuf) {
+          pipeOil = this.pipelines.computePipeline('packOil', PACK_KERNELS.packOil);
+          if (pipeOil) {
+            packPass.setPipeline(pipeOil);
+            packPass.setBindGroup(0, groupOf(this.device, pipeOil, [this.oilPackArgs[i], fields[i].dye, fields[i].oilDye!, fields[i].mix!, this.oilBuf]));
             packPass.dispatchWorkgroups(groups, groups);
           }
         }
         const writes = fields[i].writes;
-        this.packedState[i] = writes !== undefined && pipeVel && (!bodies || pipeDye)
+        this.packedState[i] = writes !== undefined && pipeVel && (!bodies || pipeOil)
           ? { writes, bodies, drop: i === 0 && !!height }
           : null;
       }
@@ -735,6 +773,7 @@ export class WebGPUPlate {
     });
     pass.setPipeline(display);
     const rings = this.beads.rings;
+    const hasOil = !!this.oilBuf && fields.some((f) => !!f.oilDye && !!f.mix && f.oilDye.width === f.dye.width && f.mix.width === f.dye.width);
     pass.setBindGroup(0, groupOf(this.device, display, [
       uniforms, this.sampler,
       one.dye, two.dye, one.derived, two.derived, one.vel, two.vel,
@@ -742,8 +781,8 @@ export class WebGPUPlate {
       this.source('film'), this.source('mark'), this.source('beads'),
       parts(0), parts(1), air(0), air(1), view(0),
       soap ?? this.blankStore, (soap && this.soapLut) || this.blankSoapLut,
-      // The lead plate's bubbles as its air was stamped (38h-15); the back plate carries none.
-      fields[0].airGeo?.discs ?? this.blankList, fields[0].airGeo?.rims ?? this.blankList,
+      // The lead plate's bubbles as its air was stamped (38h-15); per-pixel oil dye (47z-1b) in slot 21.
+      fields[0].airGeo?.data ?? this.blankList, hasOil ? this.oilBuf! : this.blankStore,
       // The rings' list the beads' mask was drawn from, read at the screen's resolution (38h-17).
       rings?.args ?? this.blankBeadArgs, rings?.beads ?? this.blankBeads, rings?.tiles ?? this.blankList,
       // The shaken dish's standing waves (48f), the front plate's alone.
