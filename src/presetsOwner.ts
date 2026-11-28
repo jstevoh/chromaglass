@@ -28,7 +28,9 @@ import { stirCordDepth, withMusicStir } from './lib/stir';
 /*
   Classical Vibe: the photograph style (a lens, its focus and bloom) on a thin
   water at a slow pace, two paper colours, sienna and ice, for the light the
-  dish is shot through. Kept as saved, but for its Lamp Ground (below).
+  dish is shot through. Kept as saved, but for its Lamp Ground and, at the
+  owner's ask for more dye and complexity (2026-11-27), its stirs, pours and
+  form dials (below).
 */
 export const CLASSICAL_VIBE: Preset = {
   id: 'classical-vibe',
@@ -48,7 +50,9 @@ export const CLASSICAL_VIBE: Preset = {
     airVelocity: 0.4926,
     vibrationFrequency: 0.2296,
     blendMode: 'lighter',
-    gooeyEffect: 0.6026,
+    // 0.6 → 0.45, and Soft Focus 0.35 → 0.2 below: less melting and less blur,
+    // so the smaller forms the owner asked for stay forms (2026-11-27).
+    gooeyEffect: 0.45,
     rotationSpeed: 0.1931,
     centerGravity: 0.4207,
     ledMode: 'fire',
@@ -61,12 +65,30 @@ export const CLASSICAL_VIBE: Preset = {
     advection: 0.7355,
     damping: 0.9419,
     heatDecay: 0.9667,
-    cometSpeed: 1.5,
+    // The comet's pull, saved at 1.5 and driven by the bass, is gone, and so
+    // are its two cords (bass on Comet Speed, tonal mid on Comet Angle). What
+    // was reported (2026-11-27): once the real dye mixing landed the look was
+    // a bare sienna-and-ice paper with a faint haze, colourfulness 57, no dye
+    // to speak of at 10, 30 or 60 s; the owner asked for a little more dye
+    // and complexity. What was measured, each stir alone on the look's own
+    // pours: with nothing stirring the plate held its dye at a mean of 0.59;
+    // the comet at half its saved speed took it to 0.05 in 10 s. On a thin gap
+    // whose rim is open, the comet is a through-flow: it carries the dye out
+    // of the dish faster than any pour lays it, and the regulator cannot put
+    // back what has left (PLAN 18a-25). The swells are the motion this look
+    // is about, so it keeps those and loses the pull.
+    cometSpeed: 0,
     cometAngle: 90,
     surge: 0.6,
     automateRate: 0.1056,
-    turbulenceScale: 0.5035,
-    turbulenceDetail: 2,
+    // Turbulence 0.5 → 0.1, Detail 2 → 3, for the same leak: the curl noise
+    // was the second drain (0.59 → 0.17 in 30 s at 0.25, 0.49 at 0.1), its
+    // lowest octave dish-sized and not held closed at the rim. A tenth of it
+    // still folds the pours; the third octave gives the smaller curls the
+    // owner asked for. The music's stir cord on it is re-sized from these by
+    // houseRules, as on every look.
+    turbulenceScale: 0.1,
+    turbulenceDetail: 3,
     boundaryContrast: 0.295,
     saturationBoost: 1.382,
     // Saved at 1, and it never drew: a photograph has its own ground, the lit
@@ -78,10 +100,12 @@ export const CLASSICAL_VIBE: Preset = {
     // byte for byte, and the desk's lamp dial no longer reads 1 on a look it
     // cannot reach.
     lampGround: 0,
-    dyeBudget: 0.5884,
+    // 0.59 → 0.7: a little more dye, the owner's ask (2026-11-27).
+    dyeBudget: 0.7,
     edgeRelief: 0.3335,
     plateRock: 0.8054,
-    layerScaleVariety: 0.7438,
+    // 0.74 → 0.9: a wider spread of form sizes, the owner's "complexity".
+    layerScaleVariety: 0.9,
     hueJourney: 0,
     beatSqueeze: 0.5293,
     backgroundLoop: 0.6085,
@@ -107,37 +131,54 @@ export const CLASSICAL_VIBE: Preset = {
     moireFlip: false,
     lampWarmth: 0.097,
     beads: 0,
-    postBlurRadius: 0.3546,
+    postBlurRadius: 0.2,
     macroChase: 0.53,
     macroHold: 9.106,
     macroSync: 0.5725,
     macroCellScale: 0.8853,
     macroDepth: 0.2751,
     macroRelief: 0.4586,
+    // Sound Drive 0.6 (unset, the default) → 0.2, with every pour's volume
+    // tripled below so the dye the music lays is what it was. The drive scales
+    // the music's stir (Turbulence's cord, the eddies), and that stir alone,
+    // at the old drive, drained the plate to 0.06 by 60 s even with the comet
+    // gone and Turbulence at 0.1. At 0.2 with the pours tripled: a mean of
+    // 0.32 at 30 s and 0.17 at 60 s, against 0.11 and 0.06; colourfulness 72
+    // and 62, against 57. Lowering the drive alone starves the pours, which
+    // it masters, so they carry the difference. The swells still breathe
+    // with the energy; they are only stirred less.
+    audioImpact: 0.2,
+    // The pours (owner's ask, 2026-11-27): smaller and more of them, so more
+    // and smaller forms: the pulse 0.12 → 0.08 across, the kick's bloom 8
+    // drops at 0.3 → 14 at 0.2, the stream and swell 0.2 → 0.14; each volume
+    // ×3 for the Sound Drive above (0.6 → 0.2) and a little over for the dye.
     sceneMappings: [
-      { source: 'bands', feature: 'bass', setting: 'cometSpeed', depth: 0.4 },
-      { source: 'bands', feature: 'tonalMid', setting: 'cometAngle', depth: 0.125 },
+      // In the comet's place, the bass on Buoyancy (0.12, the depth other
+      // looks give it): the warm water lifts on the low end, a roll that turns
+      // inside the dish and sends nothing over the rim, so the look keeps a
+      // second fast patch beside the snare's (`npm run soundpatch`, 28i-3b).
+      { source: 'bands', feature: 'bass', setting: 'buoyancy', depth: 0.12 },
       { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
       { source: 'sound', feature: 'mid', setting: 'turbulenceScale', depth: 0.33 },
       { source: 'sound', feature: 'energy', setting: 'areaPour', depth: 0.5, mode: 'follow', masters: [
         'audioImpact',
-      ], role: 'pulse', volume: 0.6, size: 0.12 },
+      ], role: 'pulse', volume: 2.4, size: 0.08 },
       { source: 'sound', feature: 'energy', setting: 'areaHeat', depth: 0.05, mode: 'follow', masters: [
         'audioImpact',
       ], role: 'heat', size: 0.1 },
       { source: 'sound', feature: 'energy', setting: 'areaPress', depth: 0.5, mode: 'follow', masters: [
         'audioImpact',
       ], role: 'press', gain: 1.176, size: 0.42 },
-      { source: 'hits', feature: 'kickHit', setting: 'areaPour', depth: 0.5, mode: 'gate', threshold: 0.3, attack: 0, release: 0.1, volume: 3.2, drops: 8, size: 0.3, bottle: 2, masters: [
+      { source: 'hits', feature: 'kickHit', setting: 'areaPour', depth: 0.5, mode: 'gate', threshold: 0.3, attack: 0, release: 0.1, volume: 10.8, drops: 14, size: 0.2, bottle: 2, masters: [
         'audioImpact',
         'kickBloom',
       ], role: 'bloom' },
       { source: 'sound', feature: 'mid', setting: 'areaPour', depth: 0.5, mode: 'follow', masters: [
         'audioImpact',
-      ], role: 'stream', volume: 1.44, gain: 1.429, size: 0.2, wander: 0.6, bottle: 1 },
+      ], role: 'stream', volume: 5.1, gain: 1.429, size: 0.14, wander: 0.6, bottle: 1 },
       { source: 'sound', feature: 'energy', setting: 'areaPour', depth: 0.5, mode: 'follow', masters: [
         'audioImpact',
-      ], role: 'swell', volume: 1.44, size: 0.2, wander: 0.56, bottle: 3 },
+      ], role: 'swell', volume: 5.1, size: 0.14, wander: 0.56, bottle: 3 },
       { source: 'sound', feature: 'timbre', setting: 'areaHue', depth: 0.6, mode: 'follow', role: 'bottle', wander: 1 },
     ],
   },
@@ -146,7 +187,8 @@ export const CLASSICAL_VIBE: Preset = {
   Mushy Mushy: thick liquid in two layers with a ferrofluid phase on a
   walking magnet, the chemistry (Liesegang rings, the Turing print, a little
   BZ) printing through it, and a long hue journey. Kept as saved but for
-  Turbulence (below) and the name, capitalised as the other looks' are.
+  Turbulence and Phase Scale (below) and the name, capitalised as the other
+  looks' are.
 */
 export const MUSHY_MUSHY: Preset = {
   id: 'mushy-mushy',
@@ -162,7 +204,17 @@ export const MUSHY_MUSHY: Preset = {
     platePressure: 0.7712,
     gapThickness: 0.3953,
     phaseAmount: 0.6751,
-    phaseScale: 0.357,
+    // 0.15, saved at 0.357 (PLAN 28i-8). After the real dye mixing landed the
+    // second phase gathered into one hand-sized body, and the ferrofluid in
+    // it, dark by its nature, read as a black hole in the plate: the lab
+    // render (lookstills-entry, its synth band) measured 55% of the frame
+    // black at 10 s and 45% at 60 s. Phase Scale runs the phase from beads to
+    // hands by setting its interfacial tension and the magnet's falloff
+    // together; a lower tension cannot hold one big round domain, so at 0.15
+    // as much of the same phase breaks into a labyrinth of cells and fingers
+    // with the dye lying between them, the magnet still walking under it.
+    // The liquids, the magnet and the chemistry are unchanged.
+    phaseScale: 0.15,
     phaseSharp: 0.3486,
     magnetHeight: 0.2622,
     magnetStrength: 0.7733,

@@ -593,7 +593,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 | 25 | Areas of interest: several places on one plate | [`25-areas.md`](docs/plan/25-areas.md) |  | 13 |
 | 26 | A reaction that prints: Turing stripes in black and white (proposed 2026-10-05) | [`26-turing-print.md`](docs/plan/26-turing-print.md) |  | 8 |
 | 27 | Every control does something you can see | [`27-controls-you-see.md`](docs/plan/27-controls-you-see.md) |  | 33 |
-| 28 | Preset palettes: the looks refreshed for what the plate does now (2026-10-10) | [`28-preset-palettes.md`](docs/plan/28-preset-palettes.md) | 28a–28h | 20 |
+| 28 | Preset palettes: the looks refreshed for what the plate does now (2026-10-10); ~~28i-8~~ the six looks the real dye mixing left bad, re-tuned on their own dials, shipped (`npm run soundpatch`, `samelook`) | [`28-preset-palettes.md`](docs/plan/28-preset-palettes.md) | 28a–28h | 20 |
 |  | (continued) | [`28-preset-palettes-2.md`](docs/plan/28-preset-palettes-2.md) | 28i–28l | 21 |
 | 29 | The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11) | [`29-ferro-drop.md`](docs/plan/29-ferro-drop.md) |  | 15 |
 | 30 | Shaping the sound and the MIDI: what Imaginando's VS rig showed (2026-10-11) | [`30-sound-and-midi.md`](docs/plan/30-sound-and-midi.md) |  | 12 |
