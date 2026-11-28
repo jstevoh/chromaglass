@@ -165,6 +165,7 @@
     "qa:gpu": "QA_GPU=mid npm run qa",
     "bench": "npm run build && node scripts/bench.mjs",
     "stutter": "npm run build && node scripts/stutter.mjs",
+    "smooth": "npm run build && esbuild scripts/smooth.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/smooth.mjs && node node_modules/.cache/smooth.mjs",
     "map": "node --experimental-strip-types scripts/map.mjs",
     "qr": "node --experimental-strip-types scripts/qr.mjs",
     "score": "esbuild scripts/score.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/score.mjs && node node_modules/.cache/score.mjs",
