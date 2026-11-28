@@ -31,6 +31,7 @@
 
 import { PLATE_STRUCT } from './plateFields';
 import { FINISH_WGSL } from './plate';
+import { LIGHT_WGSL } from './plateLight';
 import { SOFTBOX_GAIN, SOFTBOX_HALF, SOFTBOX_TILT } from './closeupDepth';
 import {
   FLAKE_ASPECT, FLAKE_CRINKLE, FLAKE_DENSITY_EXCESS, FLAKE_RADIUS, FLAKE_REFLECT, GAP_METRES, IRIS_BLADES, IRIS_TURN,
@@ -339,6 +340,7 @@ const PI = 3.14159265359;
 @group(0) @binding(3) var glints: texture_2d<f32>;
 @group(0) @binding(4) var aux: texture_2d<f32>;
 @group(0) @binding(5) var markTex: texture_2d<f32>;
+${LIGHT_WGSL}
 ${FINISH_WGSL}
 struct VsOut {
   @builtin(position) pos: vec4f,

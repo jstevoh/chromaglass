@@ -104,6 +104,15 @@ export interface LiquidVisualizerHandle {
    * Says when the look change should go in, inside the rack.
    */
   rack: (seconds: number, back?: boolean, two?: boolean) => DissolvePlan;
+  /** A deck dissolve's racks over `seconds` to projector `to`, 0 A or 1 B (PLAN 51c-2, stageClocks' rackDeck). */
+  deck: (seconds: number, to: 0 | 1) => void;
+  /**
+   * The back plate keeps what it shows now (the front's solver settings and
+   * dyes, while it follows the front) as a look of its own, `id` and `name`,
+   * so a Go to the dark front leaves the lit back as it is (PLAN 51c-2).
+   * False when it already has one, or a render holds the plates.
+   */
+  pinBack: (id: string, name: string) => boolean;
   /**
    * Send a look to the back plate alone (PLAN.md §16a), or `null` to have it
    * follow the front again. Over `seconds`: its solver settings fade the way

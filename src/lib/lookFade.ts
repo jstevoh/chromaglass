@@ -57,7 +57,7 @@ export const RIG_KEYS: ReadonlySet<keyof VisualizerSettings> = new Set<keyof Vis
   // Keep full (PLAN 18a-22): the operator's hand on the dropper, left running, not a look's.
   'keepFull',
   // The projector bank (PLAN 51a): the operator's hands on the lamps, shutters and crossfade.
-  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross', 'projFocusA', 'projFocusB', 'projRack',
+  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross', 'projFocusA', 'projFocusB', 'projRack', 'projDeck',
   'filmMix', 'filmKey',
   // How the video is framed for this wall (PLAN 14ag): the operator's, as the logo's place is.
   'filmZoom', 'filmX', 'filmY',
@@ -232,6 +232,8 @@ export class LaterWrites {
   mark(keys: Iterable<string>, now: number): void { for (const k of keys) this.at.set(k, now); }
   /** The settings written strictly after `since`: a write in the same instant as the press is the press's own. */
   since(since: number): string[] { return [...this.at].filter(([, t]) => t > since).map(([k]) => k); }
+  /** Whether `key` was written strictly after `since`, with nothing made (the deck dissolve's crossfade asks it thirty times a second). */
+  wroteSince(key: string, since: number): boolean { return (this.at.get(key) ?? -Infinity) > since; }
   /** A render runs on a clock of its own, from far ahead (lib/showClock.ts); its stamps are dropped on its way in and out. */
   clear(): void { this.at.clear(); }
 }

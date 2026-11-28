@@ -25,10 +25,10 @@ comments, which moved with it.
 | `useLayerReport` | each layer's fill and colour, for the desk in Preview |
 | `useLookDocument` | the open saved look (`docId`, `docDirty`) and save, overwrite and delete for the desk and phone |
 | `useSetListState` | the set list, the armed look, the Go's fade; publishes them to `setNow.ts` for the assistant, and its fade and cancel |
-| `usePhoneLayout` | phone or desks (the old narrow overlay is unhooked, PLAN 49c); Live or Preview |
+| `usePhoneLayout` | phone or desks (the old narrow overlay and its `overlayUp` were deleted, PLAN 49c-2); Live or Preview |
 | `useWallLook` | Preview's copy for the wall, and Send to wall |
 | `useBlackout` | blackout and the dimmer's fades |
-| `useLookFades` | Go, Go now, the back plate, Revert; sets `setNow.ts`'s Go door for the assistant; with Focus Dissolve up, a Go's look change waits inside the visualizer's `rack` (PLAN 51c) |
+| `useLookFades` | Go, Go now, the back plate, Revert; sets `setNow.ts`'s Go door for the assistant; with Focus Dissolve up, a Go's look change waits inside the visualizer's `rack` (PLAN 51c); with Decks on and two projectors, a Go goes to the dark one, its dish there, the crossfade glided over and the racks from the visualizer's `deck` (`pinBack` keeps a lit back plate's look, PLAN 51c-2) |
 | `useTimecode` | MIDI timecode, for the sequence |
 | `useShowLibrary` | songs' shows, action sets, what a cloud sync reloads; Follow songs for the assistant (`songShowNow.ts`) |
 | `useSetActions` | the set list's own edits and files; sets `editNow.ts`'s door for the owner's assistant (PLAN 44k-16a) |

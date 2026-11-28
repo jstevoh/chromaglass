@@ -22,6 +22,7 @@
 
 import { POST_STRUCT } from './postFields';
 import { FINISH_WGSL } from './plate';
+import { LIGHT_WGSL } from './plateLight';
 
 /** The bindings and helpers both passes share. */
 const HEAD = /* wgsl */ `
@@ -82,7 +83,7 @@ fn fxRand(pixel: vec2u, frame: u32, seed: u32) -> f32 {
 `;
 
 /** The finish: the dimmer, the mark, the dither, onto whatever comes next. */
-export const FINISH_PASS_WGSL = `${HEAD}${FINISH_WGSL}
+export const FINISH_PASS_WGSL = `${HEAD}${LIGHT_WGSL}${FINISH_WGSL}
 @fragment fn fs(in: VsOut) -> @location(0) vec4f {
   // GL counts fragment rows up from the bottom and the dither hashes that
   // coordinate, so a frame drawn either way dithers the same pixels.

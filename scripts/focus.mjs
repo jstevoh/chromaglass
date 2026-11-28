@@ -449,16 +449,23 @@ const boxOf = (k, hb = false, size = S) => { const b = new Float32Array(4); focu
     check(`a dissolve's glow on a ${BIG} frame (a box ${f2(2 * g[0])} by ${f2(2 * g[1])} pixels) drawn at an eighth is the sharp picture through the law's bar within 2 levels where it moves anything, the light within 1%`,
       sc.bigGlow === 8 && errG < 2 && sharpG > 3 * errG && lightG < 0.01, `drew at ${sc.bigGlow}; off the box ${f2(errG)} levels (sharp ${f2(sharpG)}); light ${(100 * lightG).toFixed(3)}%`);
   }
-  // B melted beside a sharp A: A untouched (it is not taken down), B's melt drawn small and boxed.
+  /*
+    B melted beside a sharp A: A untouched (it is not taken down), B's melt
+    drawn small and boxed. With the crossfade at A, B has no light on the
+    wall and since 51c-2 the pass sits out for it (a deck dissolve holds the
+    dark deck melted: gpu/plateUniforms.ts), so that frame draws at full size,
+    A to the byte; the melt drawn at a quarter beside a sharp A is asked of
+    the crossfade's middle, where B is lit.
+  */
   const [bx, by] = boxOf(1, true, BIG);
   const wantB = boxed(shots.bigTwoB, bx, by);
   const errB = edgeAbs(shots.bigTwoBmelt, wantB, shots.bigTwoB, wantB), sharpB = edgeAbs(shots.bigTwoBmelt, shots.bigTwoB, shots.bigTwoB, wantB);
   const keptA = maxDiff(shots.bigTwoAmeltB, shots.bigTwoA);
   let worst = 0;
   for (let k = 0; k < shots.bigTwoMid.length; k++) if (k % 4 !== 3) worst = Math.max(worst, Math.abs(shots.bigTwoMid[k] - disp(0.5 * lin(shots.bigTwoA[k]) + 0.5 * lin(shots.bigTwoBmelt[k]))));
-  check(`two projectors on a ${BIG} frame, B melted beside a sharp A: drawn at a quarter, A stays sharp to the dither, B is its box, and the crossfade's middle is half of each in linear light within 1% of the lamp`,
-    sc.bigTwoAmeltB === 4 && sc.bigTwoBmelt === 4 && keptA <= 1 && errB < 2 && sharpB > 3 * errB && worst <= 2.6,
-    `scales ${sc.bigTwoAmeltB}/${sc.bigTwoBmelt}; A ${keptA} levels from sharp; B off its box ${f2(errB)} (sharp ${f2(sharpB)}); the middle's worst ${f2(worst)} levels`);
+  check(`two projectors on a ${BIG} frame, B melted beside a sharp A: drawn at a quarter at the crossfade's middle and not at all with B dark, A stays sharp to the dither, B is its box, and the crossfade's middle is half of each in linear light within 1% of the lamp`,
+    sc.bigTwoAmeltB === 1 && sc.bigTwoMid === 4 && sc.bigTwoBmelt === 4 && keptA <= 1 && errB < 2 && sharpB > 3 * errB && worst <= 2.6,
+    `scales ${sc.bigTwoAmeltB} (B dark)/${sc.bigTwoMid} (middle)/${sc.bigTwoBmelt}; A ${keptA} levels from sharp; B off its box ${f2(errB)} (sharp ${f2(sharpB)}); the middle's worst ${f2(worst)} levels`);
   // The law's choice of scale, at the sizes that matter (a 1600 frame, the Air's).
   const at = (k, two = false, kb = 0) => { const b = new Float32Array(4); focusBoxPx(b, { projFocusA: k, projFocusB: kb }, two, 1600, 1); return focusScale(b, two); };
   const glowAt = (two) => { const b = new Float32Array(4); focusBoxPx(b, { projRack: 1 }, two, 1600, 1, [1, 1]); return focusScale(b, two); };

@@ -10,10 +10,12 @@ import { kernel } from '../wgsl/fluid';
 import type { GpuStepParams } from '../solverTypes';
 import { stepDisplacement } from '../../lib/detailFlow';
 import { WebGPUSlosh } from '../slosh';
-import { OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
+import { OPEN_RIM } from '../../lib/turntable';
+import { DYE_FLOOR } from '../../lib/dye';
 import { WebGPUParticles } from '../particles';
-import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, oilNuOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIQUID_FALL, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32, VEL, AIR_DISP_LEAST, HOLD_APART_FINE, HOLD_APART_WIDER } from './constants';
+import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, oilNuOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIQUID_FALL, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, thinGapViscosity, R32, RG32, VEL, AIR_DISP_LEAST, HOLD_APART_FINE, HOLD_APART_WIDER } from './constants';
 import { FluidFields } from './fields';
+import type { SlumpPlan } from './slump';
 import { WARM_GROUPS } from '../wgsl/thinWarm';
 import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
 import { HAND_RADIUS, seedBoilSites } from '../lampBoil';
@@ -703,43 +705,45 @@ export class FluidPasses extends FluidFields {
   }
 
   /**
-   * How the dye's slump runs this step (PLAN 18m, wgsl/slump.ts), or null when
-   * it would move nothing a person could see.
-   *
-   * `rate` is g′Δt/(3νΔx²) for one substep, in 1/m³: K Δt/Δx² is it times
-   * η³(1 − η/b)³ and the dye's strength, cell by cell, on the GPU. The
-   * substeps are as many as the deepest layer the plate can hold asks for
-   * (the dye's cap), up to SLUMP_SUBSTEPS. Not the plate's own thickest cell
-   * from the measure: that lands a frame or two late, whenever its readback
-   * does, so the substeps (and the plate) would differ between two renders of
-   * the same seed (`node scripts/render-app.mjs`: 221 of 240 frames differed
-   * from frame 20 when they were planned from it). On a thick liquid nothing moves (the rate goes as 1/ν: in
-   * glycerine a pool takes minutes to spread a millimetre), and the pass is
-   * skipped.
+   * The dye's slump (PLAN 18m, 18m-1a; wgsl/slump.ts), a backward-Euler step
+   * in `plan.substeps` substeps: each works out its faces from the plate as
+   * it is, sweeps the implicit system `plan.sweeps` times, and moves the dye
+   * by the fluxes the sweeps reached. The plan is fluid/slump.ts's.
    */
-  protected slumpPlan(p: GpuStepParams): { rate: number; substeps: number; inertRate: number } | null {
-    const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
-    const nu = thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS);
-    // Stood up by θ (Gravity, 0 flat to 1 upright), only cos θ of g is through the glass.
-    const upright = Math.max(0, Math.min(1, p.plateUpright ?? 0));
-    const gPrime = 9.81 * dyeDensityContrast(p.solutalBuoyancy) * Math.cos(upright * Math.PI / 2);
-    const dx = PLATE_METRES / this.N;
-    const perStep = gPrime * seconds / (3 * nu * dx * dx);
-    if (!(perStep > 0) || !Number.isFinite(perStep)) return null;
-    const eta = DYE_CAP * DYE_LAYER;
-    const b = this.coverGap * GAP_METRES;
-    // η³(1 − η/b)³ rises to its peak at half the gap.
-    const e = Math.min(eta, b / 2);
-    const open = 1 - e / b;
-    const mostVisc = perStep * e * e * e * open * open * open;
-    // The inertial Froude current's maximum speed √(g′e(1 - e/b)) (Huppert and Simpson 1980).
-    const mostInert = FROUDE_FRONT * (seconds / dx) * Math.sqrt(gPrime * e * open);
-    const most = Math.min(mostVisc, mostInert);
-    if (most < 1e-4) return null;
-    const substeps = Math.max(1, Math.min(SLUMP_SUBSTEPS, Math.ceil(most / SLUMP_FACE)));
-    const dtSub = seconds / substeps;
-    const inertRate = FROUDE_FRONT * (dtSub / dx) * Math.sqrt(gPrime);
-    return { rate: perStep / substeps, substeps, inertRate };
+  protected stepSlump(pass: GPUComputePassEncoder, plan: SlumpPlan, oilMix: GPUTexture): void {
+    // A pipeline that failed to build is skipped by a dispatch, and a swap after a
+    // skipped apply would hand the plate the other buffer's stale dye: all three, or no slump.
+    if (!this.pipeline('slumpFaces', R32) || !this.pipeline('slumpSmooth', R32) || !this.pipeline('slumpApply', this.dye.write.format)) return;
+    const { x, faces } = this.ensureSlump();
+    const half = Math.ceil(Math.ceil(this.N / 2) / 8), w = Math.ceil(this.N / 8);
+    const rates = this.arg('slump rate', [plan.visc, DYE_LAYER, GAP_METRES, 1 / -Math.log(DYE_FLOOR), plan.courant, 0, 0, 0]);
+    const red = this.arg('slump sweep 0', [0, 0, 0, 0]), black = this.arg('slump sweep 1', [1, 0, 0, 0]), last = this.arg('slump sweep last', [1, 1, 0, 0]);
+    const none = this.arg('none', [0, 0, 0, 0]);
+    for (let k = 0; k < plan.substeps; k++) {
+      this.runSlump(pass, 'slumpFaces', R32, [this.dye.read, this.squeeze.read, oilMix], [faces, x], rates, w, w);
+      for (let s = 0; s < plan.sweeps; s++) {
+        this.runSlump(pass, 'slumpSmooth', R32, [this.dye.read], [faces, x], red, half, w);
+        this.runSlump(pass, 'slumpSmooth', R32, [this.dye.read], [faces, x], s === plan.sweeps - 1 ? last : black, half, w);
+      }
+      this.runSlump(pass, 'slumpApply', this.dye.write.format, [this.dye.read, this.dye.write], [faces, x], none, w, w);
+      this.dye.swap();
+    }
+  }
+
+  /** A slump dispatch: textures (read, then any written) and then the slump's buffers, its group found by the objects it binds. */
+  private runSlump(pass: GPUComputePassEncoder, name: string, format: GPUTextureFormat, textures: GPUTexture[], bufs: GPUBuffer[], args: GPUBuffer, wx: number, wy: number): void {
+    const pipe = this.pipeline(name, format);
+    if (!pipe) return;
+    let at = this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'slump'), pipe), args);
+    for (const t of textures) at = this.groupAt(at, t);
+    let group = at.group;
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, args, ...textures, ...bufs]);
+      at.group = group;
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    pass.dispatchWorkgroups(wx, wy);
   }
 
   protected stepParticles(enc: GPUCommandEncoder, p: GpuStepParams): void {

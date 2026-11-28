@@ -65,7 +65,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | **Shipped** (#353) |
 | 18k | Smaller ones | Small | Free to small | See each |
 | 18l | A dye has more than one colour | Large: every pool a ramp from pale tint to deep core, mixtures that walk between their dyes, five dyes on the plate | Free | **Shipped** (#281); real dye spectra (18l-1) after |
-| 18m | A drop slumps under its own weight | Large where the liquid is thin: a pool of ink sinks and runs out as a flat, sharp-edged pool, r ∝ t^⅛ | 2 passes on the default Thickness, 7 in water | None. **Shipped** (#364); ~~18m-1~~ (#371, 18m-1a implicit step open), ~~18m-5~~, ~~18m-5a~~ and ~~18m-5b~~ shipped, 18m-2 to 18m-4 and 18m-5c after |
+| 18m | A drop slumps under its own weight | Large where the liquid is thin: a pool of ink sinks and runs out as a flat, sharp-edged pool, r ∝ t^⅛ | 10 dispatches on the default Thickness (a faces pass, four red-black sweeps, an apply), up to 3 × 26 at 1024² with Dye Weight 1 (18m-1b) | None. **Shipped** (#364); ~~18m-1~~ (#371), ~~18m-1a~~ (implicit step, grid-free Froude front; 18m-1b its cost), ~~18m-5~~, ~~18m-5a~~ and ~~18m-5b~~ shipped, 18m-2 to 18m-4 and 18m-5c after |
 
 ## 18a. The plate is a Hele-Shaw cell (replaces the speed clamp)
 **Partly shipped**: Thin Gap is built and on in every look (#248), the Press draws the liquid back, and 18a-2 (forces that are forces) is done. What is open is below: the findings along the way, 18a-2's open findings, and the steps left for later PRs. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
@@ -202,13 +202,19 @@ its frame rate live. "Free" means no new passes or texture reads.
     pressure that takes it out reaches the middle for two steps (`npm run thingap`
     prints that first step). The rim should sit a cell or two inside the square, or the
     cells outside it count as open too.
-  - **18a-8c, the grid filter's kernels still compile at every opening.** No opening
-    runs `dampGridCurv`, `dampGridLimit` or `dampGrid` since 18a-8b (every look opens on
-    a thin gap), but they are still waited for (`true` in `WebGPUFluid.prepare`). Built
-    behind the show instead, `run` skips a kernel that is not ready one at a time, so
-    the stage could run `dampGrid` on a stale `scratchA` while `dampGridCurv` is still
-    compiling. Gate the stage on all three being ready, then mark them `false`, and read
-    `npm run startup` for the opening's time.
+  - **18a-8c, the grid filter's kernels still compile at every opening: shipped 2026-11-27.**
+    No opening had run `dampGridCurv`, `dampGridLimit` or `dampGrid` since 18a-8b (every
+    look opens on a thin gap), yet every opening waited for them. They are now built with
+    the old plate's own pipelines (`FluidFields.gridBuilds`, in `oldPlateBuilds`): waited for
+    by a look that opens with Thin Gap off, otherwise built off the frame when Thin Gap is
+    first turned off (`prepareOldPlate`, the plate staying thin until they are in). The stage
+    (`FluidFields.dampGrids`) asks for all three before running any, so a kernel that failed
+    to build cannot leave `dampGrid` adding a stale `scratchA` and the swap handing the plate
+    that. Measured with the opening's own list (`WebGPUFluid.prepare` for `openingOf`): a thin
+    opening waits for 46 fluid pipelines on main, 43 now; an old-plate opening 39, unchanged.
+    Found on the way: `run` does not skip a kernel that is still compiling, as the 18a-8b
+    note had it; `computePipeline` builds a missing one synchronously on the frame, and only
+    a failed build returns null. The stale-scratch risk was the failed build's.
   - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
     against it; measure whether any look shows it, and drop it for the time if not.

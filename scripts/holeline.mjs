@@ -40,8 +40,9 @@
  *
  *   0. the dial is live in these pictures: out of focus (Focus 0.8), where
  *      it scales the optical path's contrast, it moves the pool's rim by
- *      more than LIVE levels on average. So "moves nothing" below is the
- *      shader's answer and not a setting the lab dropped
+ *      more than LIVE levels on average, at Dye Index Boost INDEX_LIT (the dye's
+ *      real index is too faint to see the dial by). So "moves nothing" below
+ *      is the shader's answer and not a setting the lab dropped
  *   1. round holes of 1.8 to 14 cells in one flat dye: no pixel in a ring
  *      from half the hole's radius to HALO_OUT cells past its rim is moved
  *      by more than MAX_MOVE levels in any channel
@@ -134,6 +135,24 @@ const N = 256, SIZE = 768;
 const MOVED = 24, MAX_MOVE = 4, HALO_OUT = 6, RIM_SLACK = 1.5;
 const DIALS = [0.35, 1, 2], LIVE = 3, SEAM = 6, SIDES = 60, SEAM_CLOSE = 8, RELIEF_LIVE = 5;
 const SIZES = [1.8, 3, 5, 8, 14];
+/*
+  Dye Index Boost for the lines that need the dye to bend light (0, 4, 5).
+  Since 38u-10 the dye's index is its measured one, 1.78e-5 a unit of each
+  channel's absorbance, and at ×1 a dye-only plate's rim bends nothing a
+  pupil or a plane out of focus can see: lines 4 and 5 read 0.00 levels of
+  relief everywhere, the control's too, so their controls went dark (0.7,
+  0.0 and 0.0 against bars of 6, 5 and 3). The mask has nothing to take off
+  a dye that bends no light; it is asked where a performer who turns the
+  boost up would see these rims and these holes. ×3370 is 0.06 / 1.78e-5:
+  on this pink, whose channels sum to 2.3 a unit of its density, about 2.3
+  times what the old stand-in drew (0.06 a unit of density), which is
+  ×1465 here. The old strength is not enough for line 4's control: read on
+  main with its throw above stepped past, the control's glow was 3.9 levels
+  (under CONTROL_GLOW's 6) and the mask let 3.46 through within 3 cells
+  (over MAX_NEAR's 1), both unseen while the rim check threw. At ×3370 the
+  control glows 13.1 and the mask is asked harder than it was.
+*/
+const INDEX_LIT = 3370;
 const HOLE_FROM = 1, HOLE_TO = 6, HOLE_REF = 10, MAX_GLOW = 6, CONTROL_GLOW = 6, KEEP_RIM = 0.98, KEEP_ARC = 0.95, ARC_REACH = 24, PART_SMALL = 0.9, MIN_RIM = 3, MAX_NEAR = 1, CONTROL_NEAR = 5;
 
 /*
@@ -157,7 +176,7 @@ const CONTROL_AIR = {
   },
 };
 
-const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT, DIALS }) => {
+const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT, DIALS, INDEX_LIT }) => {
   const { L } = await lab.create(N);
   // The frame shows the middle 1/1.5 of the plate (plate.ts), so a point x
   // on the plate is at 0.5 + (x - 0.5) * 1.5 in the picture.
@@ -225,7 +244,13 @@ const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT
   const rimRing = (x, y) => Math.abs(Math.hypot(x - C, y - C) - R) < HALO_OUT / N && Math.abs(y - 0.5) > 0.1;
   const rim = dialled(plateA, rimRing, 0);
   // Line 0: out of focus the dial scales the optical path's contrast, and the pool's rim shows it.
-  const live = share(await shot(1, { projectorFocus: 0.8 }), await shot(0, { projectorFocus: 0.8 }), rimRing, 0).mean;
+  // At INDEX_LIT in both shots: since 38u-10 the dye bends light at its real
+  // index, a hundredth of a level out of focus, and the dial no longer
+  // scales that index, only the defocus shadow's gain. So the control asks
+  // what it always asked, does the dial reach the shader, where the dye has
+  // a step for the shadow to show.
+  const LIT = { projectorFocus: 0.8, dyeIndexBoost: INDEX_LIT };
+  const live = share(await shot(1, LIT), await shot(0, LIT), rimRing, 0).mean;
 
   // Plate B: two dyes meeting down the middle.
   const band = (x, y) => Math.abs(x - 0.5) < 4 / N && y > 0.25 && y < 0.75;
@@ -279,19 +304,25 @@ const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT
   // The camera's path: the same two dyes photographed.
   const photo = await meet(pink, 1.3, teal, 1.3, { renderStyle: 'photo' });
   return { halo, rim, live, even, uneven, near, nearer, photo, px };
-}, { N, SIZE, SIZES, MOVED, HALO_OUT, DIALS });
+}, { N, SIZE, SIZES, MOVED, HALO_OUT, DIALS, INDEX_LIT });
 
 /*
   Plate A again, with the air handed to the plate and the bubbles not drawn.
   Edge Relief is the setting under test: a render at the look's own value
   against one at 0, so the pool's rim has something to be compared with.
 */
-const glow = (page) => page.evaluate(async ({ N, SIZE, SIZES, HOLE_FROM, HOLE_TO, HOLE_REF, ARC_REACH }) => {
+const glow = (page) => page.evaluate(async ({ N, SIZE, SIZES, HOLE_FROM, HOLE_TO, HOLE_REF, ARC_REACH, INDEX_LIT }) => {
   await lab.create(N);
   const F = 1.5, W = SIZE;
   const pink = [1.2, 0.3, 0.8];
   const shot = async (over) => {
-    const p = new Uint8ClampedArray(await lab.render(SIZE, { boundaryContrast: 0, ...over }, { zoom: 1, macroAmount: 0, view: true, bubbles: 0, airField: true }));
+    // At INDEX_LIT, since 38u-10: Edge Relief on the projected plate is the
+    // pupil's loss to the optical path's slope, and a dye at its real index
+    // has none to lose light to (0.00 levels everywhere here, control and
+    // shader alike, at Boost 1). The hole's false ramp is a step in that same
+    // path, so it glows only where the dye bends light, and the mask is asked
+    // where it has something to take off.
+    const p = new Uint8ClampedArray(await lab.render(SIZE, { boundaryContrast: 0, dyeIndexBoost: INDEX_LIT, ...over }, { zoom: 1, macroAmount: 0, view: true, bubbles: 0, airField: true }));
     if (p.length !== W * W * 4) throw new Error(`holeline: a picture came back ${p.length} bytes, not ${W * W * 4}`);
     return p;
   };
@@ -380,7 +411,7 @@ const glow = (page) => page.evaluate(async ({ N, SIZE, SIZES, HOLE_FROM, HOLE_TO
   if (rn < 1000) throw new Error(`holeline: the pool's rim ring picked only ${rn} pixels`);
   if (an < 500) throw new Error(`holeline: the rim arc beside the aside hole picked only ${an} pixels`);
   return { holes: out, rim: rsum / rn, rimN: rn, arc: asum / an, arcN: an };
-}, { N, SIZE, SIZES, HOLE_FROM, HOLE_TO, HOLE_REF, ARC_REACH });
+}, { N, SIZE, SIZES, HOLE_FROM, HOLE_TO, HOLE_REF, ARC_REACH, INDEX_LIT });
 
 const t0 = Date.now(), lap = (what) => console.log(`   (${what}: ${((Date.now() - t0) / 1000).toFixed(0)} s in)`);
 const plain = await openLab();

@@ -72,7 +72,7 @@ export function FeedbackPane({ card, title }: {
       <h3 className={title}>
         <MessageSquare size={12} /> Feedback
       </h3>
-      <p className="mb-4 text-[12px] leading-relaxed text-white/55">
+      <p className="mb-4 text-[12px] leading-relaxed text-muted">
         Tell us what broke, what you wish it did, or what you love. Every note is read, kept, and goes
         to {SUPPORT_EMAIL}.
       </p>

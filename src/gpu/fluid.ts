@@ -49,13 +49,13 @@ import type { GpuStepParams } from './solverTypes';
 import { stepDisplacement } from '../lib/detailFlow';
 import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
-import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { holdApartPull, HOLD_APART_CELLS, AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, THIN_GAP_LATER_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, oilTensionOf, OIL_CELLS, SEALED_TENSION, SEALED_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, NU_REF, dripOf, dripWeightOf, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, oilBodyLn, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { holdApartPull, HOLD_APART_CELLS, AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, THIN_GAP_LATER_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, oilTensionOf, OIL_CELLS, SEALED_TENSION, SEALED_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, NU_REF, dripOf, dripWeightOf, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, LIQUID_DENSITY, thinGapViscosity, oilBodyLn, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidCover } from './fluid/cover';
 import { phaseCHPlan, phaseCapillaryPull } from './fluid/phase';
 import { heatViscPlan } from './fluid/heat';
 import { soapPlan } from './fluid/soap';
+import { slumpPlan } from './fluid/slump';
 import { OPEN_RIM } from '../lib/turntable';
 
 // What this file exported before its constants moved (PLAN 19ai-7); importers still import them from here.
@@ -123,10 +123,6 @@ export class WebGPUFluid extends FluidCover {
       ['scaleDye', [dye], open.oilBodies],
       // The slosh's flow over the dye's (18a-13): waited for when the look tips its dish.
       ['addSlosh', [VEL], open.slosh],
-      // The dye's grid pattern on the old plate (dampGrid; none on a thin gap since 18a-8b).
-      ['dampGridCurv', [dye], true],
-      ['dampGridLimit', [dye], true],
-      ['dampGrid', [dye], true],
       // Viscosity diffuses velocity only; no caller diffuses dye via jacobi.
       ['jacobi', [VEL], true],
       ['dyeDisperse', [dye], true],
@@ -362,8 +358,9 @@ export class WebGPUFluid extends FluidCover {
       [`bodyAdvectSub:${VEL}`, kernel('bodyAdvectSub', VEL)],
       [`dyeDisperse:${dye}`, kernel('dyeDisperse', dye)],
       // The dye's slump (PLAN 18m), which runs on every thin step of a liquid thin enough to let it.
-      [`slumpRate:${R32}`, kernel('slumpRate', R32)],
-      [`slump:${dye}`, kernel('slump', dye)],
+      [`slumpFaces:${R32}`, kernel('slumpFaces', R32)],
+      [`slumpSmooth:${R32}`, kernel('slumpSmooth', R32)],
+      [`slumpApply:${dye}`, kernel('slumpApply', dye)],
     ];
   }
 
@@ -383,6 +380,8 @@ export class WebGPUFluid extends FluidCover {
       // The dye's backtrace and the velocity's self-advection (one key when the dye is half float).
       ...[...new Set([dye, VEL])].map((f): [string, string] => [`advect:${f}`, kernel('advect', f)]),
       ...[...new Set([dye, VEL])].map((f): [string, string] => [`macCormack:${f}`, kernel('macCormack', f)]),
+      // The grid filter's, the old plate's alone (PLAN 18a-8c; dampGrids says why).
+      ...WebGPUFluid.gridBuilds(dye),
     ];
   }
 
@@ -1180,28 +1179,10 @@ export class WebGPUFluid extends FluidCover {
     });
     // The lamp's heat, carried with the colour (PLAN 38f, carryHeat).
     stage('carry heat', (pass) => this.carryHeat(pass, disp, thinAt), thin && !this.boilLive);
-    /*
-      The grid's checkerboard out of the dye (dampGrid, and why), topped up to
-      GRID_DAMP a step on the old plate. Jacobi diffusion took 8a/(1+8a) of it a
-      step; at molecular diffusion (dm ≈ 0) gridDiff is ~0, so the damping
-      runs at full GRID_DAMP there.
-
-      None on a thin gap, whose faces lay no checkerboard (GRID_DAMP's note, 18a-8b).
-    */
+    // The grid's checkerboard out of the dye, the old plate's alone (dampGrids, PLAN 18a-8b/8c).
     const gridDiff = (8 * dm) / (1 + 8 * dm);
     const gridTop = ((p.gridDamp ?? (thin ? 0 : GRID_DAMP)) - gridDiff) / (1 - gridDiff);
-    stage('dye grid', (pass) => {
-      const k = this.arg('dye grid', [gridTop, 0, 0, 0]);
-      const damp = (field: PingPong) => {
-        this.run(pass, 'dampGridCurv', this.scratchA, [field.read, field.write], k);
-        this.run(pass, 'dampGridLimit', this.scratchB, [field.read, this.scratchA], k);
-        this.run(pass, 'dampGrid', field.write, [field.read, this.scratchA, this.scratchB], k);
-        field.swap();
-      };
-      damp(this.dye);
-      // The oil's share has the same grid in it, from the same faces.
-      if (bodiesOn) damp(this.oilDye!);
-    }, gridTop > 0.002);
+    stage('dye grid', (pass) => this.dampGrids(pass, gridTop, bodiesOn), gridTop > 0.002);
     /*
       Marangoni flow (see marangoniFlux): the dye, and the mix itself, carried
       away from soap along the surface, conservatively. The mix goes second,
@@ -1636,21 +1617,8 @@ export class WebGPUFluid extends FluidCover {
       liquid. Its own pass, apart from 'dye diffuse' (the blur 18h replaces
       with the real rates), so the two can change apart.
     */
-    const slump = thin ? this.slumpPlan(p) : null;
-    stage('slump', (pass) => {
-      // run() skips a pipeline that failed to build, and a swap after a skipped
-      // pass would hand the plate the other buffer's stale dye: no pass, no slump.
-      if (!this.pipeline('slumpRate', R32) || !this.pipeline('slump', this.dye.write.format)) return;
-      const rate = this.ensureSlump();
-      const oilMix = mix && this.mixLive ? mix.read : this.blank('rgba');
-      this.run(pass, 'slumpRate', rate, [this.dye.read, this.squeeze.read, oilMix],
-        this.arg('slump rate', [slump!.rate, DYE_LAYER, GAP_METRES, 1 / -Math.log(DYE_FLOOR), slump!.inertRate, 0, 0, 0]));
-      const args = this.arg('slump', [SLUMP_FACE, 0, 0, 0]);
-      for (let k = 0; k < slump!.substeps; k++) {
-        this.run(pass, 'slump', this.dye.write, [this.dye.read, rate], args);
-        this.dye.swap();
-      }
-    }, !!slump);
+    const slump = thin ? slumpPlan({ seconds: p.magnetSeconds, thickness: p.gapThickness, dyeWeight: p.solutalBuoyancy, upright: p.plateUpright }, this.N, this.coverGap) : null;
+    stage('slump', (pass) => this.stepSlump(pass, slump!, mix && this.mixLive ? mix.read : this.blank('rgba')), !!slump);
 
     // 10. Decay: damping, the speed limit, evaporation, the cap, heat decay
     stage('decay', (pass) => {

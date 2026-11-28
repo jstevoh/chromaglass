@@ -436,10 +436,12 @@ const airEdge = 'wet' in C.coverNew(C.COVER_FULL_ML);
   const share = L.pourShare(0.1, 1e-6, 1 / 60, 2 * H0) / L.pourShare(0.1, 1e-6, 1 / 60);
   const drag = L.coverDrag(0.45, 1000, C.COVER_GLASS_G, H0) / L.coverDrag(0.45), heavy = L.coverDrag(0.45, 1000, 2 * C.COVER_GLASS_G, H0) / L.coverDrag(0.45);
   const fluid = readFileSync('src/gpu/fluid.ts', 'utf8'), passes = readFileSync('src/gpu/fluid/passes.ts', 'utf8'), thin = readFileSync('src/gpu/wgsl/thinGap.ts', 'utf8');
+  // The slump's plan moved out of passes.ts into fluid/slump.ts (PLAN 18m-1a): it reads the gap it is handed, and fluid.ts hands it the cover's.
+  const slumpPlan = readFileSync('src/gpu/fluid/slump.ts', 'utf8');
   const solver = [
     /get coverH2\(\): number \{\s*const r = this\.coverGap \/ DISH_REST_GAP;\s*return r \* r;/.test(readFileSync('src/gpu/fluid/cover.ts', 'utf8')),
     /oilTensionOf\(this\.oilSigma, thin\) \* \(thin \? this\.coverH2 \*/.test(fluid), /ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockX : 0, rockOn \? ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockY : 0/.test(fluid), /const kappa = -OIL_LIFT \* oilLightnessOf\(p\.oilWeight\) \* seconds \/ \(PLATE_METRES \* Math\.max\(disp, 1e-9\) \* ROCK_FALL\);/.test(fluid),
-    /const h0 = this\.coverGap \* GAP_METRES;/.test(fluid), /const b = this\.coverGap \* GAP_METRES;/.test(passes), /const hc = this\.coverGap \* GAP_METRES;/.test(passes),
+    /const h0 = this\.coverGap \* GAP_METRES;/.test(fluid), /export function slumpPlan\(ask: SlumpAsk, N: number, coverGap: number\)/.test(slumpPlan) && /const b = coverGap \* GAP_METRES;/.test(slumpPlan) && /slumpPlan\(\{[^}]*\}, this\.N, this\.coverGap\)/.test(fluid), /const hc = this\.coverGap \* GAP_METRES;/.test(passes),
     /\(A\.a\.x \/ \(S\.cover \* S\.cover\) \* A\.a\.y\)/.test(thin),
   ];
   check('the rest gap\'s readers follow the cover: a pour\'s share, the cover\'s drag, and the solver\'s Darcy speeds, breath, glass drag, slump and hand forcing; the dials\' defaults are the lib\'s',

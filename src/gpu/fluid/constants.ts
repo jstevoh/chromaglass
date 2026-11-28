@@ -1020,17 +1020,32 @@ export const LIQUID_FALL = 9.81 * REST_GAP_METRES ** 2 / (12 * NU_REF);
 */
 export const DYE_LAYER = 3.55e-4;
 /*
-  The explicit slump's limits (wgsl/slump.ts, "The shortcuts (PLAN 18m-1,
-  18m-1a)"): a face moves at most SLUMP_FACE of the difference across it in
-  a substep (¼ is the edge of stability on a square grid), in at most
-  SLUMP_SUBSTEPS substeps a step. At 1024² with Heavy dye at 1 (g′ = 1.47 m/s²)
-  the worst cell (half the gap deep, 1 mm, where η³(1 − η/b)³ peaks; slumpPlan)
-  has an inertial bound of about 2.8 a frame at 60 Hz, which asks for
-  ceil(2.8 / 0.24) = 12 substeps. In the 6 mm gap before PLAN 38r a cell at
-  DYE_CAP (2.13 mm) asked for 20, which is why the cap is 20.
+  The implicit slump's plan (wgsl/slump.ts, "The step", "And the
+  substeps"; fluid/slump.ts, PLAN 18m-1a). The step is backward Euler, stable
+  at any rate, so these are for accuracy, not stability. SLUMP_COURANT is how
+  many cells the fastest face may move in a substep (the slower of its
+  viscous rate and its Froude front, as a face is held; on the default
+  light-oil Thickness the viscous one): with lagged K a
+  pool at the dye's cap drains a cell a substep from its edge in, so one cell
+  a substep is a drain that runs at the front's own speed on every plate.
+  At 1024² with Dye Weight 1 at 60 Hz the front's Courant number is 2.75 a
+  frame (u_f = 0.032 m/s at half the 2 mm gap), so three substeps; one at
+  256² and 512² with food colouring. SLUMP_SUBSTEPS caps a long frame (the
+  step's seconds are held to 0.1): six times the substeps a 60 Hz frame wants
+  at 1024² would be 17, and past the cap a substep crosses more than a cell,
+  which slows the drain and nothing else. SLUMP_SWEEPS caps the red-black
+  sweeps a substep, planned as 2a + 2 from the largest face rate a (four at
+  the least: six at 256² with Dye Weight 1, nine at 512², the cap at 768²
+  and 1024², where a is about nine a substep). In the CPU model of the
+  kernels the deep pool of `npm run slump` 12 leaves 3.8e-6 of its L2 as
+  residual at 256², 2.7e-5 at 1024², and at most 2.9e-4 of its dye on the
+  checkerboard (the bar is 1e-3). The fluxes are taken from what the sweeps
+  reached, so a residual moves the dye a hair less far, never makes or
+  loses any.
 */
-export const SLUMP_FACE = 0.24;
-export const SLUMP_SUBSTEPS = 20;
+export const SLUMP_COURANT = 1;
+export const SLUMP_SUBSTEPS = 8;
+export const SLUMP_SWEEPS = 12;
 /** The Froude number for a gravity current front in the slumping regime (Huppert and Simpson 1980). */
 export const FROUDE_FRONT = 1.19;
 /** The dye's cap per cell (decayDye), the deepest layer the slump has to be ready for. */
