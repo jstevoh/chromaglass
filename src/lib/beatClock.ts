@@ -54,7 +54,14 @@ export class BeatClock {
   period = 0;
   /** How sure the clock is of its beat, 0..1. */
   confidence = 0;
-  private onsets: number[] = [];
+  /** Ring of recent onset timestamps (at most 32), avoiding shift() and slice() allocations. */
+  private readonly onsets = new Float64Array(32);
+  private onsetHead = 0;
+  private onsetCount = 0;
+  /** Reused scratch for folding and sorting inter-onset intervals in `hear`. */
+  private readonly ivs = new Float64Array(6);
+  /** Reused tick returned by `update` so each frame allocates no object. */
+  private readonly tick: BeatTick = { kick: false, predicted: false };
   private lastBeat = 0;          // when the last accepted beat fell (ms)
   private predictedAt = 0;       // the next beat the clock expects
   private firedPrediction = false;
@@ -83,7 +90,8 @@ export class BeatClock {
   reset(): void {
     this.period = 0;
     this.confidence = 0;
-    this.onsets = [];
+    this.onsetHead = 0;
+    this.onsetCount = 0;
     this.lastBeat = 0;
     this.predictedAt = 0;
     this.firedPrediction = false;
@@ -197,8 +205,16 @@ export class BeatClock {
 
     if (onset) {
       this.lastOnsetAt = at;
-      this.onsets.push(at);
-      while (this.onsets.length > 32 || at - this.onsets[0] > 12000) this.onsets.shift();
+      if (this.onsetCount === 32) {
+        this.onsetHead = (this.onsetHead + 1) & 31;
+        this.onsetCount--;
+      }
+      this.onsets[(this.onsetHead + this.onsetCount) & 31] = at;
+      this.onsetCount++;
+      while (this.onsetCount > 0 && at - this.onsets[this.onsetHead] > 12000) {
+        this.onsetHead = (this.onsetHead + 1) & 31;
+        this.onsetCount--;
+      }
       // A heard beat the clock already fired for is the same beat: absorb it.
       // (Judged before the onset re-times the clock.)
       const sameBeat = locked && this.firedPrediction && Math.abs(at - this.predictedAt) < this.period * 0.3;
@@ -230,21 +246,37 @@ export class BeatClock {
       }
     }
 
-    return { kick, predicted };
+    this.tick.kick = kick;
+    this.tick.predicted = predicted;
+    return this.tick;
   }
 
   /** An onset was heard: refine period and phase, or find a beat to begin with. */
   private hear(now: number): void {
     if (this.period === 0) {
       // Find a period: the last few inter-onset intervals, folded into range,
-      // must agree with one another.
-      const n = this.onsets.length;
+      // must agree with one another. Runs only when an onset arrives and fills
+      // the reused `ivs` buffer sorted in place (no array/sort garbage).
+      const n = this.onsetCount;
       if (n < 4) return;
-      const ivs: number[] = [];
-      for (let i = n - 1; i > 0 && ivs.length < 6; i--) ivs.push(fold(this.onsets[i] - this.onsets[i - 1]));
-      ivs.sort((a, b) => a - b);
-      const med = ivs[Math.floor(ivs.length / 2)];
-      const agree = ivs.filter(v => Math.abs(v - med) < med * 0.12).length;
+      const ivs = this.ivs;
+      let len = 0;
+      for (let i = n - 1; i > 0 && len < 6; i--) {
+        const cur = this.onsets[(this.onsetHead + i) & 31];
+        const prev = this.onsets[(this.onsetHead + i - 1) & 31];
+        ivs[len++] = fold(cur - prev);
+      }
+      for (let i = 1; i < len; i++) {
+        const v = ivs[i];
+        let j = i - 1;
+        while (j >= 0 && ivs[j] > v) { ivs[j + 1] = ivs[j]; j--; }
+        ivs[j + 1] = v;
+      }
+      const med = ivs[Math.floor(len / 2)];
+      let agree = 0;
+      for (let i = 0; i < len; i++) {
+        if (Math.abs(ivs[i] - med) < med * 0.12) agree++;
+      }
       if (agree >= 3) {
         this.period = med;
         this.lastBeat = now;
@@ -277,7 +309,10 @@ export class BeatClock {
       this.confidence = Math.max(0, this.confidence - 0.08);
       if (this.confidence <= 0.05) {
         this.period = 0;
-        this.onsets = this.onsets.slice(-4);
+        if (this.onsetCount > 4) {
+          this.onsetHead = (this.onsetHead + this.onsetCount - 4) & 31;
+          this.onsetCount = 4;
+        }
       }
     }
   }

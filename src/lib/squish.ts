@@ -109,21 +109,35 @@ export type SquishCell = (idx: number, gap: number, vx: number, vy: number, mul:
 
 export interface Spokes { count: number; phase: number; seed: number }
 
+const NO_SPOKES: Spokes = { count: 0, phase: 0, seed: 0 };
+const discSpokes: Spokes = { count: 0, phase: 0, seed: 0 };
+const spokePropScratch = { w: 0, len: 0, k: 0 };
+const onSpokeScratch = { ang: 0, prop: spokePropScratch };
+
 /**
  * Each press gets its own spoke count and phase (from where it is, so a held
  * press keeps them), and each spoke its own width, length and strength, with
  * a second harmonic shifting the spacing: a ragged sunburst with dye
  * surviving between the fingers, not a turbine.
  */
-export function spokesAt(x: number, y: number, fingering: number): Spokes {
-  if (!(fingering > 0)) return { count: 0, phase: 0, seed: 0 };
+export function spokesAt(x: number, y: number, fingering: number, out?: Spokes): Spokes {
+  if (!(fingering > 0)) {
+    if (out) { out.count = 0; out.phase = 0; out.seed = 0; return out; }
+    return NO_SPOKES;
+  }
   const seed = (((x * 73856093) ^ (y * 19349663)) >>> 0);
-  return { count: 8 + (seed % 9) + Math.round(8 * fingering), phase: ((seed >>> 8) % 1000) / 1000 * Math.PI * 2, seed };
+  const count = 8 + (seed % 9) + Math.round(8 * fingering);
+  const phase = ((seed >>> 8) % 1000) / 1000 * Math.PI * 2;
+  if (out) { out.count = count; out.phase = phase; out.seed = seed; return out; }
+  return { count, phase, seed };
 }
 
 function spokeProp(s: number, seed: number) {
   const h = ((s + 1) * 2654435761 + seed) >>> 0;
-  return { w: 0.5 + ((h & 255) / 255) * 0.9, len: 0.45 + (((h >>> 8) & 255) / 255) * 0.6, k: 0.25 + (((h >>> 16) & 255) / 255) * 0.75 };
+  spokePropScratch.w = 0.5 + ((h & 255) / 255) * 0.9;
+  spokePropScratch.len = 0.45 + (((h >>> 8) & 255) / 255) * 0.6;
+  spokePropScratch.k = 0.25 + (((h >>> 16) & 255) / 255) * 0.75;
+  return spokePropScratch;
 }
 
 const TAU = Math.PI * 2;
@@ -136,8 +150,8 @@ function onSpoke(theta: number, sp: Spokes) {
   const prop = spokeProp(sIdx, sp.seed);
   const raw = Math.cos(n * warped + sp.phase);
   // Narrow spokes: the cosine sharpened by this spoke's width.
-  const ang = Math.max(-1, Math.min(1, (raw - (1 - prop.w * 0.85)) / (prop.w * 0.85)));
-  return { ang, prop };
+  onSpokeScratch.ang = Math.max(-1, Math.min(1, (raw - (1 - prop.w * 0.85)) / (prop.w * 0.85)));
+  return onSpokeScratch;
 }
 
 /**
@@ -185,7 +199,7 @@ export function squishDisc(
   // typed array drops those writes silently (Beat Squeeze, PLAN §10 step 4).
   x = Math.round(x);
   y = Math.round(y);
-  const sp = spokesAt(x, y, fingering);
+  const sp = fingering > 0 ? spokesAt(x, y, fingering, discSpokes) : NO_SPOKES;
   const spokeGain = fingering * 0.9;
   const reach = stroke === 'lift' ? Math.round(radius * 1.15) : radius;
   const r2 = reach * reach;
@@ -704,20 +718,32 @@ export function bassPressDepth(level01: number, impact: number): number {
  */
 export const BASS_STEP = 0.03;
 export class BassPress {
-  private at: { x: number; y: number; r: number; thin: boolean } | null = null;
+  private hasAt = false;
+  private atX = 0;
+  private atY = 0;
+  private atR = 0;
+  private atThin = false;
   /** The depth the glass is down now, each disc's amount as `squishDisc` takes it. */
   depth = 0;
 
   follow(S: number, x: number, y: number, radius: number, depth: number, thin: boolean, cell: SquishCell): void {
     const want = Number.isFinite(depth) && depth > 0 ? depth : 0;
     x = Math.round(x); y = Math.round(y); radius = Math.max(1, Math.round(radius));
-    const moved = this.at !== null && (this.at.x !== x || this.at.y !== y || this.at.r !== radius);
+    const moved = this.hasAt && (this.atX !== x || this.atY !== y || this.atR !== radius);
     if (moved || (want === 0 && this.depth > 0)) this.letGo(S, thin, cell);
     const d = want - this.depth;
     if (d === 0 || Math.abs(d) < BASS_STEP * BASS_PRESS) return;
     squishDisc(S, x, y, radius, d, 0, 'press', 0, cell, thin);
     this.depth = want;
-    this.at = want > 0 ? { x, y, r: radius, thin } : null;
+    if (want > 0) {
+      this.hasAt = true;
+      this.atX = x;
+      this.atY = y;
+      this.atR = radius;
+      this.atThin = thin;
+    } else {
+      this.hasAt = false;
+    }
   }
 
   /**
@@ -727,11 +753,11 @@ export class BassPress {
    * for a bowl, leaving the middle pressed and lifting the rim.
    */
   letGo(S: number, _thin: boolean, cell: SquishCell): void {
-    if (this.at && this.depth > 0) squishDisc(S, this.at.x, this.at.y, this.at.r, -this.depth, 0, 'press', 0, cell, this.at.thin);
+    if (this.hasAt && this.depth > 0) squishDisc(S, this.atX, this.atY, this.atR, -this.depth, 0, 'press', 0, cell, this.atThin);
     this.depth = 0;
-    this.at = null;
+    this.hasAt = false;
   }
 
   /** Drop it without laying anything: the plate it pressed was cleared. */
-  forget(): void { this.depth = 0; this.at = null; }
+  forget(): void { this.depth = 0; this.hasAt = false; }
 }

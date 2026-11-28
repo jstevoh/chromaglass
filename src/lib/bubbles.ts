@@ -247,6 +247,8 @@ export class BubbleField {
   private readonly sampleL: BubbleLiquid = { mu: 0, sigma: 0, rho: 0 };
   private readonly hereA: BubbleLiquid = { mu: 0, sigma: 0, rho: 0 };
   private readonly hereC: BubbleLiquid = { mu: 0, sigma: 0, rho: 0 };
+  /** Reused (vx, vy) pair handed to the velocity sampler so each tap allocates no tuple. */
+  private readonly velScratch: [number, number] = [0, 0];
 
   /**
    * Hand the field a downsampled species snapshot and the last-poured
@@ -383,7 +385,8 @@ export class BubbleField {
     if (gap === this.areaGap) return;
     const scale = this.areaGap / gap;
     const rScale = Math.sqrt(scale);
-    for (const b of this.bubbles) {
+    for (let i = 0; i < this.bubbles.length; i++) {
+      const b = this.bubbles[i];
       b.r *= rScale;
       b.inject *= scale;
     }
@@ -581,9 +584,10 @@ export class BubbleField {
 
   /**
    * Advance by `dt` seconds. `velocity` samples the solver field in its own
-   * units; `tiltX/Y` is the plate's hold tilt (air climbs against it).
+   * units into `out` (or returns a pair, for older callers); `tiltX/Y` is the
+   * plate's hold tilt (air climbs against it).
    */
-  step(dt: number, velocity: (x: number, y: number) => [number, number], tiltX: number, tiltY: number): void {
+  step(dt: number, velocity: (x: number, y: number, out: [number, number]) => readonly [number, number] | void, tiltX: number, tiltY: number): void {
     this.syncGap();
     const N = this.grid;
     const bs = this.bubbles;
@@ -600,12 +604,13 @@ export class BubbleField {
     const sinX = plateSin(tiltX, 0), sinY = plateSin(tiltY, 0);
     const rimR = OPEN_RIM * N, cx0 = N / 2, cy0 = N / 2;
     const breath = this.breath;
+    const v = this.velScratch;
 
     // The bubbles on the end of the straw this step: held where it is, so
     // nothing below moves them (a satellite pressed against one, a merge).
     const heldNow = this.heldNow;
     heldNow.clear();
-    for (const b of bs) if (b.held) heldNow.add(b);
+    for (let i = 0; i < bs.length; i++) if (bs[i].held) heldNow.add(bs[i]);
     for (let i = bs.length - 1; i >= 0; i--) {
       const b = bs[i];
       // A bubble on the end of the straw is held there; one let go rounds off.
@@ -637,7 +642,9 @@ export class BubbleField {
       let vx = 0, vy = 0;
       const ring = b.r + 1.5;
       for (let k = 0; k < 8; k++) {
-        const [ux, uy] = velocity(b.x + ring * RING_COS[k], b.y + ring * RING_SIN[k]);
+        const res = velocity(b.x + ring * RING_COS[k], b.y + ring * RING_SIN[k], v);
+        const ux = res ? res[0] : v[0];
+        const uy = res ? res[1] : v[1];
         vx += ux * 0.125;
         vy += uy * 0.125;
       }
@@ -702,8 +709,14 @@ export class BubbleField {
         // Twice the radius out, where the pocket's own disturbance of a
         // strain (R⁴/r³) is an eighth of what it is at the rim (PLAN 15g-8d).
         const h = Math.max(1, 2 * b.r);
-        const [ux1, uy1] = velocity(b.x + h, b.y), [ux0, uy0] = velocity(b.x - h, b.y);
-        const [ux3, uy3] = velocity(b.x, b.y + h), [ux2, uy2] = velocity(b.x, b.y - h);
+        let res = velocity(b.x + h, b.y, v);
+        const ux1 = res ? res[0] : v[0], uy1 = res ? res[1] : v[1];
+        res = velocity(b.x - h, b.y, v);
+        const ux0 = res ? res[0] : v[0], uy0 = res ? res[1] : v[1];
+        res = velocity(b.x, b.y + h, v);
+        const ux3 = res ? res[0] : v[0], uy3 = res ? res[1] : v[1];
+        res = velocity(b.x, b.y - h, v);
+        const ux2 = res ? res[0] : v[0], uy2 = res ? res[1] : v[1];
         const k2h = CELLS_PER_UNIT / (2 * h);
         half = 0.5 * ((ux1 - ux0) - (uy3 - uy2)) * k2h;
         exy = 0.5 * ((ux3 - ux2) + (uy1 - uy0)) * k2h;
@@ -819,8 +832,10 @@ export class BubbleField {
         bs.splice(j, 1);
       }
     }
-    for (const key of this.contactDrain.keys()) {
-      if (!this.touchingNow.has(key)) this.contactDrain.delete(key);
+    if (this.contactDrain.size > 0) {
+      for (const key of this.contactDrain.keys()) {
+        if (!this.touchingNow.has(key)) this.contactDrain.delete(key);
+      }
     }
 
     /*
