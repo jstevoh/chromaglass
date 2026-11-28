@@ -225,17 +225,19 @@ function softWhileMoving(frames) {
   */
   const wall = { ...DEFAULT_SETTINGS, layerCount: 2, twoProjectors: 1, lampGround: 1, backBlend: 'own', projDeck: 1, projCross: 0, frontLevel: 1, backLevel: 1 };
   const two = (s) => bankHasTwo(s, Math.round(s.layerCount ?? 1), s.renderStyle === 'photo' ? 0 : s.lampGround ?? 0);
-  let plainOff = 0, deckOff = 0, levels = 0;
+  let plainOff = 0, deckOff = 0, levels = 0, ledMoves = 0;
   for (const p of PRESETS) {
     const full = targetLook(wall, p.settings);
     if (!two(full)) plainOff++;
     const front = drawingOf(full, dishOf(full, wall)), back = drawingOf(full, wall);
     if (!two(front) || !two(back)) deckOff++;
-    for (const k of ['frontLevel', 'backLevel']) if (front[k] !== wall[k] || back[k] !== wall[k]) levels++;
+    // The plates' levels, and the light under the glass (the second Mac film: Solar Flare's dark LED became both plates' lamp).
+    for (const k of Object.keys(wall)) if ((k === 'frontLevel' || k === 'backLevel' || k.startsWith('led')) && (front[k] !== wall[k] || back[k] !== wall[k])) levels++;
+    for (const k of Object.keys(wall)) if (k.startsWith('led') && full[k] !== wall[k]) ledMoves++;
   }
-  check('every house look, sent by a deck Go either way, leaves two projectors on the wall and both plates\' levels where the operator has them; a plain Go to the same looks would switch the second projector off (the control: the bug the Mac film caught)',
-    PRESETS.length > 20 && deckOff === 0 && levels === 0 && plainOff > PRESETS.length / 2 && DECK_RIG.has('twoProjectors'),
-    `${PRESETS.length} looks: a plain Go takes two projectors off in ${plainOff}, a deck Go in ${deckOff}; levels moved ${levels}`);
+  check('every house look, sent by a deck Go either way, leaves two projectors on the wall, both plates\' levels and the light under the glass where the operator has them; a plain Go to the same looks would switch the second projector off and move the LED (the controls: the bugs the Mac films caught)',
+    PRESETS.length > 20 && deckOff === 0 && levels === 0 && plainOff > PRESETS.length / 2 && ledMoves > 0 && DECK_RIG.has('twoProjectors'),
+    `${PRESETS.length} looks: a plain Go takes two projectors off in ${plainOff}, a deck Go in ${deckOff}; a plain Go moves ${ledMoves} LED settings, a deck Go's levels and LED moved ${levels}`);
 }
 
 // ── 6. The switch, and the wiring ──────────────────────────────────────

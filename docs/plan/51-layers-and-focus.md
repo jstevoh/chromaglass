@@ -263,7 +263,10 @@ Found while building it, not done:
   deck Go now leaves what the decks stand on alone (`DECK_RIG`: Two Projectors, the plate
   count, the lamp ground and render style, the back row's blend, both plates' levels), and
   `npm run decks` sends every house look through it (46 of 46 would switch it off by a plain
-  Go, 0 by a deck Go). A Back, a later Go or a Go to the
+  Go, 0 by a deck Go). The second film (51c-2c) found the light under the glass: held at
+  the lamp ground, Solar Flare's own LED (a single dark #2a0700) became both plates' lamp
+  when its switch flipped at the fade's middle, and the wall fell to a third of its light in
+  one frame; the LED platform and its Mixer row are now held too. A Back, a later Go or a Go to the
   back plate stops what of a deck Go is still to come. And B with no light on the wall is no
   longer blurred at all (`gpu/plateUniforms.ts`), so a dark B's melt costs nothing; A's is
   still drawn, because where neither projector has light the Mixer's rows laid over both
@@ -277,6 +280,10 @@ Found while building it, not done:
   for a quarter of the fade at each end; the pass still draws it, because the Mixer's rows
   where neither projector has light go to A's share. Give those rows their own share, then
   skip A's melt when A is dark as B's is.
+- **51c-7 · A plain Go takes a two-projector wall down** (S, the owner's call). Every house
+  look carries Two Projectors off and most a lamp ground of 0, so with Decks off a Go fades
+  the second projector out (the 51c-2 films). Either looks stop carrying the rig (make it
+  `RIG_KEYS`), or keep it as the look's and say so on the Projectors box.
 - **51c-4 · Each deck its own drawing** (M, after 16b). A deck Go changes the rest of a look
   (lamp ground, glass, lacing, blend) on both projectors at once, hidden in the middle half;
   with 16b's own sources each projector would take its own and nothing would change on the lit one.
