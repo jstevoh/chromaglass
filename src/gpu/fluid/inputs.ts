@@ -134,7 +134,8 @@ export class FluidInputs extends FluidPasses {
     // Kept until the step takes them: a second flush before it (pullStateFromGpu's) brings no hands of its own.
     if (hands) this.handLive = true;
     if (breath) { this.upsample(pass, this.cpuBreathTex!, this.breathTex!); this.breathLive = true; }
-    if (sheet) this.upsample(pass, this.cpuSheetTex!, this.sheetTex!);
+    // The sheet by a cubic (upsampleCubic, PLAN 18a-15): a solved plate, smooth, the bilinear drew it in facets.
+    if (sheet && (this.sheetBilinear || !this.splatRun(pass, 'upsampleCubic', R32, [this.cpuSheetTex!, this.sheetTex!], this.N))) this.upsample(pass, this.cpuSheetTex!, this.sheetTex!);
     if (oilAdd) { this.upsample(pass, this.cpuOilTex!, this.deltaOilTex!); this.oilLayPending = true; }
     this.foldDeltas(pass, !!sheet, bodyMul);
     pass.end();
@@ -175,6 +176,9 @@ export class FluidInputs extends FluidPasses {
     this.device.queue.writeBuffer(this.splatBuf, 0, list.records);
   }
 
+  /** The sheet by the bilinear, as before PLAN 18a-15: `npm run gridlay`'s control, never the app's. */
+  sheetBilinear = false;
+
   /** The presses' bowls waiting for the next flush (pressBowl). */
   private readonly bowls = new SplatList(16);
 
@@ -187,6 +191,11 @@ export class FluidInputs extends FluidPasses {
    */
   pressBowl(x: number, y: number, radius: number, amount: number): void {
     this.bowls.disc(x, y, radius, { gap: -3 * amount, falloff: 'plate' });
+  }
+
+  /** A lift's spokes opening the glass, at the solver's cells as a press's bowl is (PLAN 18a-15; `spokeLift` in wgsl/splat.ts). */
+  liftSpokes(x: number, y: number, radius: number, reach: number, gap: number, count: number, phase: number, seed: number): void {
+    this.bowls.spokes(x, y, radius, reach, gap, count, phase, seed);
   }
 
   /**

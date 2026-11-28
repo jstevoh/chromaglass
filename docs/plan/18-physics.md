@@ -295,11 +295,27 @@ its frame rate live. "Free" means no new passes or texture reads.
     share `applySquish`. `npm run pressfacets` (gpu=high, 512²): crease score of the
     bowl's curvature 0.70–0.73 on main, 0.01–0.05 now; at gpu=mid (an even 2×, where the
     relaxation rounds most of it) 0.04–0.10 against 0.01–0.05. Open: 18a-15.
-  - **18a-15, the rest of the thin gap's laying at solver cells.** The lift's spokes
-    (`liftStep`), the kick's release (`kickRelease`), the bass press and the rhythm sheet
-    still lay the gap on the 192² grid and reach the solver through the bilinear. None was
-    reported, but each has the same facets at a low enough amount. Move each to records
-    like 18a-14's, or lay the sheet at N, and measure the crease energy before and after.
+  - **18a-15, the rest of the thin gap's laying at solver cells: shipped** (2026-11-28). The
+    bass's hand (`BassPress`), a kick's hold and release (`KickRelease`) and the lift's
+    spokes (`layLift`) laid the gap on the 192² grid, and the rhythm sheet's change came up
+    by the bilinear. The bowls are now the solver's (`BowlLay`, pressBowl's records, at the
+    kick's unrounded radii, so a release gives back the bowl the press laid); the spokes
+    are a record of their own (`liftSpokes`, `spokeLift` in wgsl/splat.ts: squish.ts's
+    `liftShare`, a function of a point, in WGSL, every edge of a spoke eased so the glass
+    has no crease); the sheet comes up by Catmull–Rom (`upsampleCubic`). Two seams in the
+    lift's spokes went too (`onSpoke`: each spoke's props changed at its crest, and an odd
+    count's wobble jumped at the −x axis; a drop's splash keeps its old spokes). `npm run
+    gridlay` (lab, 512² over 192²): the share of curvature between the CPU's samples, 0 for
+    facets and 1 for smooth glass, main → now: bass down 0.13 → 1.00, deeper 0.37 → 1.00,
+    let go 0.23 → 0.99, kick release 0.00 → 1.00, kick hold 0.15 → 1.00, lift 0.00 → 1.14,
+    sheet 0.00 → 0.73; each no more curvature than main's or, for the release and the
+    lift, its formula at every solver cell (0.00% rms); the same volume (within 3%) and
+    pattern (0.98 to 1.00 at the 192² scale). `npm run lift`'s centre-against-rim line now
+    reads the mean over 16 presses (one press's spokes are a small sample). Then 18a-15b.
+  - **18a-15b, the sheet solved at the solver's grid.** The rhythm sheet still solves at
+    192² and is only interpolated smoothly; its dent's edge is the 192² solve's. Solve it on
+    the GPU at N (it is a plate equation, the same stencil the thin gap's pressure uses) if
+    a dent's rim is ever seen to be coarse. (S–M; not reported.)
   - **18a-16, the draught slid the dish out over its rim: shipped** (2026-11-26; reported as
     Solar Flare, filmed to Hymn to the Dawn, fading to an empty dish by 2:40). On the owner's
     Mac with no music every build since 11-21 drained Solar Flare to 5–7% of its dye in 150 s;

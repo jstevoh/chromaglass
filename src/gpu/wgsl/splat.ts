@@ -70,6 +70,49 @@ fn splatDist(s: Splat, p: vec2f) -> f32 {
 
 const W = '@compute @workgroup_size(8, 8)';
 
+/**
+ * A lift's spokes at a point of the solver's grid (PLAN 18a-15): lib/squish.ts's
+ * `liftShare`, with `onSpoke` and `spokeProp`, in WGSL, the hashes in u32 (JS's
+ * `>>> 0` of an exact double is the same wrap; smoothstep over 0..1 is its
+ * `smooth`). What was owed: the lift laid its opening on the 192² grid and the
+ * bilinear carried it to the solver as facets, the press's fault 18a-14
+ * mended. Why every edge of a spoke is eased is liftShare's. `npm run gridlay`
+ * holds this against liftShare at every solver cell.
+ */
+const SPOKE_LIFT = /* wgsl */ `
+fn spokeLift(s: Splat, p: vec2f) -> f32 {
+  let o = p - s.a.xy;
+  let dist = length(o);
+  let reach = s.a.z;
+  let radius = s.d.z;
+  if (dist >= reach || dist < 0.0001) { return 0.0; }
+  let n = s.b.x;
+  let ph = s.b.y;
+  let seed = u32(s.b.z) | (u32(s.b.w) << 16u);
+  let tau = 6.283185307179586;
+  let theta = atan2(o.y, o.x);
+  let warped = theta + 0.35 * cos((floor(n * 0.5) + 1.0) * theta + ph * 1.7) / n * tau;
+  let k = floor((n * warped + ph) / tau + 0.5);
+  let spoke = u32(((k % n) + n) % n);
+  let h = (spoke + 1u) * 2654435761u + seed;
+  let w = 0.5 + f32(h & 255u) / 255.0 * 0.9;
+  let len = 0.45 + f32((h >> 8u) & 255u) / 255.0 * 0.6;
+  let strength = 0.25 + f32((h >> 16u) & 255u) / 255.0 * 0.75;
+  let ang = clamp((cos(n * warped + ph) - (1.0 - w * 0.85)) / (w * 0.85), -1.0, 1.0);
+  if (ang <= 0.0) { return 0.0; }
+  let inner = radius * (1.0 - len);
+  let along = clamp((dist - inner) / max(1.0, radius - inner), 0.0, 1.0);
+  let ends = smoothstep(0.0, 1.0, dist - inner) * smoothstep(0.0, 1.0, reach - dist);
+  return smoothstep(0.0, 1.0, ang) * strength * (0.35 + 0.65 * smoothstep(0.0, 1.0, along)) * ends;
+}
+
+/** What of a record lands at p: its falloff, or a lift's spokes. */
+fn splatWeight(s: Splat, p: vec2f) -> f32 {
+  if (s.d.y > 4.5) { return spokeLift(s, p); }
+  return falloff(s.d.y, splatDist(s, p), s.a.z);
+}
+`;
+
 export const SPLAT_KERNELS: Record<string, string> = {
   /**
    * Every record, at every cell it touches, into the three delta fields.
@@ -172,6 +215,46 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
   /** Bilinear from the CPU's 192² delta arrays onto the full grid. */
   upsampleDelta: upsample(false),
+
+  /**
+   * The rhythm sheet's change, from its 192² solve onto the full grid by
+   * Catmull–Rom, not the bilinear (PLAN 18a-15). The sheet is a plate's
+   * deflection solved as one (lib/sheet.ts), smooth to its fourth
+   * derivative, and the bilinear drew it as a surface of flat facets whose
+   * slope jumps at every CPU cell's edge: curvature there and none between,
+   * which the gap's closing (squeezeUpdate, h³) turned into creases in the
+   * flow, as it had the press's bowl (18a-14). A cubic through the same
+   * samples keeps the slope continuous across them and reproduces any cubic
+   * exactly, so a smooth field stays smooth; it is still the 192² solve's
+   * field (solving at N would cost the sheet's whole CPU budget again).
+   * `npm run gridlay` measures it.
+   */
+  upsampleCubic: `${SPLAT_STRUCT}
+@group(0) @binding(1) var src: texture_2d<f32>;
+@group(0) @binding(2) var dst: texture_storage_2d<DST_FORMAT, write>;
+fn cr(t: f32) -> vec4f {
+  let t2 = t * t;
+  let t3 = t2 * t;
+  return vec4f(-0.5 * t3 + t2 - 0.5 * t, 1.5 * t3 - 2.5 * t2 + 1.0, -1.5 * t3 + 2.0 * t2 + 0.5 * t, 0.5 * t3 - 0.5 * t2);
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (id.x >= u32(A.n) || id.y >= u32(A.n)) { return; }
+  let p = (vec2f(id.xy) + 0.5) / A.n * A.l - 0.5;
+  let i = floor(p);
+  let wx = cr(p.x - i.x);
+  let wy = cr(p.y - i.y);
+  var sum = vec4f(0.0);
+  for (var b = 0; b < 4; b = b + 1) {
+    var row = vec4f(0.0);
+    let y = i32(clamp(i.y + f32(b - 1), 0.0, A.l - 1.0));
+    for (var a = 0; a < 4; a = a + 1) {
+      let x = i32(clamp(i.x + f32(a - 1), 0.0, A.l - 1.0));
+      row += wx[a] * textureLoad(src, vec2i(x, y), 0);
+    }
+    sum += wy[b] * row;
+  }
+  textureStore(dst, vec2i(id.xy), sum);
+}`,
 
   /**
    * The same, with a press's bowl added where it is laid, at the solver's
@@ -291,9 +374,9 @@ function upsample(sum: boolean, press = false): string {
   var add = vec4f(0.0);
   for (var k = 0u; k < A.count; k = k + 1u) {
     let s = splats[k];
-    add += s.c * falloff(s.d.y, splatDist(s, uv * A.l), s.a.z);
+    add += s.c * splatWeight(s, uv * A.l);
   }` : '';
-  return `${SPLAT_STRUCT}
+  return `${SPLAT_STRUCT}${press ? SPOKE_LIFT : ''}
 @group(0) @binding(1) var src: texture_2d<f32>;
 ${sum ? '@group(0) @binding(2) var more: texture_2d<f32>;\n' : ''}${press ? `@group(0) @binding(${bind - 1}) var<storage, read> splats: array<Splat>;\n` : ''}@group(0) @binding(${bind}) var dst: texture_storage_2d<DST_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {

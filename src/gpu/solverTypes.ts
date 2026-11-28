@@ -397,6 +397,14 @@ export interface PlateSolver {
    * 192² grid it came up through the bilinear upsample as facets.
    */
   pressBowl?(x: number, y: number, radius: number, amount: number): void;
+  /**
+   * A lift's spokes opening the glass on a thin gap, at the solver's own cells
+   * (PLAN 18a-15; lib/squish.ts `squishDisc`'s lift, `spokeLift` in
+   * wgsl/splat.ts): centre (logical cells, a cell's middle), the press's
+   * radius, the lift's reach, the opening at a spoke's full strength, and the
+   * spokes (`spokesAt`). Folded at the next flush, as pressBowl's bowls are.
+   */
+  liftSpokes?(x: number, y: number, radius: number, reach: number, gap: number, count: number, phase: number, seed: number): void;
   /** Oil Bodies: the oil a press squeezes out, onto the ring (radius to outer) the dye lands on (pressOil). */
   pressMix?(x: number, y: number, radius: number, outer: number, take: number): void;
   /** The ferrofluid carried along a gesture, or straight out from its middle for a puff (Finger and Blow), in plate units. */
