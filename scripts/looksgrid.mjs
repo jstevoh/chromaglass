@@ -299,7 +299,7 @@ async function openSurface(sf, query) {
   const page = await ctx.newPage();
   page.setDefaultTimeout(60_000);
   await page.goto(`${base}/?${query}`, { waitUntil: 'load' });
-  // The app is up when the surface's own frame is: the desk (folded or not), the phone's stage.
+  // The app is up when the surface's own frame is: the desk (folded or full), the phone's stage.
   const up = sf.touch ? 'phone-open-looks' : 'perform-desk';
   for (let i = 0; i < 240 && !(await page.getByTestId(up).count()); i++) await page.waitForTimeout(250);
   await page.waitForTimeout(800);
