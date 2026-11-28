@@ -191,6 +191,11 @@ its frame rate live. "Free" means no new passes or texture reads.
       only: they could build with `oldPlateBuilds` (as 18a-8c did for dampGrid), and the
       M-grid textures be made only when the old plate runs. A plate that falls back from
       thin to old picks up the current where it stood when the thin gap took over.
+    - **18f-visc, open (found 2026-11-28, Mac GPU).** `npm run heat` line 6 is red on main
+      (da4dde79) and here alike: "thin-gap mobility rises with heat" reads 1.888 against a
+      bar of 1.4–1.8 (cold 0.00829, warm 0.01566). Real water's μ(20 °C)/μ(50 °C) is
+      1.0016/0.5465 = 1.83, so the bar's "~2%/K" may be the thing that is off, or the
+      warm plate's speed carries more than the viscosity. Measure which before moving it.
   - **18a-5, the press over its own time.** `squish` can lay a press's dent in one
     step, so the displaced volume leaves in one step, faster than the dye's face
     fluxes may carry it (0.45 of a cell a step). The app's Press lays its dent a step
