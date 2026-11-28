@@ -8,9 +8,10 @@ import { LIT } from '../ui';
 /**
  * The desk's Looks grid (PLAN 34b-1).
  *
- * A laptop window under 1024 px has `PresetMenu` off the title and the phone
- * has its Looks sheet, while the 1440 px desk had only the document menu (New,
- * Save, and user-saved presets) and no visual picker for the shipped looks.
+ * The phone has its Looks sheet, while the desk had only the document menu
+ * (New, Save, and user-saved presets) and no visual picker for the shipped
+ * looks. The folded desk of a narrow window draws this same grid: the old
+ * overlay's `PresetMenu` that it had instead was deleted in 49c-2.
  * `looks-grid-open` in the desk header opens `looks-grid`, drawing one card
  * `looks-grid-<id>` per shipped preset from `groupedShippedLooks()`, each
  * showing the same lazy-loaded WebP still (`public/looks/<id>.webp`) as the

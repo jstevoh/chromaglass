@@ -13,7 +13,7 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 ## Contracts
 
 - Imports `src/lib`, `src/types`, `presets`, `constants`, React. No components (`useSongRender` takes `FrameDigest`, `VisualizerRender` from `sim/frameTypes.ts`, types only). Never `src/gpu`.
-- Called from `App.tsx` and from the hooks in `src/app/` (several name the hook file they wrap in their headers). Components take `useEarView` and `EarView` (`components/EarLeaves.tsx`: `EarPercent`, `EarMeters`; `settings/SoundSection.tsx`'s room readout), `useEscape`, `useMidiTouch`, `useRemoteLink`, `useGamepad`, `useWakeLock` and the types `TabEdit`, `MidiController`, `Recorder`, `SongRenderState`, `SongShowStatus`.
+- Called from `App.tsx` and from the hooks in `src/app/` (several name the hook file they wrap in their headers). Components take `useEarView` and `EarView` (`components/EarLeaves.tsx`: `EarPercent`; `settings/SoundSection.tsx`'s room readout), `useEscape`, `useMidiTouch`, `useRemoteLink`, `useGamepad`, `useWakeLock` and the types `TabEdit`, `MidiController`, `Recorder`, `SongRenderState`, `SongShowStatus`.
 - `lib/sceneMap`, `lib/songTrack`, `constants.ts` and `sim/` take the type `AudioData` from `useAudioAnalyzer`.
 
 ## Files

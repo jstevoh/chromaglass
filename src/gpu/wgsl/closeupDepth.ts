@@ -195,7 +195,7 @@ fn liquidPart(c: vec3f, rimCol: vec3f, rimS: vec3f, rimA: f32, frac: f32, fracBl
   var base = c;
   if (milkScatter > 0.001) { base = mix(c, vec3f(1.0), milkDiffuseReflectance(milkScatter, milkGap * fracBlack)); }
   let painted = mix(base, rimS / max(rimA, 1e-4), aL);
-  return mix(painted, lit, U.lampGround);
+  return mixLight(painted, lit, U.lampGround);
 }
 fn airColumn(c: vec3f, rimCol: vec3f, rimS: vec3f, rimA: f32, tB: f32, R: f32, rho: f32) -> vec3f {
   let left = clamp(1.0 - min(R, rho) * sqrt(max(0.0, 1.0 - tB * tB)) / max(rho, 1e-6), 0.0, 1.0);

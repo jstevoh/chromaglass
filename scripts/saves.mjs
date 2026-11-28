@@ -232,19 +232,30 @@ try {
   }
 
   // ── A laptop window under the desks' width ────────────────────────
+  /*
+    This used to be the old floating overlay's Save, off `preset-title-button`
+    and listed in `PresetMenu`. 49c-3 (#981) gave every mouse window the
+    folded desk at any width and 49c-2 deleted the overlay, so a 900 px
+    window saves where the desk does: the same `save-look`, the same sheet,
+    and listed under the same look menu. The window keeps its own block
+    because the folded desk is a different layout of those controls, and a
+    Save that falls off a folded header is exactly what would go unseen.
+  */
   {
-    const { ctx, page } = await open({ width: 900, height: 800, ready: 'preset-title-button' });
-    await page.getByTestId('preset-title-button').click();
-    await page.getByTestId('preset-save').click();
-    const confirm = await page.getByTestId('preset-save-confirm').innerText();
-    check('window: the button says Save, not "Save as file"', /^save$/i.test(confirm.trim()), confirm);
-    await page.getByTestId('preset-save-name').fill('Small window');
-    await page.getByTestId('preset-save-confirm').click();
+    const { ctx, page } = await open({ width: 900, height: 800, ready: 'save-look' });
+    check('window: the folded desk is up, not the phone', await count(page, 'perform-desk') === 1 && await count(page, 'phone-stage') === 0
+      && await page.getByTestId('perform-desk').getAttribute('data-narrow') === 'true');
+    await page.getByTestId('save-look').click();
+    check('window: Save asks for a name', await count(page, 'save-sheet') === 1);
+    const confirm = await page.getByTestId('save-confirm').innerText();
+    check('window: the button says Save look (49d), not "Save as file"', /^save look$/i.test(confirm.trim()), confirm);
+    await page.getByTestId('save-name').fill('Small window');
+    await page.getByTestId('save-confirm').click();
     await page.waitForTimeout(300);
     const list = await stored(page);
     check('window: it is saved under that name', list?.length === 1 && list[0].name === 'Small window');
-    await page.getByTestId('preset-title-button').click();
-    check('window: and listed under Yours', await count(page, `preset-menu-${list?.[0]?.id}`) === 1);
+    await page.getByTestId('doc-menu-button').click();
+    check('window: and listed under the look menu', await count(page, `doc-saved-${list?.[0]?.id}`) === 1);
     await ctx.close();
   }
 

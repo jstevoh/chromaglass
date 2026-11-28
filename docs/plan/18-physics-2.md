@@ -267,7 +267,8 @@ Left from 18h, each its own item:
   faint (0–8%), so a strong rainbow is a look and should be named one. The honest
   version is a transported film-thickness field driven by the soap. **Planned as §32**
   (a draining soap film in reflection; its check is written first). Cost: about 0.2 ms.
-- **Linear light:** everything is composited in sRGB-encoded values. The six-band
+- **Linear light** (shipped 2026-11-27 as 38p / 18k-linear: the sums and fades now add light,
+  `wgsl/plateLight.ts`; leftovers 38p-1, 38p-2): everything was composited in sRGB-encoded values. The six-band
   spectral sums, every mix, screen and add, the camera's blur and its bloom are biased
   by that. Decoding at the inputs and encoding in the finish is free, but it moves every
   look a few per cent against the "same picture to the bit" gates, so it goes with a
