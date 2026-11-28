@@ -38,6 +38,22 @@
 // anyone remembering to add it here, and a floor on how many views and
 // elements were judged fails a walk that quietly found nothing.
 //
+// The closed parts (PLAN 49i-guard-2). A view walked as it opens shows
+// only what its panels show at rest: a set's ⋯ menu, the Liquid designer's
+// draft, an "ⓘ What this does" note and a chip's × that appears on hover
+// were held only by review. So inside each desk tab and each settings
+// section the walk also opens what says it is closed: anything with
+// aria-expanded="false" or aria-haspopup, and a button that is only a ⋯,
+// … or ▾. Each is opened, walked and closed again, one at a time, and only
+// what the click drew is judged: a button that says aria-expanded and draws
+// nothing, or a ⋯ that opens nothing, is a view not found, as a tab that
+// goes nowhere is, and a part's walk never re-counts the page around it
+// (its views stay out of the floors below). A control drawn at opacity 0 (revealed on hover) is hovered by its
+// row, one of each kind (its class list), and walked while it shows; the
+// at-rest exemption stays for the rest. The set menu's list, the liquid
+// draft (by the test ids they draw) and a hover reveal must each be walked,
+// so the finder cannot quietly stop finding them.
+//
 // It proves itself before it judges: a page given a 10 px label, a 0.4
 // button and a 0.8 label inside a 0.7 box must fail on exactly those three,
 // and pass a 12 px label at full opacity beside them.
@@ -77,7 +93,7 @@ const browser = await launchChromium(chromium, { headless: true });
  * as. Written as one function so the self-test runs exactly the code the
  * views do.
  */
-function measure({ floorPx, floorOpacity }) {
+function measure({ floorPx, floorOpacity, onlyNew = false, only = null }) {
   const CONTROL = 'button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=switch], [role=slider], [role=tab], [role=checkbox], [role=radio], [role=menuitem], [role=option]';
   // A colour's alpha, whatever syntax the browser computes it to: Tailwind 4's
   // `text-white/40` is `oklab(… / 0.4)` or a `color-mix()`, which a parse of
@@ -117,8 +133,13 @@ function measure({ floorPx, floorOpacity }) {
   };
   const out = { judged: 0, moving: 0, revealed: 0, small: [], faint: [] };
   const seen = new Set();
+  // A closed part is judged by what opening it drew (`onlyNew`: not drawn
+  // when `markDrawn` ran before the click) or by the one control a hover
+  // revealed (`only`), never by the whole page again: a re-walk would judge
+  // nothing the part holds and swell every count (the review of 49i-guard-2).
+  const fresh = (el) => (!onlyNew || !window.__readableDrawn?.has(el)) && (!only || el.closest(only));
   const consider = (el, words) => {
-    if (seen.has(el) || !drawn(el)) return;
+    if (seen.has(el) || !fresh(el) || !drawn(el)) return;
     seen.add(el);
     if (moving(el)) { out.moving += 1; return; }
     // Fully transparent is not drawn: a control revealed on hover or focus
@@ -141,14 +162,14 @@ function measure({ floorPx, floorOpacity }) {
 }
 
 /** Wait for the page's animations to finish (at most `ms`), then walk it. */
-async function walk(page, ms = 4000) {
+async function walk(page, ms = 4000, opts = {}) {
   await page.evaluate(async (ms) => {
     const end = performance.now() + ms;
     while (performance.now() < end && document.getAnimations().some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming?.().endTime))) {
       await new Promise(r => setTimeout(r, 100));
     }
   }, ms);
-  return page.evaluate(measure, { floorPx: FLOOR_PX, floorOpacity: FLOOR_OPACITY });
+  return page.evaluate(measure, { floorPx: FLOOR_PX, floorOpacity: FLOOR_OPACITY, ...opts });
 }
 
 const results = [];
@@ -156,6 +177,101 @@ const results = [];
 const drawnIds = (page) => page.evaluate(() => [...document.querySelectorAll('[data-testid]')].filter(e => e.getClientRects().length).map(e => e.dataset.testid));
 const opensNew = async (page, before) => { const b = new Set(before); return (await drawnIds(page)).some(i => !b.has(i)); };
 const record = (surface, view, m) => results.push({ surface, view, ...m });
+
+/*
+  The closed parts of what is drawn inside `scope` (a CSS selector): openers
+  (aria-expanded false, aria-haspopup, or a button that is only a ⋯ … ⋮ ▾)
+  and controls revealed on hover (drawn, at opacity 0; one of each class
+  list, since the same chip's × drawn forty times is one kind). Each is
+  tagged with a data attribute the app never sets, so the walk can find it
+  again while it lives. An opener's `key` is its nearest test id, its name
+  and its place among openers sharing both (the Setup tab's five "What this
+  does" notes are five), so the set menu two tabs draw is walked once and
+  five notes are five.
+*/
+async function closedParts(page, scope) {
+  return page.evaluate((scope) => {
+    const root = document.querySelector(scope);
+    // Gone is loud: an Escape that closed the whole sheet would otherwise
+    // leave nothing to find, and the rest of its parts unwalked in silence.
+    if (!root) throw new Error(`closed parts: ${scope} is not drawn`);
+    const shown = (e) => e.getClientRects().length && e.checkVisibility({ visibilityProperty: true });
+    const op = (e) => { let o = 1; for (; e; e = e.parentElement) o *= Number(getComputedStyle(e).opacity); return o; };
+    const name = (e) => (e.dataset.testid || e.getAttribute('aria-label') || e.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 30);
+    let n = 0;
+    const tag = (e) => { e.dataset.readableProbe ??= `${Date.now() % 1e6}-${n++}`; return e.dataset.readableProbe; };
+    const count = new Map();
+    const openers = [...root.querySelectorAll('[aria-expanded="false"], [aria-haspopup]:not([aria-expanded="true"]), button')]
+      .filter(e => shown(e) && op(e) >= 0.02 && (e.matches('[aria-expanded="false"], [aria-haspopup]') || /^[⋯…⋮▾]$/.test(e.innerText.trim())))
+      .map(e => {
+        const base = `${e.closest('[data-testid]')?.dataset.testid ?? ''}|${name(e)}`;
+        const k = count.get(base) ?? 0; count.set(base, k + 1);
+        return { probe: tag(e), key: `${base}#${k}`, name: name(e) };
+      });
+    const hovers = [];
+    for (const e of root.querySelectorAll('button, a[href], [role=button]')) {
+      if (!shown(e) || op(e) >= 0.02) continue;
+      hovers.push({ probe: tag(e), row: e.parentElement ? tag(e.parentElement) : null, kind: e.className, name: name(e).replace(/-[a-z0-9-]+$/, '') });
+    }
+    return { openers, hovers };
+  }, scope);
+}
+
+/*
+  Before a click, every element drawn now is remembered, so the walk after it
+  judges only what the click drew.
+*/
+const markDrawn = (page) => page.evaluate(() => {
+  window.__readableDrawn = new WeakSet([...document.querySelectorAll('*')].filter(e => e.getClientRects().length && e.checkVisibility({ visibilityProperty: true })));
+});
+
+/*
+  Open each closed part in `scope`, walk what it drew, close it, one at a
+  time and found afresh before each: closing one can redraw the panel (or
+  `reset` start the page again), and a tag found before that would point at
+  nothing. An opener counts as opened only when the walk judges something it
+  drew: a button that turns aria-expanded and draws nothing, or a ⋯ that
+  opens nothing, is a view not found. A hover counts when the control it
+  reveals is judged (no longer at opacity 0). The test ids a part drew are
+  kept, so the verdict can ask for the set menu's list and the liquid draft
+  by name. `reset` puts the page back when a part will not close (a menu left
+  open covers the next opener) or its closing took the scope with it.
+*/
+async function walkClosed(page, scope, surface, prefix, seen, reset) {
+  const probe = (t) => page.locator(`[data-readable-probe="${t}"]`).first();
+  for (;;) {
+    const o = (await closedParts(page, scope)).openers.find(x => !seen.has(x.key));
+    if (!o) break;
+    seen.add(o.key);
+    const el = probe(o.probe);
+    const before = await drawnIds(page);
+    await markDrawn(page);
+    await el.click({ timeout: 5_000 }).catch(() => {});
+    await page.waitForTimeout(450);
+    const expanded = await el.getAttribute('aria-expanded', { timeout: 1_000 }).catch(() => null);
+    const m = await walk(page, 2500, { onlyNew: true });
+    const drew = (await drawnIds(page)).filter(i => !before.includes(i));
+    record(surface, `${prefix} › ${o.name}`, m.judged > 0 ? { ...m, closed: true, drew } : undefined);
+    // Closed the way it opened, else by Escape; if anything it drew is
+    // still up, or the scope went with it, the page starts again.
+    if (expanded === 'true') await el.click({ timeout: 3_000 }).catch(() => {});
+    else await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    const gone = !(await page.locator(scope).count());
+    if (reset && (gone || await opensNew(page, before))) await reset();
+  }
+  const kinds = new Set();
+  for (const h of (await closedParts(page, scope)).hovers) {
+    if (kinds.has(h.kind)) continue;
+    kinds.add(h.kind);
+    const el = probe(h.probe);
+    await (h.row ? probe(h.row) : el).hover({ timeout: 5_000, force: true }).catch(() => {});
+    await page.waitForTimeout(350);
+    const m = await walk(page, 2500, { only: `[data-readable-probe="${h.probe}"]` });
+    record(surface, `${prefix} › hover ${h.name}`, m.judged > 0 ? { ...m, closed: true, drew: [] } : undefined);
+    await page.mouse.move(0, 0);
+  }
+}
 
 async function openPage({ width, height, touch = false, url, ready, init }) {
   const ctx = await browser.newContext({ viewport: { width, height }, isMobile: touch, hasTouch: touch, deviceScaleFactor: 1, reducedMotion: 'reduce' });
@@ -192,6 +308,36 @@ try {
       `small: ${ids(m.small) || 'none'}; faint: ${ids(m.faint) || 'none'}; ${m.judged} judged`);
     await ctx.close();
   }
+  {
+    // And it opens what is closed: a made-up panel whose words fail only once
+    // opened (a disclosure's 10 px note, a ⋯ menu's 0.4 item, a × at opacity
+    // 0 that hover brings to 0.5) must give three views, each failing on its
+    // part; a disclosure whose note is fine must pass; and a button that
+    // only says it opened (aria-expanded, nothing drawn) and a … that opens
+    // nothing must each be a view not found.
+    const ctx = await browser.newContext({ viewport: { width: 600, height: 400 } });
+    const page = await ctx.newPage();
+    await page.setContent(`<style>.row .x{opacity:0}.row:hover .x{opacity:.5}</style>
+      <body style="background:#000;color:#fff;font:16px sans-serif"><div data-testid="panel">
+      <button aria-expanded="false" data-testid="note" onclick="this.setAttribute('aria-expanded', this.getAttribute('aria-expanded') === 'false');n.hidden=!n.hidden">Note</button>
+      <p id="n" hidden style="font-size:10px">Small note</p>
+      <button aria-expanded="false" data-testid="fine" onclick="this.setAttribute('aria-expanded', this.getAttribute('aria-expanded') === 'false');f.hidden=!f.hidden">Fine</button>
+      <p id="f" hidden>Fine note</p>
+      <button aria-expanded="false" data-testid="liar" onclick="this.setAttribute('aria-expanded', this.getAttribute('aria-expanded') === 'false')">Liar</button>
+      <button data-testid="dots" onclick="m.hidden=false">⋯</button>
+      <button data-testid="empty">…</button>
+      <div id="m" hidden data-testid="menu" onkeydown=""><button style="opacity:.4">Faint item</button></div>
+      <div class="row"><span>A chip</span><button class="x" data-testid="x">×</button></div>
+      </div><script>addEventListener('keydown', e => { if (e.key === 'Escape') m.hidden = true; });</script></body>`);
+    const from = results.length;
+    await walkClosed(page, '[data-testid="panel"]', 'proof', 'made-up', new Set(), null);
+    const got = results.splice(from);
+    const say = (r) => `${r.view.replace('made-up › ', '')}:${r.judged === undefined ? 'unopened' : (r.small.length ? 'small' : '') + (r.faint.length ? 'faint' : '') || 'clean'}`;
+    const seen = got.map(say).join(',');
+    check('a made-up panel\'s closed parts are opened and fail on what they hide: a 10 px note, a 0.4 menu item, a × hover shows at 0.5; a fine note passes; a liar and an empty … open nothing',
+      seen === 'note:small,fine:clean,liar:unopened,dots:faint,empty:unopened,hover x:faint', seen);
+    await ctx.close();
+  }
 
   // ── The desk, 1440 x 900 ─────────────────────────────────────────────
   {
@@ -200,6 +346,7 @@ try {
     const names = [];
     for (const t of tabs) names.push((await t.innerText()).replace(/\s+/g, ' ').trim());
     const deskIds = new Set();
+    const closedSeen = new Set();
     for (let i = 0; i < tabs.length; i++) {
       await tabs[i].click();
       await page.waitForTimeout(600);
@@ -209,6 +356,16 @@ try {
       const fresh = desk && !deskIds.has(desk);
       if (desk) deskIds.add(desk);
       record('desk', `tab ${names[i] || i + 1}`, fresh ? await walk(page) : undefined);
+      if (fresh) {
+        const reset = async () => {
+          await page.goto(SHOW, { waitUntil: 'load' });
+          await page.getByTestId('perform-desk').first().waitFor({ state: 'visible', timeout: 60_000 });
+          await page.waitForTimeout(900);
+          await page.locator('[data-testid="desk-tabs"] button:not([data-testid="tabs-edit"])').nth(i).click();
+          await page.waitForTimeout(600);
+        };
+        await walkClosed(page, '[data-desk="v2"]', 'desk', `tab ${names[i] || i + 1}`, closedSeen, reset);
+      }
     }
     if (tabs.length) { await tabs[0].click(); await page.waitForTimeout(400); }
     // The sheets and menus the desk's header opens.
@@ -241,6 +398,20 @@ try {
       const ok = n === 0 || now !== prev;
       prev = now;
       record('desk', `Settings › ${id.replace('settings-nav-', '')}`, ok ? await walk(page, 2500) : undefined);
+      // A part left open (the liquid draft: a second press of Design starts
+      // a new draft rather than closing it) or an Escape that closed the
+      // sheet: the page starts again, the sheet open at this section.
+      const reopen = async () => {
+        await page.goto(SHOW, { waitUntil: 'load' });
+        await page.getByTestId('perform-desk').first().waitFor({ state: 'visible', timeout: 60_000 });
+        await page.waitForTimeout(900);
+        await page.getByTestId('open-all-settings').first().click();
+        await page.waitForTimeout(800);
+        await page.getByTestId(id).first().click().catch(() => {});
+        await page.waitForTimeout(350);
+      };
+      if (ok) await walkClosed(page, '[data-testid="settings-panel"]', 'desk', `Settings › ${id.replace('settings-nav-', '')}`, new Set(), reopen);
+      prev = await paneText();
     }
     await ctx.close();
   }
@@ -309,12 +480,22 @@ try {
 
 // ── The verdict ──────────────────────────────────────────────────────────
 const walked = results.filter(r => r.judged !== undefined);
+// The floors count views as they open; a closed part's walk is its own count.
+const opened = walked.filter(r => !r.closed);
 const missing = results.filter(r => r.judged === undefined).map(r => `${r.surface} ${r.view}`);
-const per = (s) => walked.filter(r => r.surface === s).length;
-const judged = walked.reduce((n, r) => n + r.judged, 0);
+const per = (s) => opened.filter(r => r.surface === s).length;
+const judged = opened.reduce((n, r) => n + r.judged, 0);
 check('every view found opened, and views enough to mean it (desk 30, phone 12, remote 2)',
   missing.length === 0 && per('desk') >= 30 && per('phone') >= 12 && per('remote') >= 2 && judged >= 15000,
-  `desk ${per('desk')}, phone ${per('phone')}, remote ${per('remote')} views; ${judged} elements judged, ${walked.reduce((n, r) => n + r.revealed, 0)} hidden until hovered${missing.length ? `; not found: ${missing.join(', ')}` : ''}`);
+  `desk ${per('desk')}, phone ${per('phone')}, remote ${per('remote')} views; ${judged} elements judged, ${opened.reduce((n, r) => n + r.revealed, 0)} hidden until hovered${missing.length ? `; not found: ${missing.join(', ')}` : ''}`);
+// The three closed parts 49i-guard-2 names, each walked by name: a finder
+// that stopped finding them would otherwise pass on what is left.
+const closedViews = walked.filter(r => r.closed);
+const MUSTS = [['the set ⋯ menu', r => r.drew.includes('set-menu-list')], ['the Liquid designer draft', r => r.drew.includes('liquid-draft')], ['a control revealed on hover', r => / › hover /.test(r.view)]];
+const lacking = MUSTS.filter(([, ok]) => !closedViews.some(ok)).map(([n]) => n);
+check('the closed parts are opened and walked: the set menu, the liquid draft, a hover reveal, and closed parts enough to mean it (20)',
+  lacking.length === 0 && closedViews.length >= 20,
+  `${closedViews.length} closed parts walked${lacking.length ? `; never walked: ${lacking.join(', ')}` : ''}`);
 const stillMoving = walked.filter(r => r.moving > 5);
 check('the animation exemption excuses no more than a few elements in any view', stillMoving.length === 0,
   stillMoving.map(r => `${r.surface} ${r.view}: ${r.moving} still moving`).join('; ') || `${walked.reduce((n, r) => n + r.moving, 0)} in all`);
