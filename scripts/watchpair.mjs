@@ -13,6 +13,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { watchVideo, writePng, label } from './watch.mjs';
 import { compareReads } from './watchwords.mjs';
+import { loadConfig } from './watchconfig.mjs';
 import { compareOverall } from './watchoverall.mjs';
 
 const stamp = t => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')}`;
@@ -200,7 +201,7 @@ function writePairs(file, b, a) {
  */
 export async function watchPair(before, after, opts = {}) {
   const name = `${path.basename(String(before)).replace(/[^\w.-]+/g, '_')}_vs_${path.basename(String(after)).replace(/[^\w.-]+/g, '_')}`.slice(0, 60);
-  const out = path.resolve(opts.out || path.join(os.tmpdir(), 'chromaglass-watch-pair', name));
+  const out = path.resolve(opts.out || path.join(os.tmpdir(), `${loadConfig().scratch}-pair`, name));
   fs.mkdirSync(out, { recursive: true });
 
   const shared = { ...opts, vs: '', keep: '', before: '', after: '' };

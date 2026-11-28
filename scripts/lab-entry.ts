@@ -29,8 +29,10 @@ import { PRESETS } from '../src/presets';
 import { phasePourShape, PRESET_CONTRACTS, dyesOnPlate } from '../src/presetPlate';
 import { dyeAbsorbances } from '../src/lib/dye';
 import { PALETTE_RGB } from '../src/constants';
-import { squishDisc, glassSpring, PressLift, KICK_HOLD, kickPress, type Stroke } from '../src/lib/squish';
+import { squishDisc, glassSpring, PressLift, KICK_HOLD, KICK_RADII, BassPress, kickPress, type Stroke } from '../src/lib/squish';
+import { layLift } from '../src/sim/pressLay';
 import { RhythmSheet, stampedVolume, kickRoom } from '../src/lib/sheet';
+import { GlassPress, glassDepth } from '../src/lib/glassPress';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
 import { layFinger, handEdge } from '../src/lib/handSolid';
 import { layBreath, BREATH_STRESS } from '../src/lib/breath';
@@ -74,6 +76,8 @@ type Lab = {
   /** Beat Squeeze's rhythm sheet (lib/sheet.ts), made at its first press, and its change laid this step, or null with none. */
   sheet: RhythmSheet | null;
   sheetGap: Float32Array | null;
+  /** The clock glass pressed whole on a kick (lib/glassPress.ts), made at its first press. */
+  glass?: GlassPress;
   /** The magnets the plate was last stepped with, as the app hands them to the picture. */
   magnets: { x: number; y: number; height: number; strength: number }[];
 };
@@ -85,6 +89,8 @@ let lab: Lab | null = null;
 let adapterInfo: { vendor: string; architecture: string; device: string; description: string } | null = null;
 
 let lastDrop: { n: number; h: Float32Array; z: Float32Array } | null = null;
+/** gridLay's bass hand, one a plate (gridLayReset). */
+let bassHand: BassPress | null = null;
 let lastFocusScale = 1;
 /** The colour drops on their way in (PLAN 18c-2), drained a step at a time by `step` as the app's sim drains its own. */
 const drops = makeDropQueue();
@@ -207,6 +213,40 @@ const api = {
       velAdd[idx * 4] += vx; velAdd[idx * 4 + 1] += vy; velAdd[idx * 4 + 3] += gap; mul[idx] *= m;
     }, thin);
   },
+  /**
+   * The app's own writers of the glass on a thin gap (PLAN 18a-15, `npm run
+   * gridlay`), through the classes the plate runs: laid on the lab's L × L
+   * deltas as the 192² grid lays them (`fine` false: what reaches the solver
+   * through the bilinear) or at the solver's own cells (`fine`, as the plate
+   * lays them once its solver has pressBowl and liftSpokes). At grid cell
+   * (x, y), `r` cells: 'press' a bowl of `amount` (always the solver's, the
+   * pressed glass a lift or a release opens); 'bass' the bass's hand followed
+   * to depth `amount` (one BassPress for the plate, so a deeper bass, a move
+   * and a let-go at 0 are each a step of the same hand); 'lift' one step of
+   * the lift's spokes, `amount` its strength (layLift). Returns the gap the
+   * 192² grid's cells were told, summed: the volume either lay must come to.
+   */
+  gridLay(what: 'press' | 'bass' | 'lift', x: number, y: number, r: number, amount: number, fine: boolean, fingering = 0.8) {
+    const { L, velAdd, solver } = lab!;
+    let told = 0;
+    const count = (_: number, g: number) => { told += g; };
+    const cell = (idx: number, gap: number) => { velAdd[idx * 4 + 3] += gap; };
+    const bowl = fine ? (bx: number, by: number, br: number, a: number) => solver.pressBowl(bx, by, br, a) : undefined;
+    if (what === 'press') { solver.pressBowl(x + 0.5, y + 0.5, r, amount); return 0; }
+    if (what === 'bass') {
+      const hand = (bassHand ??= new BassPress()), was = hand.depth;
+      hand.follow(L, x, y, r, amount, true, cell, bowl);
+      squishDisc(L, x, y, r, hand.depth - was, 0, 'press', 0, count, true);
+    }
+    if (what === 'lift') {
+      const spokes = (...a: Parameters<NonNullable<WebGPUFluid['liftSpokes']>>) => solver.liftSpokes(...a);
+      layLift(L, { x, y, radius: r, amount, fingering }, true, cell, fine ? spokes : undefined);
+      squishDisc(L, x, y, r, amount, fingering, 'lift', 0, count, true);
+    }
+    return told;
+  },
+  /** A fresh plate's writers for gridLay: no bass hand down yet, and the sheet by the cubic (`bilinear`: main's, the control). */
+  gridLayReset(bilinear = false) { bassHand = null; lab!.solver.sheetBilinear = bilinear; },
   /** The carries' substeps on the last thin step, and the Courant number that asked for them (carryPlan). */
   async carry() { return lab!.solver.readCarry(); },
   /**
@@ -254,11 +294,38 @@ const api = {
   sheetStep(dt = 1 / 60, spring = BASE.gapSpring, curve = 0) {
     const l = lab!;
     if (!l.sheet?.live) return 0;
-    const out = new Float32Array(l.L * l.L);
+    // Beside the glass's, if it laid this step (glassStep): both add.
+    const out = l.sheetGap ?? new Float32Array(l.L * l.L);
     const cells = l.sheet.step(l.L, dt, spring, out, curve);
     if (cells > 0) l.sheetGap = out;
     return cells;
   },
+  /**
+   * Beat Squeeze's kick on the clock glass, pressed whole, as the app presses
+   * it on a thin gap where the kick is the glass (FluidSimulation.pressKick,
+   * lib/glassPress.ts, PLAN 38w-28): at plate fraction (x, y), each disc of
+   * `radii` (cells of a 128 plate) pressed `amount` as the old stamp took it,
+   * so the middle goes as deep as that stamp closed it. Laid by `glassStep`.
+   * Returns the depth its middle reaches.
+   */
+  glassPress(x: number, y: number, amount: number, radii: number[] = [...KICK_RADII], down?: number) {
+    const l = lab!;
+    if (!l.glass) l.glass = new GlassPress();
+    const depth = glassDepth(amount, radii.length);
+    l.glass.press(l.L, Math.round(x * l.L), Math.round(y * l.L), radii.map((r) => r * l.L / 128), depth, down);
+    return depth;
+  },
+  /** One step of the glass, its change laid for the next flush beside the sheet's, as the app's liftStep lays it. Returns the cells laid. */
+  glassStep(dt = 1 / 60, spring = BASE.gapSpring, curve = 0) {
+    const l = lab!;
+    if (!l.glass?.live) return 0;
+    const out = l.sheetGap ?? new Float32Array(l.L * l.L);
+    const cells = l.glass.step(l.L, dt, spring, out, curve);
+    if (cells > 0) l.sheetGap = out;
+    return cells;
+  },
+  /** What the glass has pressed and laid: for the checks. */
+  glassState() { const g = lab!.glass; return g ? { live: g.live, kicks: g.kicksPressed, steps: g.steps, laid: g.laid, closed: g.closed, opened: g.opened, deepest: g.deepest } : null; },
   /** The sheet's change laid this step moved to the press's channel (the gap column of the velocity deltas), for the check that the press's ceiling cuts its ring. */
   sheetAsPress() {
     const l = lab!;

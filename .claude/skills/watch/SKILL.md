@@ -38,7 +38,9 @@ npm run watchcard               # footage robustness, report card & gap settings
    `~/chromaglass-films/watch/<name>/`, a folder threads may stage from), then
    `device_stage_files` the `source.mkv` and `source.info.json` and watch the
    staged `source.mkv`. The info file is what gives the techniques section the
-   page's description, tags, chapters and links. Vimeo wants a login from
+   page's description, tags, chapters and links. (The Mac, its folder and the
+   reference library come from `scripts/reelreader.config.json`; `docs/watch.md` is
+   the tool's README.) Vimeo wants a login from
    anyone now and its copies are DRM-locked: ask for a screen recording.
 2. **Look at the first sheet, then crop.** If the camera shows the room (a
    tutorial, a gig from the floor), find the projection or the plate on a

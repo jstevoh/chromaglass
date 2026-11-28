@@ -628,13 +628,38 @@ Each lands as a watched take against its reference (`--vs lll-oscilloscope-vecto
 cosmo-packed-foam-cells` for 47z-5), the
 number it moves printed before and after.
 
+## 47p. Packaging the link watcher for anyone (the owner's pick, 2026-11-28) (M)
+
+The owner asked (2026-11-28, after a brainstorm of who else could use it) for the watch tool
+(`npm run watch`, 47v, 47x) to be packaged for public use: liquid and VJ artists, and anyone who
+studies how a video looks and moves (film students, editors, colourists, ad teams, video
+makers, video QA). It reads look and motion, not content. Its public name is **reelreader**,
+under the MIT licence (the owner, 2026-11-28). Five pieces, one PR each, in this
+order; the README is `docs/watch.md`, the plugin's layout `docs/watch-plugin-plan.md`.
+
+- **47p-2** the self-test green on a stock ffmpeg: 47x-6 (A, B, D fail on ffmpeg-full 9.0.2, the
+  Homebrew default has no libvorbis) and 47x-11 (two takes of one look read as changed on
+  Ubuntu, quarantined to 12-06). The root cause, not the bar.
+- **47p-3** general mode by default: the physics read, the liquid-calibrated report card
+  (`REAL_SHOW_CARDS`), "Settings to try" and the wet show's words only for liquid footage or a
+  `--liquid` flag; otherwise a general read in general words, with a check that non-liquid
+  footage gets no liquid verdict.
+- **47p-4** an HTML report and the best moment: one self-contained page per run (sheets,
+  timeline, numbers, the words), and the strongest moment saved as a still and a 10-15 s clip.
+- **47p-5** a shot list and batch runs: cut and dissolve times, each shot's length, the average
+  shot length, a palette per shot and the share of cuts on a beat (CSV and in the summary);
+  `--batch <folder|playlist>` with a table across the videos.
+
+Later, not now: photosensitivity (flash) screening, real units (mm/s), dance and pose, "what is
+in it". The reference library stays private and ships empty (watch-plugin-plan.md, point 3).
+
 ## Order
 
 47a-1 first (the cheapest fix for the photograph's serrated, soft closeup), then 47b (one
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q; 47d-1 shipped), 47a, 47e (its glitter half shipped; 47e-1, 47e-2), 47f, 47k; 47b-2 and 47b-3 after 47b-1; 47g,
-47h, 47i and 47n when wanted; 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
+47h, 47i and 47n when wanted; 47p-2 to 47p-5 in that order (the owner's pick, 2026-11-28); 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
 as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4 in that order (the owner asked
 for the drops' physics and their colour, 2026-11-12; ~~47z-5~~ shipped early, 2026-11-13, as Foam
 Cells), then 47z-7 after 47z-3, 47z-8 and 47z-6 after 28k-2 (a). Each its own thread

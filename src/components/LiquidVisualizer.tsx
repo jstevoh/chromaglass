@@ -3923,13 +3923,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const sqArea = sqAreas ? areaForBand(sqAreas, 'bass', areaKicksRef.current) : null;
                 /*
                   The press is the rhythm sheet's dent, as wide as the sheet bends
-                  over this liquid, or the glass's across the dish where the look
-                  may move the frame (lib/squish.ts kickPress, PLAN 27f-3). The
-                  dent lands anywhere in the middle half of the dish, a finger
-                  finding the glass where it falls; the glass about the middle.
+                  over this liquid, or the whole glass (lib/squish.ts kickPress,
+                  PLAN 27f-3, 38w-28). The dent lands anywhere in the middle
+                  half, a finger finding the glass where it falls; the glass
+                  about the middle.
                 */
                 const nu = thinGapViscosity(currentSettings.gapThickness ?? THIN_GAP_THICKNESS);
-                const press = kickPress(nu, currentSettings.frameSway ?? 0, leadPlate.gpu?.coverMetres);
+                const press = kickPress(nu, currentSettings.frameSway ?? 0, leadPlate.gpu?.coverMetres, currentSettings.kickGlass);
                 const sheet = press.radii.length === 1;
                 const { x: cx, y: cy } = kickCenter(sqArea, sheet, DICE.music);
                 // Twice what it was: at full it showed on 6 looks of 24 with the band playing.

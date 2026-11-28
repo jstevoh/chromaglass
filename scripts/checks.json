@@ -558,6 +558,22 @@
       ]
     },
     {
+      "name": "The watch tool's places come from its config",
+      "shard": "logic",
+      "run": "npm run watchconfig",
+      "why": [
+        "The watch tool is being packaged for anyone (PLAN 47p). Its modules named",
+        "this project's shared folder, a folder on the owner's Mac, Homebrew's bin",
+        "folder and the app's settings map in their code; 47p-1 moved them into",
+        "scripts/reelreader.config.json (scripts/watchconfig.mjs). This holds that no",
+        "watch module names one again (the scan shown to catch the old lines), that",
+        "an empty config gives the general places and no settings map, that this",
+        "repo's config gives the project's, and that a missing config or a map that",
+        "will not load is an error. Node only, under a second; the end-to-end line",
+        "(no map, no Settings to try) is (h2) in npm run watchcard."
+      ]
+    },
+    {
       "name": "Watching in words",
       "shard": "sound",
       "run": "npm run watchwords",
@@ -1953,6 +1969,18 @@
       ]
     },
     {
+      "name": "A thin gap takes the lasting current into its own field",
+      "shard": "lab2",
+      "run": "npm run thincurrent",
+      "why": [
+        "PLAN.md 18a-4 (scripts/thincurrent.mjs): a thin gap's step dispatches none of the current's",
+        "four kernels on the M grid (the old plate, the control, runs all four); the current's share of",
+        "a thin step's lift and pull scales with its dial and is not lagged by Damping (main's was, 0.05);",
+        "with Heat up the lift is water's real density deficit; and the lift is laid at the solver's",
+        "cells, not as the M grid's 2x2 facets or blocks (the old plate's current, the control, reads as both)."
+      ]
+    },
+    {
       "name": "A bubble's colour goes with its liquid",
       "shard": "lab2",
       "run": "npm run bubbledye",
@@ -3208,6 +3236,16 @@
       ]
     },
     {
+      "name": "The bass, a kick's release, the lift and the sheet lay smooth glass",
+      "shard": "plate",
+      "run": "npm run gridlay",
+      "why": [
+        "On a thin gap the glass's other writers reach the solver at its own cells, not",
+        "as the 192² grid's facets: their curvature is spread between the CPU's samples",
+        "as main's is not, with the same volume and pattern as main lays (PLAN 18a-15)."
+      ]
+    },
+    {
       "name": "The Finger drags the liquid",
       "shard": "plate",
       "run": "npm run fingerflow",
@@ -3749,6 +3787,20 @@
         "oil keeps its share of the dye (main handed 0.54% of it to the water),",
         "inside the oil, none stranded in open water, no oil made or lost.",
         "About six minutes on software WebGPU at 192²."
+      ]
+    },
+    {
+      "name": "Lava Pop's hand presses the whole glass and keeps the oil",
+      "shard": "plate",
+      "run": "npm run classichand",
+      "timeout": 25,
+      "why": [
+        "PLAN 38w-28, 38w-35: Lava Pop's water slid where a real dish shears. Lava",
+        "Pop's own dish under 120 bpm kicks on the rigid clock glass and a real",
+        "rock, read as npm run watch reads a film: twice main's own motion, the",
+        "slide under a third, the oil kept in the middle third and the gap back",
+        "at rest, against the old disc kick, which must pump the oil out. Two",
+        "labs side by side, about nineteen minutes on software WebGPU at 256²."
       ]
     },
     {

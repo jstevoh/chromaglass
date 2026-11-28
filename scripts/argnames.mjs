@@ -166,13 +166,16 @@ try {
     that did not run the calls that clashed: the current's own, the flow's
     addCurrent (the open plate's or the thin gap's), and on a spun open dish
     the swirl's projection. And three submits for three steps: one each, so
-    no window ended inside a step.
+    no window ended inside a step. A thin gap runs no current of its own since
+    PLAN 18a-4 (forcesB takes what drives it, under 'current grid thin'), so
+    there 'current step' must not be written at all.
   */
   const wants = (i) => {
     const o = PLATES[i][1];
-    return ['current step', o.thinGap ? 'current grid thin' : 'add current', ...(o.spinLiquid && !o.thinGap ? ['swirl grid'] : [])];
+    return [...(o.thinGap ? [] : ['current step']), o.thinGap ? 'current grid thin' : 'add current', ...(o.spinLiquid && !o.thinGap ? ['swirl grid'] : [])];
   };
-  const missing = r.rows.map((x, i) => wants(i).filter((n) => !x.current.includes(n)));
+  const missing = r.rows.map((x, i) => [...wants(i).filter((n) => !x.current.includes(n)),
+    ...(PLATES[i][1].thinGap && x.current.includes('current step') ? ["no 'current step' (a thin gap's current is forcesB's)"] : [])]);
   const asked = r.rows.every((x, i) => x.names >= 20 && !missing[i].length && x.submits === 3 && x.thin === (PLATES[i][1].thinGap === 1));
   check('names: every plate ran as asked (thin or open), one submit a step, and wrote the current\'s, the flow\'s and the swirl\'s args while watched', asked,
     r.rows.map((x, i) => `${x.name}: ${x.names} names, ${x.submits} submits${x.thin ? ', thin' : ''}${missing[i].length ? `, missing ${missing[i].join(', ')}` : ''}`).join('; '));
