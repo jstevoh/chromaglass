@@ -15,6 +15,7 @@ import { GRID_FILTER_KERNELS } from './fluid/gridFilter';
 import { REACTION_KERNELS } from './fluid/reactions';
 import { FIELD_KERNELS } from './fluid/fields';
 import { SEAL_KERNELS } from './fluid/seal';
+import { STIR_KERNELS } from './fluid/stir';
 import { OUZO_KERNELS } from './fluid/ouzo';
 import { SPLIT_KERNELS, monomorph, perShare } from './fluid/split';
 import { HEAD, NOISE_WGSL, PACKED, THIN_FACE, W } from './fluid/shared';
@@ -45,6 +46,8 @@ export const KERNELS: Record<string, string> = {
   ...FIELD_KERNELS,
   // A standing plate's weight inside a sealed bottle (PLAN 27f-9): see wgsl/fluid/seal.ts.
   ...SEAL_KERNELS,
+  // Turbulence on the thin gap as the closed dish's stir (PLAN 18a-25): see wgsl/fluid/stir.ts.
+  ...STIR_KERNELS,
   // Anise oil out of solution where its alcohol is watered down (PLAN 48s): see wgsl/fluid/ouzo.ts.
   ...OUZO_KERNELS,
   // The dye's two liquids' shares through the faces in one pass (PLAN 38w-33): see wgsl/fluid/split.ts.

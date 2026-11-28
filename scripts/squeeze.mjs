@@ -106,9 +106,13 @@ try {
     const lead = d.fluids[0];
     if (!lead.pressedCells) throw new Error('the lead plate has no pressedCells');
     if (!lead.kickRelease) throw new Error('the lead plate has no kickRelease');
+    if (!lead.glassPress) throw new Error('the lead plate has no glassPress');
+    // On a thin gap Bass Drop's kick is the clock glass pressed whole (lib/glassPress.ts, PLAN 38w-28), on the old plate the discs and KickRelease: both are read.
+    const kr = lead.kickRelease, gp = lead.glassPress;
     return {
       kicks: d.kicks(), kick: lead.pressedCells.kick, depth: lead.pressedDepth.kick, steps: lead.stepCount, squeeze: d.settings.beatSqueeze,
-      released: lead.kickRelease.steps, given: lead.kickRelease.given, pressedKicks: lead.kickRelease.kicks, owed: lead.kickRelease.size,
+      released: kr.steps + gp.releaseSteps, given: kr.given, pressedKicks: kr.kicks + gp.kicksPressed, owed: kr.size + gp.pressing,
+      discKicks: kr.kicks, glassKicks: gp.kicksPressed, glassClosed: gp.closed, glassOpened: gp.opened, glassDown: gp.live, thin: lead.thinGap,
       dt: lead.dtSeconds, stepRate: d.solver().stepRate,
     };
   });
@@ -246,7 +250,7 @@ try {
   */
   await page.waitForFunction(() => {
     const d = window.chromaglassDebug();
-    return d.settings.beatSqueeze === 0 && d.fluids[0].kickRelease.size === 0;
+    return d.settings.beatSqueeze === 0 && d.fluids[0].kickRelease.size === 0 && !d.fluids[0].glassPress.live;
   }, null, { timeout: 10_000 }).catch(() => {});
   await mark('off window');
   const off = await window_(12000);
@@ -390,9 +394,20 @@ try {
       is asked here and nowhere else: discs of the wrong size would give back
       a different sum.
     */
+    /*
+      The glass (a thin gap, PLAN 38w-28) lays its own dent step by step:
+      on a thin gap every one of Bass Drop's kicks is the glass and none the
+      old discs (a plate sent back to the discs pumps the oil out to the rim,
+      38w-35), and once it is up again it opened what it closed less the
+      share the gap's spring gave back on its own (which the glass pressed
+      again each step): opened, and at most what it closed. On the old plate it is the discs, given back as
+      much as they pressed, cell for cell.
+    */
     const t = off.total;
-    check('every kick\'s gap given back, as much as it pressed', t.owed === 0 && t.depth > 0 && Math.abs(t.given - t.depth) <= 0.01 * t.depth,
-      `${t.given.toFixed(3)} given back against ${t.depth.toFixed(3)} pressed over the run`);
+    const discsBack = t.discKicks > 0 && t.glassKicks === 0 && Math.abs(t.given - t.depth) <= 0.01 * t.depth;
+    const glassBack = t.glassKicks > 0 && t.discKicks === 0 && !t.glassDown && t.glassOpened > 0 && t.glassOpened <= t.glassClosed;
+    check('every kick\'s gap given back, the glass\'s on a thin gap and the discs\' on the old plate', t.owed === 0 && t.depth > 0 && (t.thin ? glassBack : discsBack),
+      `${t.thin ? 'thin gap' : 'old plate'}; discs: ${t.discKicks} kicks, ${t.given.toFixed(3)} given back against ${t.depth.toFixed(3)} pressed; glass: ${t.glassKicks} kicks, ${t.glassOpened.toFixed(3)} opened against ${t.glassClosed.toFixed(3)} closed${t.glassDown ? ', still down' : ''}`);
     check('with nothing pressed, nothing is given back', off.released === 0 && off.owed === 0, `${off.released} release steps, ${off.owed} owed`);
   }
 } finally {

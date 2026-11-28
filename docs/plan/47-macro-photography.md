@@ -334,6 +334,28 @@ capillary pass so threads narrower than the gap bead at the Rayleigh-Plateau wav
 *Measure:* bead spacing 9.0 r within 15 %, breakup time against the Tomotika rate for the
 two liquids' viscosity ratio, and a strip wider than the gap stays whole.
 
+*The beading part shipped 2026-11-28* (`npm run pinch`, with 38w-27's `npm run beads`). The
+gap curvature was in (38w-27), but measured, the beads came at the wrong spacing: the
+per-cell clip on the capillary force (OIL_CELLS) bound about twelve times over on a thread's
+edge, so neck and bulge pushed alike and a wave at kr = 1.5, past Plateau's cutoff, grew.
+Now a thread's whole pull is slowed by one factor (THREAD_PULL in
+`src/gpu/wgsl/fluid/capillary.ts`), which keeps the law's shape. Measured against the
+plate's own law (Darcy between the glasses, the oil 1.9 times the clear liquid's viscosity:
+s = (mσ/r³) x sinh x (1 − x²)/(cosh x + m sinh x), fastest at kr = 0.67, 9.4 radii, near
+Rayleigh's 9.0 and Tomotika's 9 to 11): waves past kr = 1 shrink, the fastest of eight is at
+0.70, the three longest grow within 23% of the law's rate, and noisy threads bead 4.3 to 5.1
+widths apart against the law's 4.7 (main: 4.0 to 8.6). The breakup time is the shortcut: a
+real 1 mm thread breaks in milliseconds, the explicit force cannot step that at 60 Hz, so
+the plate's takes about a second (and longer on a finer grid, the factor being in cells a
+step); the implicit capillary, **27f-9s**, takes it out.
+
+- **47k-2. Open: the tendrils from each bead.** The film's beads then throw tendrils into a
+  star: solutal Marangoni spreading from each bead (47g's physics, small), not built.
+- **47k-3. Open: ink threads.** An ink thread in water is miscible, with no interfacial
+  tension, and does not bead by Rayleigh–Plateau; the films' ink channels that do are paint
+  or ink in an immiscible carrier. Which our dye is, on which looks, wants the reference
+  first (47m) before anything is built.
+
 ## 47m. Gear: a small kit to film real references (owner's call, not code)
 
 The realism rule asks for the real phenomenon before each build; three of the items above
@@ -445,23 +467,16 @@ Arnheim's balance, and the wet show's own words (cells, beads, threads, marbling
 a bloom, a turned dish, a pour). Every word carries the number that chose it, a word from
 an unsteady measure says "may vary from take to take", and every word names its source.
 
-- **47x-6** the watch selftest's A, B (sound against motion lag) and D (one composition change
-  in the crossfade) fail on a Mac's ffmpeg-full 9.0.2, on main as well as this branch, and the
-  Homebrew default ffmpeg has no libvorbis, so the selftest cannot make its clips at all. Find
-  whether the encoder or the reads moved, and say in the selftest which ffmpeg it needs.
+- **47x-6b** run `npm run watch -- --selftest`, `npm run watchwords` and `npm run watchcard` on the
+  owner's Mac with ffmpeg-full 9.0.2 and with Homebrew's default ffmpeg, to confirm 47x-6 there.
 - **47x-9** the overall read against itself. Swells, rests and the peak's place come from one
   take of a moving fluid: run two takes of one look through it and find which of its sentences
   hold between takes, as 47x-2 did for the words, and mark the rest as varying. It has no
   check of its own yet: `npm run watchwords` sees only that diff.md still holds its sections.
-- **47x-11** two takes of one look still read as changed on Ubuntu. On main's deploy of
-  2026-11-22 (f825ee6b, Measure sound, after 47x-10 shipped) "drift → drift2 (the same look,
-  another phase): no steady change past a step" failed with show/turnover and show/own flow
-  speed each 1.3 steps apart between the two takes. #936 merged without that shard running,
-  so this is its first Ubuntu read. Find which of the two measures the phase moves (the
-  turnover's window against the stripes' period, as 47x-10 found for the flow), fix the read,
-  not the bar. Quarantined on PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the
-  check now closes on the "n/m checks passed" tally a quarantine counts against, where its old
-  "watchwords: 1 of 58 FAIL" line read as a second FAIL and no quarantine could match.
+- **47x-17** own flow speed on a rigid slide is the read's own floor, 0.11 to 0.16 % of the width a
+  second across phases of one drift, so a ratio between two takes of a picture that only slides
+  can still reach most of a step (0.87 at worst of eight). Take the floor out of it as carried
+  does (47v-5), or let the words compare a show measure under its floor as held.
 - **47x-15** refit the card's bands from the owner's ratings once there are enough.
 - **47x-16** calibrate `REAL_SHOW_CARDS` (`scripts/watchcard.mjs`) with more real optical liquid-show
   references so leave-one-out scoring (`(f2)` in `npm run watchcard`) passes `>= 6` on at least
@@ -611,13 +626,35 @@ Each lands as a watched take against its reference (`--vs lll-oscilloscope-vecto
 cosmo-packed-foam-cells` for 47z-5), the
 number it moves printed before and after.
 
+## 47p. Packaging the link watcher for anyone (the owner's pick, 2026-11-28) (M)
+
+The owner asked (2026-11-28, after a brainstorm of who else could use it) for the watch tool
+(`npm run watch`, 47v, 47x) to be packaged for public use: liquid and VJ artists, and anyone who
+studies how a video looks and moves (film students, editors, colourists, ad teams, video
+makers, video QA). It reads look and motion, not content. Its public name is **reelreader**,
+under the MIT licence (the owner, 2026-11-28). Five pieces, one PR each, in this
+order; the README is `docs/watch.md`, the plugin's layout `docs/watch-plugin-plan.md`.
+
+- **47p-3** general mode by default: the physics read, the liquid-calibrated report card
+  (`REAL_SHOW_CARDS`), "Settings to try" and the wet show's words only for liquid footage or a
+  `--liquid` flag; otherwise a general read in general words, with a check that non-liquid
+  footage gets no liquid verdict.
+- **47p-4** an HTML report and the best moment: one self-contained page per run (sheets,
+  timeline, numbers, the words), and the strongest moment saved as a still and a 10-15 s clip.
+- **47p-5** a shot list and batch runs: cut and dissolve times, each shot's length, the average
+  shot length, a palette per shot and the share of cuts on a beat (CSV and in the summary);
+  `--batch <folder|playlist>` with a table across the videos.
+
+Later, not now: photosensitivity (flash) screening, real units (mm/s), dance and pose, "what is
+in it". The reference library stays private and ships empty (watch-plugin-plan.md, point 3).
+
 ## Order
 
 47a-1 first (the cheapest fix for the photograph's serrated, soft closeup), then 47b (one
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q; 47d-1 shipped), 47a, 47e (its glitter half shipped; 47e-1, 47e-2), 47f, 47k; 47b-2 and 47b-3 after 47b-1; 47g,
-47h, 47i and 47n when wanted; 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
+47h, 47i and 47n when wanted; 47p-2 to 47p-5 in that order (the owner's pick, 2026-11-28); 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
 as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4 in that order (the owner asked
 for the drops' physics and their colour, 2026-11-12; ~~47z-5~~ shipped early, 2026-11-13, as Foam
 Cells), then 47z-7 after 47z-3, 47z-8 and 47z-6 after 28k-2 (a). Each its own thread

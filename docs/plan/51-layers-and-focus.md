@@ -242,10 +242,15 @@ Found while building it, not done:
   for a quarter of the fade at each end; the pass still draws it, because the Mixer's rows
   where neither projector has light go to A's share. Give those rows their own share, then
   skip A's melt when A is dark as B's is.
-- **51c-7 · A plain Go takes a two-projector wall down** (S, the owner's call). Every house
-  look carries Two Projectors off and most a lamp ground of 0, so with Decks off a Go fades
-  the second projector out (the 51c-2 films). Either looks stop carrying the rig (make it
-  `RIG_KEYS`), or keep it as the look's and say so on the Projectors box.
+- **51c-7 · A plain Go takes a two-projector wall down** (S). *Shipped 2026-11-28 (decided
+  for the owner 11-28: looks leave the wall alone).* Every house look carries Two Projectors
+  off and most a lamp ground of 0, so with Decks off a Go faded the second projector out (the
+  51c-2 films). Now, while the wall is built as two (lib/projectorBank's `keepWall`), a plain
+  Go and a song's look hold Two Projectors, the layers and the lamp ground as one; the render
+  style stays the look's (a photograph draws no lamp, and the next show look has both back).
+  Not `RIG_KEYS`, which preset matching and the Design desk read. `npm run decks` 12/12. Open:
+  Lucky still rolls the plates, as the randomiser takes a whole look; opening a look on the
+  Design desk (App's applyPreset) still lays it whole.
 - **51c-8 · A deck show's held lamp under a look made dark** (S). *Decided 2026-11-28
   (the owner: "just pick"): leave it, no code.* With 51c-2c a deck Go keeps the operator's
   lamp ground (1 in the films); Solar Flare's clear water then passes that lamp and reads

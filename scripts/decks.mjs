@@ -40,7 +40,13 @@
  *   5b. every house look sent by a deck Go leaves two projectors on the wall
  *      and both plates' levels as they were (the Mac film of the first build:
  *      the rest of the look switched Two Projectors off mid-dissolve), where
- *      the same looks' whole targets switch it off (the control);
+ *      the same looks' whole targets switch it off (the control); and a
+ *      plain Go and a song's look (PLAN 51c-7) keep it too, the switch, the
+ *      plates and the lamp ground held as one (the control: the switch
+ *      alone still leaves the wall one lamp under a dark-lamp look), only
+ *      while the wall has two (a one-projector wall takes the look whole),
+ *      not as the room's (`RIG_KEYS`, which preset matching reads), and the
+ *      Go's target in the source is the held one;
  *   6. the switch is the rig's: off by default (a Go as before), not
  *      wandered, ridden by a cord or carried by a look, learnable as a
  *      switch; and the wiring reads the source (the App's timers cannot run
@@ -76,11 +82,11 @@ const f3 = (v) => v.toFixed(3);
 
 const out = 'node_modules/.cache/decks.mjs';
 await build({
-  stdin: { contents: "export * from './src/lib/deckDissolve.ts'; export * from './src/lib/focusDissolve.ts'; export { crossfadeWeights } from './src/lib/projectorBank.ts'; export { DEFAULT_SETTINGS } from './src/types.ts'; export { DRIFTABLE } from './src/lib/drift.ts'; export { RIG_KEYS } from './src/lib/lookFade.ts'; export { PATCH_TARGETS, PER_LAYER } from './src/lib/sceneMap.ts'; export { PIN_RANGE } from './src/lib/deskPins.ts'; export { LEARNABLE_SETTINGS } from './src/lib/midi.ts'; export { bankHasTwo } from './src/lib/projectorBank.ts'; export { targetLook } from './src/lib/lookFade.ts'; export { PRESETS } from './src/presets.ts';", resolveDir: '.', loader: 'ts' },
+  stdin: { contents: "export * from './src/lib/deckDissolve.ts'; export * from './src/lib/focusDissolve.ts'; export { crossfadeWeights } from './src/lib/projectorBank.ts'; export { DEFAULT_SETTINGS } from './src/types.ts'; export { DRIFTABLE } from './src/lib/drift.ts'; export { RIG_KEYS } from './src/lib/lookFade.ts'; export { PATCH_TARGETS, PER_LAYER } from './src/lib/sceneMap.ts'; export { PIN_RANGE } from './src/lib/deskPins.ts'; export { LEARNABLE_SETTINGS } from './src/lib/midi.ts'; export { bankHasTwo, keepWall, wallHasTwo, WALL_RIG } from './src/lib/projectorBank.ts'; export { targetLook, evolvedLook } from './src/lib/lookFade.ts'; export { PRESETS } from './src/presets.ts';", resolveDir: '.', loader: 'ts' },
   bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning',
 });
 const m = await import(`../${out}`);
-const { darkDeck, deckPlan, crossAt, dishOf, drawingOf, DECK_RIG, bankHasTwo, targetLook, PRESETS, DARK_SHARE, rackClock, walkRack, startDeckRack, crossfadeWeights, DEFAULT_SETTINGS, DRIFTABLE, RIG_KEYS, PATCH_TARGETS, PER_LAYER, LEARNABLE_SETTINGS } = m;
+const { darkDeck, deckPlan, crossAt, dishOf, drawingOf, DECK_RIG, bankHasTwo, keepWall, wallHasTwo, WALL_RIG, targetLook, evolvedLook, PRESETS, DARK_SHARE, rackClock, walkRack, startDeckRack, crossfadeWeights, DEFAULT_SETTINGS, DRIFTABLE, RIG_KEYS, PATCH_TARGETS, PER_LAYER, LEARNABLE_SETTINGS } = m;
 
 const T = 4, MS = T * 1000, FPS = 60;
 /* A dissolve from `x0` at `start` on clock `c`, walked frame by frame to `end`: each frame's p, crossfade, lights and shares. */
@@ -238,6 +244,50 @@ function softWhileMoving(frames) {
   check('every house look, sent by a deck Go either way, leaves two projectors on the wall, both plates\' levels and the light under the glass where the operator has them; a plain Go to the same looks would switch the second projector off and move the LED (the controls: the bugs the Mac films caught)',
     PRESETS.length > 20 && deckOff === 0 && levels === 0 && plainOff > PRESETS.length / 2 && ledMoves > 0 && DECK_RIG.has('twoProjectors'),
     `${PRESETS.length} looks: a plain Go takes two projectors off in ${plainOff}, a deck Go in ${deckOff}; a plain Go moves ${ledMoves} LED settings, a deck Go's levels and LED moved ${levels}`);
+}
+{
+  /*
+    51c-7 (the owner, 2026-11-28): a plain Go leaves a two-projector wall as
+    the operator built it, and so does a song's look. Every house look from
+    the same wall, held (`keepWall`) and through the song's path
+    (`evolvedLook`), still asked the plate's own question. The controls: the
+    look's whole target switches the wall off (5b above); holding the switch
+    and the plates alone still leaves it one lamp in the looks whose lamp
+    ground is 0; from a one-projector wall the look is laid whole. The
+    owner's one photograph look draws no lamp, so it is counted apart: what
+    is asked of it is that the Go after it brings both projectors back.
+  */
+  const wall = { ...DEFAULT_SETTINGS, layerCount: 2, twoProjectors: 1, lampGround: 1, backBlend: 'own', projDeck: 0, projCross: 0 };
+  const one = { ...wall, twoProjectors: 0 };
+  // Each of the other three things a two-projector wall needs, missing: the look is laid whole there too (the skeptic's pass: the switch alone was the only control).
+  const halfBuilt = [{ ...wall, layerCount: 1 }, { ...wall, lampGround: 0 }, { ...wall, backBlend: 'add' }];
+  let goOff = 0, songOff = 0, switchOnly = 0, oneMoved = 0, otherMoved = 0, photos = 0, photoBack = 0;
+  const show = PRESETS.find(p => targetLook(wall, p.settings).renderStyle !== 'photo');
+  for (const p of PRESETS) {
+    const full = targetLook(wall, p.settings);
+    const go = keepWall(full, wall);
+    // A photograph draws no lamp (the look's render style, not held): the wall reads one there, and a Go out of it to a show look has both back.
+    if (go.renderStyle === 'photo') {
+      photos++;
+      if (wallHasTwo(keepWall(targetLook(go, show.settings), go))) photoBack++;
+    } else if (!wallHasTwo(go)) goOff++;
+    if (!wallHasTwo(evolvedLook(wall, p.settings))) songOff++;
+    if (!wallHasTwo({ ...full, twoProjectors: wall.twoProjectors, layerCount: wall.layerCount })) switchOnly++;
+    const oneFull = targetLook(one, p.settings);
+    if (keepWall(oneFull, one) !== oneFull) oneMoved++;
+    for (const h of halfBuilt) { const t = targetLook(h, p.settings); if (keepWall(t, h) !== t) oneMoved++; }
+    // Nothing but the three held: the rest of the look, the render style among it, is the look's.
+    for (const k of Object.keys(full)) if (!WALL_RIG.includes(k) && go[k] !== full[k]) otherMoved++;
+  }
+  const fades = readFileSync('src/app/useLookFades.ts', 'utf8');
+  const send = fades.slice(fades.indexOf('const sendLook ='), fades.indexOf('const goLook ='));
+  const wired = /const target = keepWall\(targetLook\(settingsRef\.current, next\.settings\), settingsRef\.current\);/.test(send)
+    && (send.match(/targetLook\(/g) ?? []).length === 1 && /lookPhase\(target\)/.test(send) && /fadeSettingsTo\(target, fade/.test(send)
+    && /const twoOnWall = wallHasTwo;/.test(fades);
+  const notRoom = WALL_RIG.length === 3 && WALL_RIG.every(k => !RIG_KEYS.has(k));
+  check('a plain Go and a song\'s look leave a two-projector wall as it is, every house look (a photograph\'s, which draws no lamp, gives both back at the next Go): the switch, the plates and the lamp ground held as one, nothing else, only while the wall has two, not as the room\'s, and the Go lays the held target (the controls: the switch alone leaves the wall one lamp under a dark-lamp look; a one-projector wall takes the look whole)',
+    PRESETS.length > 20 && goOff === 0 && songOff === 0 && switchOnly > 0 && oneMoved === 0 && otherMoved === 0 && notRoom && wired && photos > 0 && photoBack === photos,
+    `${PRESETS.length} looks: two off after a plain Go ${goOff}, after a song ${songOff}; the switch alone leaves one lamp in ${switchOnly}; a one-projector wall changed ${oneMoved}; other settings held ${otherMoved}; photo looks ${photos}, both back after ${photoBack}; not the room's ${notRoom}; the Go wired ${wired}`);
 }
 
 // ── 6. The switch, and the wiring ──────────────────────────────────────

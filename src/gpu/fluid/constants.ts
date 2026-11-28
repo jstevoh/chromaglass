@@ -950,7 +950,13 @@ export const LIFT_SWEEPS = 8;
   are in (sealReady), as it always did.
 */
 export const SEAL_KERNEL_NAMES = ['sealSource', 'hsLiftRelax', 'sealFlow'];
-export const LIFT_KERNELS = ['hsLiftSource', 'hsLiftRelax', 'hsLiftRelaxOil', 'sealSource', 'sealFlow'];
+/*
+  And Turbulence's stir on the thin gap (PLAN 18a-25, wgsl/fluid/stir.ts),
+  relaxed on hsLiftRelax too: until they are in (stirReady) the thin gap is
+  not stirred, rather than stirred out through its open rim.
+*/
+export const STIR_KERNEL_NAMES = ['stirSource', 'hsLiftRelax', 'stirFlow'];
+export const LIFT_KERNELS = ['hsLiftSource', 'hsLiftRelax', 'hsLiftRelaxOil', 'sealSource', 'sealFlow', 'stirSource', 'stirFlow'];
 /*
   The oil's own kinematic viscosity, from Oil Thickness (PLAN 38w-31): the
   same log scale as the clear liquid's Thickness, 10^(3t) times water's, so

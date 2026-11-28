@@ -12,7 +12,7 @@ import type { ShowSequence } from '../lib/sequencer';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 import type { MixSource } from '../lib/mixer';
 import { setGoDoor } from './setNow';
-import { bankHasTwo } from '../lib/projectorBank';
+import { keepWall, wallHasTwo } from '../lib/projectorBank';
 import { focusDraws } from '../lib/projectorFocus';
 import { crossAt, deckPlan, dishOf, drawingOf } from '../lib/deckDissolve';
 
@@ -112,7 +112,7 @@ export function useLookFades({
     and so is a look on either side that the focus pass cannot blur (Glitter,
     the side lamp, the tank: `focusDraws`): there it is the plain fade.
   */
-  const twoOnWall = (s: VisualizerSettings) => bankHasTwo(s, Math.round(s.layerCount ?? 1), s.renderStyle === 'photo' ? 0 : s.lampGround ?? 0);
+  const twoOnWall = wallHasTwo;
   /** After `delayMs` on the show clock, on wait `w` (at once for none). */
   const after = (w: RefObject<ShowIntervalHandle | null>, delayMs: number, fn: () => void) => {
     stopWait(w);
@@ -242,9 +242,10 @@ export function useLookFades({
     // colours with it, handed over across the fade rather than left to
     // evaporate for minutes under the new ones. A cut still gets a second.
     // Inside a focus dissolve's rack, from the plate as it is when the change goes in.
+    // All but a two-projector wall, which stays as the operator built it (lib/projectorBank's keepWall, PLAN 51c-7).
     dissolve(frontWait, seconds, false, next.settings, (fade) => {
       adoptPreset(next.id);
-      const target = targetLook(settingsRef.current, next.settings);
+      const target = keepWall(targetLook(settingsRef.current, next.settings), settingsRef.current);
       visualizerRef.current?.handoff(Math.max(1, fade), lookPhase(target));
       fadeSettingsTo(target, fade, false, [], true);
     });

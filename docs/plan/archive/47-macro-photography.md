@@ -131,3 +131,43 @@ blur.
   maps every comparable measure to `DEFAULT_SETTINGS` keys (`src/types.ts`) with real physics
   before post grades, and `gapSettings(gaps)` writes `## Settings to try` under `--vs` (with
   current values when `--settings` or a take's settings block is given).
+
+## 47p. Packaging the link watcher for anyone (the owner's pick, 2026-11-28) (M)
+
+- ~~**47p-1** unhook it from this repository~~ (shipped, this PR): the shared folder, the owner's
+  Mac folders, Homebrew's bin folder and the settings map moved out of the code into
+  `scripts/reelreader.config.json` (`scripts/watchconfig.mjs`); "Settings to try" only when a map is
+  configured; `docs/watch.md` with the limits (YouTube only from a home connection, Vimeo
+  can't be fetched, only videos you have the right to). `npm run watchconfig` 16/16 (before:
+  10 lines in watch.mjs and watchrefs.mjs named a project place); (h2) in `npm run watchcard`.
+
+## 47x. Watching in words, and what changed between two films (S–M)
+
+- ~~**47x-6**~~ the watch selftest's A, B (sound against motion lag) and D (one composition change
+  in the crossfade) failed on a Mac's ffmpeg-full 9.0.2, and the Homebrew default ffmpeg has no
+  libvorbis (shipped, 47p-2). Reproduced on Ubuntu's ffmpeg 6.1 by making the clips with libopus:
+  the same three failed. The encoder moved where the container puts the first frame (libvorbis
+  32 ms in, libopus 7 ms), and the reads counted picture and sound each from its own start, with
+  ffmpeg's fps filter taking for sample k the frame up to half a sample after k / rate. Now the
+  picture's first frame is zero for both (`sampleAt`, `pictureStart` in watch.mjs) and sample k
+  is the frame on screen at k / rate; the colour-cut test bins colours softly (`softBin`), since
+  a crossfade crossing a hard bin edge jumped 0.31 in one sample and read as a cut. Clips are made
+  with libvorbis or libopus, whichever the build has (`clipAudio`). Both encoders: all ok, A's
+  r 0.72 → 0.83. Not yet run on the Mac's ffmpeg-full 9.0.2 itself: **47x-6b**.
+- ~~**47x-11**~~ two takes of one look read as changed on Ubuntu (shipped, 47p-2): show/turnover
+  and own flow speed 1.3 steps apart. The stripes are one-way and repeating, and the flow read
+  failed both ways on them. With no texture up and down, every level of the search took a
+  vertical shift at random, the chain through time scaled it, and seeds left the picture; and
+  the seeded match was judged by a ratio of two SADs both at the codec's floor, so in some pairs
+  a quarter of the blocks took the stripes' alias 17 pixels back and dragged the fit to half the
+  speed. `flowField` now keeps a one-way block's motion along its texture to what the level above
+  or the seed predicted (`seen`, the aperture problem, structure tensor under `APERTURE` 0.02),
+  and lets the search's own match beat the seed only by more than the pair's grain (the median
+  best match). The two takes now read 0.112 and 0.120 % a second (were 0.75 and 1.26), eight
+  phases 0.11 to 0.16, p90 0.23 to 0.27 (was up to 8). Quarantine lifted.
+
+## 47p. Packaging the link watcher for anyone (the owner's pick, 2026-11-28) (M)
+
+- ~~**47p-2**~~ the self-test green on a stock ffmpeg (shipped, this PR): 47x-6 (A, B, D fail on ffmpeg-full 9.0.2, the
+  Homebrew default has no libvorbis) and 47x-11 (two takes of one look read as changed on
+  Ubuntu, quarantined to 12-06). The root cause, not the bar.

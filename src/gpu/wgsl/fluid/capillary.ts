@@ -28,6 +28,48 @@ export const THREAD_CELLS = 2.0;
 /** How far THREAD reads across the oil each way, in cells: past a 768² grid's rest gap (7.7 cells) and its blur; a walk that runs out of it is across a wide body. */
 export const THREAD_REACH = 12;
 /*
+  A thread's pull, slowed as a whole (PLAN 47k, \`npm run pinch\`): σ in a
+  thread's cells is at most THREAD_PULL caps (A.a.y, OIL_CELLS a step) per
+  unit of curvature and edge, about four cells³ a step on any grid.
+
+  Measured on main: the beads came at the wrong spacing, and waves too short
+  to bead grew. Every cell's capillary force is clipped to the most the oil
+  may move in a step, and at the oil's tension (0.024 N/m, Darcy's
+  h²/12μ on the 2 mm gap) a 4-cell thread's edge asks for about twelve times
+  that: so every edge cell of a thread pushed at the cap whatever its
+  curvature, the neck and the bulge alike, and the force kept only its sign.
+  Rayleigh–Plateau lives in the difference between the neck's pressure and
+  the bulge's, and the clip had taken it out: on main a wave at kr = 1.5,
+  which a real thread smooths, grew at 0.055 a step, faster than the one at
+  0.55, and four threads from the same noise broke into 13 to 28 beads.
+
+  The obvious fix, no clip, cannot run: a thread a millimetre wide on the
+  real gap breaks at σ/r³, about a thousand a second, and the explicit
+  force's stable step is a hundredth of a frame. A smaller clip, or a soft
+  one, has the same fault, since whatever bounds each cell's force by its
+  own size flattens the law. What keeps the law is one factor for the whole
+  thread: every thread cell's force times the same number, so the neck's
+  pull over the bulge's is what the curvatures say and the thread beads at
+  the law's wavelength, 9.4 radii for the plate's oil (4.7 widths; Rayleigh's
+  inviscid free thread is 9.0), only slower: it pinches in about a second,
+  where a real one takes milliseconds the frame cannot show. The factor is
+  set by the grid's step, as the clip is, so on a finer grid the same thread
+  is slower; eight caps keeps a 4-cell thread's edge at about half a cap,
+  under the clip, which still stands behind it for the thinnest threads and
+  their tips. The real fix is the capillary laid implicitly (PLAN 27f-9s),
+  which takes the factor out.
+
+  Wide bodies (threadCurve 0) are as they were, to the bit, and that is
+  this factor's own limit: a bead or a pool wider than the gap still pushes
+  at the clip beside a slowed neck, so late in a break-up, and where a
+  thread leaves a pool, the two sides are not on one law (the skeptic pass
+  on \`npm run pinch\`, 2026-11-28). And while the factor binds, which on
+  the thin gap is from Oil Tension 0.05 or so up, the dial no longer
+  changes a thread's speed; on main the clip made it barely change either.
+  Both go with the factor (27f-9s).
+*/
+export const THREAD_PULL = 8;
+/*
   The oil's capillary force, σ κ ∇c̃, at one cell (mixForce has the physics),
   shared by mixForce and rimLaplace so the rim reads the very force the flow
   is given. Both bind the oil's blur as \`soft\`; A.a.x is σ and A.a.y the most
@@ -152,11 +194,15 @@ fn threadCurve(p: vec2i, g: vec2f, n: f32) -> f32 {
 }
 // σ κ ∇c̃. The normal's divergence by central differences of the normals
 // themselves, not a second derivative of c: that is the step that keeps the
-// grid out of it. And the thread's own curvature across the gap (above).
+// grid out of it. And the thread's own curvature across the gap (above),
+// its whole pull slowed by THREAD_PULL's one factor before the clip, so the
+// clip does not flatten Rayleigh–Plateau (PLAN 47k).
 fn capillaryAt(p: vec2i, n: f32) -> vec2f {
   let g = grad(p, n);
   let kappa = -0.5 * ((nrm(p + vec2i(1, 0), n).x - nrm(p - vec2i(1, 0), n).x) + (nrm(p + vec2i(0, 1), n).y - nrm(p - vec2i(0, 1), n).y));
-  var f = A.a.x * (kappa + threadCurve(p, g, n)) * g;
+  let t = threadCurve(p, g, n);
+  var f = A.a.x * (kappa + t) * g;
+  if (t != 0.0) { f *= min(1.0, ${THREAD_PULL.toFixed(2)} * A.a.y / max(A.a.x, 1e-20)); }
   let l = length(f);
   if (l > A.a.y) { f *= A.a.y / l; }
   return f;
