@@ -311,12 +311,14 @@ is in the project's files).
   so its shear is the breathing and little stays; the 1969 hand also slid and turned the second
   glass, not only pressed it. Find what the period hand did besides (the films), model that,
   and raise the check's bars to the real shows'.
-- **38w-37. The oil still drifts outward under the rigid glass** (S; Medium). With the gap back
+- **38w-37. The oil still drifts outward under the rigid glass** (S; High). With the gap back
   at rest to five places after every kick, Lava Pop's oil in the middle third still loses about
-  0.35 points a second at full Beat Squeeze (none under the rock alone), an eighth of the old
-  discs' pump. Stokes flow round a reciprocal stroke should return it: find whether it is the
-  solver's inertia (the drag time h²/12ν is 0.3 s in 2 mm of water, as long as a kick), the
-  advection's diffusion or Cahn–Hilliard, and whether it saturates over a song.
+  0.3 points a second at full Beat Squeeze (none under the rock alone), an eighth of the old
+  discs' pump, and it had not settled in 20 s (65.6 → 59.7%, `node scripts/classichand.mjs
+  --hand=look --oil` with SECS=20). Stokes flow round a reciprocal stroke should return it: find
+  whether it is mixing toward an even dish (the lay starts two thirds of its oil in the middle
+  third), the solver's inertia (the drag time h²/12ν is 0.3 s in 2 mm of water, as long as a
+  kick), the advection's diffusion or Cahn–Hilliard.
 - **38w-38. oilride's hand is 60x the app's** (S; Low, a note from 38w-28's probe). oilride.mjs
   passes Beat Squeeze's dial (0.6) as lab.sheetPress's amount; the app passes kickDepth × share
   (about 0.01). Hand it the app's amount and re-read its numbers.
