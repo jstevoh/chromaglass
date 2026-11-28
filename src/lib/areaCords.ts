@@ -163,12 +163,15 @@ export function masterGain(m: SceneMapping, gains: MasterGains | undefined): num
 /*
   The hand's numbers, at a cord at full depth and full reading.
 
-  Heat: 1.5 K/s. The lamp heats dark dye at 0.24 K/s (18f's LAMP_HEATING, from
-  a kilowatt a square metre into a millimetre of water); a hot-air gun a hand
-  holds under a dish puts several times that into a spot. With Newton cooling
-  at about 12 s a held full cord settles some 18 K up, 36% runnier water in
-  18f's mobility, and a kick's envelope of a few tenths of a second adds a
-  few tenths of a kelvin that a run of kicks builds on.
+  Heat: 1.5 K/s. The lamp heats dark dye at 0.060 K/s (I/C, PLAN 38f-3: a
+  kilowatt a square metre into the 2 mm of water and its two glasses); 1.5
+  K/s over that sandwich is 25 kW/m², a hot-air gun a hand holds under a
+  dish, into a spot. This was written against the cooling's 12 s on the
+  lab's clock (a held full cord some 18 K up, 36% runnier water in 18f's
+  mobility); the cooling is on real seconds since 38f-3, 48 s at Heat Decay
+  0.98 on every look, so a held full cord climbs for most of a minute and
+  a kick's envelope of a few tenths of a second adds a few tenths of a
+  kelvin that a run of kicks builds on.
 
   Stir: one turn of the paddle in 1.2 s, round a circle 0.45 of the area's
   radius, the paddle 0.3 of it: a hand folding a pool, not whisking it. On

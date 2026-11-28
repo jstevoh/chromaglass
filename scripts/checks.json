@@ -3823,7 +3823,10 @@
         "Heat from the lamp (PLAN 18f): dark dye absorbs heat via Beer–Lambert,",
         "warm liquid rises on an upright plate, viscosity falls ~2%/K, oil floats,",
         "Newton cooling decays per-second with a tens-of-seconds time constant, and on a",
-        "thin gap the heat rides the liquid with its colour (PLAN 38f-1, carryHeat)."
+        "thin gap the heat rides the liquid with its colour (PLAN 38f-1, carryHeat).",
+        "Since 38f-3 the budget is in watts and real seconds: the lamp warms the liquid",
+        "and both glasses at I·a/C, the air and the glass's glow take 2·(h_air + h_rad)·ΔT,",
+        "the same on every look's clock, and a step's change under a half float lands."
       ]
     },
     {

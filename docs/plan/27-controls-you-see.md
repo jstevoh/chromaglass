@@ -201,7 +201,9 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       (LAMP_HEAT), which hovers for the same reason 27f-9h found. Wanted: the glass as a
       temperature per cell (stationary, so not carried), heated by the lamp at the floor,
       warmed by the liquid through the gap and cooled by the air at h ≈ 10 W/m²K, for dye
-      and oil alike; then the cycle's period should follow the lamp.
+      and oil alike; then the cycle's period should follow the lamp. With it, the glass's
+      radiation from its own T⁴ (38f-3 folds it into S.heatLoss linearised at 20 °C, 28%
+      under the real one at 50 K up) and C per cell at the local gap rather than the cover's.
     - **27f-9i, open. The wax's capillary length is a quarter of a real lamp's.** At the Dye
       Weight 0.5 a standing plate runs (27f-9j) the wax's ℓc is about 3.5 mm against a real
       lamp's 1.5 cm. The full answer is σ per liquid in N/m (§38e's bottles) with the wax's own

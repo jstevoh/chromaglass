@@ -5,10 +5,12 @@
  *   npm run heat
  *
  * Checks:
- *   1. Beer-Lambert absorption: dark dye heats up under the lamp, clear water stays cold
+ *   1. Beer-Lambert absorption: dark dye heats up under the lamp at I·a/C (PLAN 38f-3: the
+ *      lamp's watts into the liquid and both glasses), clear water stays cold
  *   2. Lamp dimmer: dimmer at 0 produces no heat, scales linearly at 0.5
- *   3. Newton cooling: decay is per-second (dt-independent), so 60 steps at dt=1/60
- *      and 120 steps at dt=1/120 cool to the same temperature (within 2%, vs 336% per-step)
+ *   3. Newton cooling: decay is per real second (the step's seconds, not its count), so 60
+ *      steps of 1/60 s and 120 of 1/120 s cool to the same temperature, the sandwich's
+ *      C/(2·(h_air + h_rad)) (PLAN 38f-3)
  *   4. Thermal buoyancy: on a level plate in-plane buoyancy is zero; on an upright
  *      plate warm liquid forms an upward plume along S.up
  *   5. Linear Boussinesq: thermal buoyancy is linear in temperature (tanh removed),
@@ -21,6 +23,10 @@
  *      of equal volume/density (Beer-Lambert decode via lampThrough)
  *   9. The heat rides the liquid on a thin gap (PLAN 38f): a warm heavy blob sinking down a
  *      standing plate takes its heat with its colour (carryHeat)
+ *  10. The cooling is the same on every look's clock (PLAN 38f-3): ten real seconds cool a
+ *      10 K patch to 10·exp(−10/τ) whether the look steps dt 0.004 or 0.0013, which also asks
+ *      a step's change smaller than a half float's unit to land (the heat's dither)
+ *  11. At Heat Decay 1 the glass still radiates (PLAN 38f-3): 2·4εσT₀³ over C, not nothing
  *
  * Owed line (PLAN 36e-6), red until built, run as `npm run heat -- --owed=once`:
  *   once  the lamp's heat diffuses once: a 50 K spot on a level plate spreads as
@@ -54,6 +60,19 @@ const line = (id, name, ok, detail, mainState) => {
   console.log(` owed  ${name} — ${detail}`);
 };
 
+/*
+  The plate's heat budget, written out here from its physics rather than
+  read from the solver (src/gpu/fluid/heat.ts has the reasons): the liquid at
+  the lab's rest gap of 2 mm and its two 2 mm glasses warm as one sheet of
+  heat capacity C a square metre; the lamp puts 1000 W/m² times the dye's
+  share in; both faces lose to the air at Heat Decay's h = 8360·(−ln v) and
+  by radiation, 4εσT₀³ at 20 °C.
+*/
+const C_PLATE = 4.18e6 * 0.002 + 2 * 2500 * 840 * 0.002;
+const LAMP_W = 1000;
+const GLOW = 4 * 0.9 * 5.670e-8 * 293.15 ** 3;
+const lossRate = (v) => (2 * (-8360 * Math.log(v) + GLOW)) / C_PLATE; // per second
+
 const { page, close } = await openLab();
 const gpuErrors = [];
 page.on('console', (m) => {
@@ -74,6 +93,9 @@ try {
     const cornerIdx = (Math.floor(N * 0.1) + Math.floor(N * 0.1) * N) * 4;
     const tempCenterA = vA[midIdx + 2];
     const tempCornerA = vA[cornerIdx + 2];
+    // The share of the lamp the dye there takes: 1 − the mean of exp(−absorbance) (the decay kernel's lampThrough).
+    const dA = await lab.field('dye');
+    const shareA = 1 - (Math.exp(-dA[midIdx]) + Math.exp(-dA[midIdx + 1]) + Math.exp(-dA[midIdx + 2])) / 3;
 
     // Test B: Lamp off (dimmer: 0), pool of dark dye in center
     await lab.create(N, N);
@@ -91,13 +113,21 @@ try {
     const vC = await lab.field('vel');
     const tempCenterC = vC[midIdx + 2];
 
-    return { tempCenterA, tempCornerA, tempCenterB, tempCenterC };
+    return { tempCenterA, tempCornerA, tempCenterB, tempCenterC, shareA };
   });
 
+  /*
+    Half a second of lamp (30 steps of the lab's sixtieth): the dark pool
+    takes I·a/C·(1 − e^−λt)/λ, the share of it the air lets it keep. The bar
+    was 0.03 K, set when the lamp warmed a millimetre of water at 0.24 K/s
+    (0.08 K here); it is now the budget itself, within 5% (PLAN 38f-3).
+  */
+  const lam1 = lossRate(0.98), t1 = 30 / 60;
+  const want1 = (LAMP_W * heating.shareA / C_PLATE) * (1 - Math.exp(-lam1 * t1)) / lam1;
   check(
-    'Beer-Lambert absorption: dark dye heats under lamp while clear water stays cold',
-    heating.tempCenterA > 0.03 && heating.tempCornerA < 0.0001,
-    `dark dye ${heating.tempCenterA.toFixed(4)} K, clear water ${heating.tempCornerA.toFixed(4)} K`
+    'Beer-Lambert absorption: dark dye heats under the lamp at I·a/C into the liquid and both glasses, clear water stays cold',
+    Math.abs(heating.tempCenterA / want1 - 1) < 0.05 && heating.tempCornerA < 0.0001,
+    `dark dye ${heating.tempCenterA.toFixed(4)} K against I·a/C's ${want1.toFixed(4)} K (a = ${heating.shareA.toFixed(3)}, ${(heating.tempCenterA / want1).toFixed(3)}x), clear water ${heating.tempCornerA.toFixed(4)} K`
   );
 
   check(
@@ -141,7 +171,7 @@ try {
     await lab.create(N, N);
     lab.vel(0.5, 0.5, 0.25, [0, 0, 10.0, 0]);
     lab.flush();
-    await lab.step(60, { thinGap: 1, dimmer: 0.0, heatDecay: 0.98, dt: 1 / 60, diff: 0, nu: 0, advection: 0 });
+    await lab.step(60, { thinGap: 1, dimmer: 0.0, heatDecay: 0.98, dt: 1 / 60, magnetSeconds: 1 / 60, diff: 0, nu: 0, advection: 0 });
     const vA = await lab.field('vel');
     const tempA = vA[mid + 2];
 
@@ -149,18 +179,25 @@ try {
     await lab.create(N, N);
     lab.vel(0.5, 0.5, 0.25, [0, 0, 10.0, 0]);
     lab.flush();
-    await lab.step(120, { thinGap: 1, dimmer: 0.0, heatDecay: 0.98, dt: 1 / 120, diff: 0, nu: 0, advection: 0 });
+    await lab.step(120, { thinGap: 1, dimmer: 0.0, heatDecay: 0.98, dt: 1 / 120, magnetSeconds: 1 / 120, diff: 0, nu: 0, advection: 0 });
     const vB = await lab.field('vel');
     const tempB = vB[mid + 2];
 
-    const theory = 9.9765625 * Math.pow(0.98, 4.0);
-    return { tempA, tempB, theory, ratio: tempA / Math.max(tempB, 1e-6) };
+    return { tempA, tempB, ratio: tempA / Math.max(tempB, 1e-6) };
   });
+  /*
+    One real second: both runs say so in magnetSeconds, the step's real
+    seconds, which the cooling now runs on (PLAN 38f-3; it ran on dt, the
+    look's clock, as 0.98^(4·dt), so the runs set only dt). The theory is
+    the sandwich's: 9.9765625 (the splat's 10 in a half float) times
+    exp(−2·(h_air + h_rad)·1 s/C), where 0.98^4 was the old fade's.
+  */
+  cooling.theory = 9.9765625 * Math.exp(-lossRate(0.98));
 
   check(
     'Newton cooling is per second (dt-independent)',
-    Math.abs(cooling.ratio - 1.0) < 0.05,
-    `60 steps at 1/60s: ${cooling.tempA.toFixed(4)}, 120 steps at 1/120s: ${cooling.tempB.toFixed(4)}, theory ${cooling.theory.toFixed(4)}, ratio ${cooling.ratio.toFixed(4)} (per-step would be 3.36x)`
+    Math.abs(cooling.ratio - 1.0) < 0.05 && Math.abs(cooling.tempA / cooling.theory - 1) < 0.02,
+    `60 steps at 1/60s: ${cooling.tempA.toFixed(4)}, 120 steps at 1/120s: ${cooling.tempB.toFixed(4)}, theory ${cooling.theory.toFixed(4)} (${(cooling.tempA / cooling.theory).toFixed(4)}x), ratio ${cooling.ratio.toFixed(4)} (per-step would be 3.36x)`
   );
 
   // ── 4: Thermal buoyancy is zero on level plate, active on upright plate ──
@@ -374,6 +411,48 @@ try {
     'the heat rides the liquid on a thin gap: a sinking warm blob takes its heat down with its colour (PLAN 38f)',
     rides.dyeShift < -1 && rides.heatShift < 0.8 * rides.dyeShift && rides.heatShift > 1.2 * rides.dyeShift && Math.abs(rides.kept - 1) < 0.03,
     `colour moved ${rides.dyeShift.toFixed(2)} cells, heat ${rides.heatShift.toFixed(2)} (0 without the carry), heat kept ${(rides.kept * 100).toFixed(1)}%`
+  );
+
+  // ── 10, 11: the cooling in real seconds on every look's clock, and the glass's glow (PLAN 38f-3) ──
+  /*
+    A 10 K patch in still water on a thin gap, no lamp, ten real seconds of
+    sixtieths (600 steps), once at the lab's look clock (dt 0.004, the house
+    looks') and once at Lava Lamp's (0.0013). The old fade ran on dt, so the
+    slow clock kept three times the heat; and at dt 0.004 its step took
+    3.2e-4 of the heat, under half a half float's unit at 10 K (3.9e-3 over
+    10), so on round-to-nearest hardware the patch never cooled at all. Both
+    now cool to 10·exp(−10 s/τ), τ = C/(2·(h_air + h_rad)) = 48 s at Heat
+    Decay 0.98. And at Heat Decay 1, where the old fade kept every kelvin,
+    the two glass faces still radiate: 10·exp(−10 s·2·4εσT₀³/C), 0.06 K
+    gone, eight of a half float's units at 10 K.
+  */
+  const clocks = await page.evaluate(async () => {
+    const N = 64;
+    // The middle 5 × 5 cells' mean: each cell's heat is one of the two half floats either side of it (the dither).
+    const midOf = (v) => { let t = 0; for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) t += v[((N / 2 + j) * N + N / 2 + i) * 4 + 2]; return t / 25; };
+    const run = async (dt, heatDecay) => {
+      await lab.create(N, N);
+      lab.vel(0.5, 0.5, 0.25, [0, 0, 10.0, 0]);
+      lab.flush();
+      await lab.step(1, { thinGap: 1, dimmer: 0, heatDecay, dt, magnetSeconds: 0, diff: 0, nu: 0, advection: 0 });
+      const t0 = midOf(await lab.field('vel'));
+      await lab.step(600, { thinGap: 1, dimmer: 0, heatDecay, dt, magnetSeconds: 1 / 60, diff: 0, nu: 0, advection: 0 });
+      return { t0, t1: midOf(await lab.field('vel')) };
+    };
+    return { house: await run(0.004, 0.98), lava: await run(0.0013, 0.98), still: await run(0.004, 1) };
+  });
+  const want10 = (r, v) => r.t0 * Math.exp(-lossRate(v) * 10);
+  const off10 = (r, v) => r.t1 / want10(r, v) - 1;
+  check(
+    'the cooling is the same on every look\'s clock: ten real seconds cool a 10 K patch to 10·exp(−10/τ), τ = C/(2·(h_air + h_rad)) (PLAN 38f-3)',
+    Math.abs(off10(clocks.house, 0.98)) < 0.02 && Math.abs(off10(clocks.lava, 0.98)) < 0.02,
+    `from ${clocks.house.t0.toFixed(3)} K: at dt 0.004 ${clocks.house.t1.toFixed(3)} K, at dt 0.0013 ${clocks.lava.t1.toFixed(3)} K, against ${want10(clocks.house, 0.98).toFixed(3)} K (τ ${(1 / lossRate(0.98)).toFixed(1)} s; ${(off10(clocks.house, 0.98) * 100).toFixed(2)}% and ${(off10(clocks.lava, 0.98) * 100).toFixed(2)}% off)`
+  );
+  const lost11 = clocks.still.t0 - clocks.still.t1, want11 = clocks.still.t0 - want10(clocks.still, 1);
+  check(
+    'at Heat Decay 1 the two glass faces still radiate the heat away, 2·4εσT₀³/C, not nothing (PLAN 38f-3)',
+    Math.abs(lost11 / want11 - 1) < 0.25,
+    `${clocks.still.t0.toFixed(4)} K to ${clocks.still.t1.toFixed(4)} K in 10 s: lost ${lost11.toFixed(4)} K against radiation's ${want11.toFixed(4)} K (${(lost11 / want11).toFixed(2)}x)`
   );
 
   // ── 36e-6 (lift): not a line yet, and why ──

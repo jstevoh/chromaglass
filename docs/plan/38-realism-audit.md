@@ -148,6 +148,32 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   - ~~**The heat is not carried on a thin gap.**~~ **Shipped** (38f-1, 2026-11-11): the heat
     rides the liquid as the colour does, h·T beside h through the thin solve's faces
     (`carryHeat`, heatPack in `wgsl/fluid/dye.ts`). Story in `docs/plan-shipped.md` §38f-1.
+  - ~~**38f-3. The cooling in watts and seconds, on today's plate.**~~ **Shipped** (2026-11-28).
+    The October build of 38f and 38t (#614) was read against main on 2026-11-27 and not
+    landed: its carry is 38f-1's by another road, its lift went through the open rim that
+    18a-17 showed empties the dish (main lifts by the sealed bottle's closed circulation,
+    `sealWeight`, 27f-9), and its Updraft was the through-flow 18a-16 took out. The cooling
+    is redone on its own (`heatSlots` in `src/gpu/fluid/heat.ts`, the decay kernel in
+    `wgsl/fluid/dye.ts`): C dΔT/dt = I·a − 2·(h_air + h_rad)·ΔT with C = ρc_w·h + 2ρc_g·t
+    (16760 J/m²K at the 2 mm gap and two 2 mm glasses), solved exactly on the step's real
+    seconds; the lamp warms dark dye at I/C = 0.060 K/s (18f's 0.24 was a millimetre of
+    water); Heat Decay is h_air, 8360·(−ln v) W/m²K a face, which keeps every look's warmest
+    (I·a/(2h)) to the kelvin and puts its approach on real seconds, 48 s at 0.98 whatever the
+    look's clock (it was 52 s to 7 minutes); radiation 4εσT₀³ = 5.1 W/m²K a face is all the
+    cooling at Heat Decay 1. Found building it: the heat lives in a half float and a step's
+    change is mostly under its unit, so rounded to nearest the plate never cooled (a 10 K
+    patch at the house clock held 10 K) and rounded toward zero (Metal) it lost a unit a step;
+    the step's heat is now rounded to either neighbour by its share (`ditherHalf`). `npm run
+    heat` lines 1, 3, 10, 11. (Numbered 38f-3 because 38f-2 is the deep quench, shipped
+    2026-11-11; the batch-1 branch wrote this item as 38f-2.)
+  - **38f-4. The old plate's CPU path still fades by steps** (S; Low: the software
+    fallback only). `src/sim/fluidSimulation.ts` `temp[i] *= p.heatDecay` once a step, with
+    no seconds and no lamp in watts; give it `heatSlots`'s budget. *Measure:* `heat` line 3's
+    two clocks on the CPU solver. none.
+  - **38f-5. The force half of 38f, and the `plume` check** (S; Medium). The heat's lift on an
+    open plate still rides the half-resolution current, capped (above); the plume check
+    the item asked for, written against heatPack and `sealWeight`, is still to write: a
+    plume's rise speed against Δρgh²/(12μ). none.
 - **38g-2. Facets and Plateau borders drawn** (M, GPU; Medium-High for the straw's rafts).
   The air field still draws every pocket as a disc (`gpu/wgsl/air.ts`), so two big ones
   pressed together overlap rather than meet in a wall, and a stretched one is drawn round
@@ -700,7 +726,7 @@ On in many looks:
   standing wave (**18a-2**, 23 looks, and it moves the dye by 1e-4, a pass for nothing: see
   46); `gapMemory` (**18a-5**); the dye's "evaporation" and the budget (**18g-4**, **18c-2**);
   Updraft (**38t**); the Auto camera's breath (**27a-8-1**); the standing lamp's heat units
-  (**27f-9g**: LAMP_HEATING is worked for 1 mm of a 2 mm gap).
+  (**27f-9g**; the lamp's rate for 1 mm of a 2 mm gap was fixed by 38f-3).
 
 Behind a dial at 0, or in one look:
 

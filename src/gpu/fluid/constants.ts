@@ -284,11 +284,12 @@ export function oilRhoOf(weight: number | undefined): number {
 export function oilLightnessOf(weight: number | undefined): number {
   return -oilRhoOf(weight) / (OIL_RHO * -OIL_WEIGHT_DEFAULT);
 }
-/**
- * The lamp heating rate: absorbed lamp irradiance turning into heat per second (PLAN §18f).
- * Derived from irradiance / (rho * c * h) ≈ 1000 W/m² / (1000 kg/m³ * 4184 J/(kg·K) * 0.001 m) ≈ 0.24 K/s.
- */
-export const LAMP_HEATING = 0.24;
+/*
+  The lamp's light warming the dye (PLAN 18f) was LAMP_HEATING here, 0.24 K/s
+  for a millimetre of water; it is now the plate's whole heat budget, the
+  liquid and both glasses, in watts and real seconds: fluid/heat.ts
+  heatSlots (PLAN 38f-3).
+*/
 /**
  * The lamp under a standing plate: heat a second into the wax where the plate goes out of view, at full Gravity.
  * Only where the wax is dye: a wax that is a liquid of its own is warmed by the floor's glass (LAMP_GLASS below).
@@ -392,7 +393,7 @@ export const LAMP_COOL_FROM = 0.5;
     8: 0.25 to 0.62, 26 s round, the wax torn into more and smaller bodies.
   And the kick kept beside the warm floor (floors of 2, 3 and 4) hovered
   every time: it is the kick that stops the lamp. The projector's own light
-  on the wax (LAMP_HEATING) was left on throughout; with it off and the
+  on the wax (18f's, now S.lampHeat, fluid/heat.ts) was left on throughout; with it off and the
   floor at 3 the wax never left the floor.
 
   The same shortcut as the cool glass's (PLAN 27f-9g): the floor's

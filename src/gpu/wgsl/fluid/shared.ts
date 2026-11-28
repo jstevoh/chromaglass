@@ -30,7 +30,8 @@ struct Sim {
   air: f32,
   smear: vec2f,
   damping: f32,
-  heatDecay: f32,
+  // The heat's loss to the air and by radiation over the step, 2·(h_air + h_rad)·s/C (PLAN 38f-3, fluid/heat.ts heatSlots).
+  heatLoss: f32,
   maxSpeed: f32,
   evap: f32,
   sharp: f32,
@@ -73,7 +74,7 @@ struct Sim {
   magRadius: f32,
   // 1 where decayDye clears thin mist first (sparse dark looks only; lib/dyeTarget.ts).
   surfaceClear: f32,
-  // Lamp intensity scaled by heating rate (PLAN 18f).
+  // The lamp over the step, I·s/C at the Dimmer: the kelvin a fully dark cell takes in with no loss (PLAN 18f, 38f-3).
   lampHeat: f32,
   // The cover glass's gap on its liquid, in gap units, 0.03 at 2 mm (PLAN 38r-5, lib/cover.ts): the dome's mean.
   cover: f32,

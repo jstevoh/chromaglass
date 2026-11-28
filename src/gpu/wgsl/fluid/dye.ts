@@ -175,6 +175,44 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(4) var dstDye: texture_storage_2d<DYE_FORMAT, write>;
 @group(0) @binding(5) var dstVel: texture_storage_2d<rgba16float, write>;
 
+/*
+  The heat is kept in a half float (the velocity's z, rgba16float), and a
+  step's change in it is mostly smaller than the half float can hold: at the
+  default Heat Decay a sixtieth of a second takes 3.4e-4 of the heat, and
+  the half floats are 2^-11 to 2^-10 of a number apart (5e-4 to 1e-3 of
+  it). Rounded to nearest, as SwiftShader stores it, a change under half
+  that gap is lost every step, so a warm plate stopped cooling and a lamp's
+  pool stopped warming wherever the step's change fell under it; rounded
+  toward zero, as the Mac's Metal stores it (heatUnpack below found the
+  same, 3.2% of a blob's heat in 90 steps), a warm cell lost a whole gap a
+  step instead, several times the physics. So the step's exact heat is
+  rounded to one of the two half floats either side of it, the far one with
+  the chance of its share of the gap: a change of a tenth of the gap a step
+  lands as a whole gap one step in ten, the same on average, whichever way
+  the hardware rounds (both candidates are half floats already, so the
+  store is exact). The chance is a hash of the cell and the step's time
+  (S.time), so the same plate on the same steps gets the same heat; a plate
+  stepped with its time held still rounds each cell the same way every
+  step, which is no worse than rounding it to nearest was.
+*/
+fn ditherHalf(t: f32, p: vec2i) -> f32 {
+  if (!finite1(t)) { return t; }
+  var x = (bitcast<u32>(p.x) * 1664525u) ^ (bitcast<u32>(p.y) * 1013904223u) ^ (bitcast<u32>(S.time) * 2654435761u);
+  x = x ^ (x >> 16u); x = x * 0x7feb352du; x = x ^ (x >> 15u); x = x * 0x846ca68bu; x = x ^ (x >> 16u);
+  let u = f32(x >> 8u) * ${(2 ** -24).toString()};
+  // Under the least normal half float (2^-14) between zero and it: the half floats there are subnormal, which SwiftShader flushes to zero.
+  let least = ${(2 ** -14).toString()};
+  if (abs(t) < least) { return select(0.0, sign(t) * least, u < abs(t) / least); }
+  let r = quantizeToF16(t);
+  let e = t - r;
+  if (e == 0.0) { return r; }
+  let mag = exp2(floor(log2(abs(r))));
+  var step = mag * ${(2 ** -10).toString()};
+  // Toward zero from a power of two the half floats are twice as close.
+  if (abs(r) == mag && sign(e) != sign(r)) { step *= 0.5; }
+  return select(r, r + sign(e) * step, u < abs(e) / step);
+}
+
 // Beer–Lambert transmission for unit absorbance and amount (matching plate.ts lampThrough)
 fn lampThrough(unit: vec3f, amount: f32) -> vec3f {
   return pow(max(unit, vec3f(1e-4)), vec3f(max(amount, 0.0)));
@@ -214,9 +252,6 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let sp = length(v.xy);
   if (sp > S.maxSpeed) { v = vec4f(v.xy * (S.maxSpeed / sp), v.z, v.w); }
   if (A.a.x <= 0.0) {
-    // Newton cooling with physical time constant tau ≈ 12.4s (PLAN §18f):
-    let cool = pow(clamp(S.heatDecay, 0.001, 1.0), S.dt * 4.0);
-    var temp = v.z * cool;
     // Heat source ∝ lamp intensity × absorbed fraction (Beer–Lambert decode, 18b):
     var absorbed = 0.0;
     if (outD.a > 1e-4) {
@@ -229,8 +264,19 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     // liquid evenly, and the hot-spot is light the lens's aperture turns away
     // after it has gone through the liquid (wgsl/lampField.ts). The old
     // 1 / (1 + 2.5 r²) here was a shortcut, centred on the plate, not the lamp.
-    temp += S.lampHeat * absorbed * S.dt;
-    v.z = temp;
+    /*
+      The plate's heat budget over the step (PLAN 38f-3, fluid/heat.ts has
+      the physics): C dΔT/dt = I·a − 2·(h_air + h_rad)·ΔT, solved exactly on
+      the step's real seconds, so it is the same budget at any step and on
+      every look's clock. S.heatLoss is the step's 2·(h_air + h_rad)·s/C and
+      S.lampHeat its I·s/C; a step keeps e^−loss of the heat it had and
+      (1 − e^−loss)/loss of the lamp's (1 − loss/2 for a tiny loss, where
+      the quotient is all rounding).
+    */
+    let loss = max(S.heatLoss, 0.0);
+    let kept = exp(-loss);
+    let held = select((1.0 - kept) / loss, 1.0 - 0.5 * loss, loss < 1e-4);
+    v.z = ditherHalf(v.z * kept + S.lampHeat * absorbed * held, p);
   }
   textureStore(dstVel, p, vec4f(v.xyz, 0.0));
 }`,

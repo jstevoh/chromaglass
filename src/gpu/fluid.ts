@@ -51,10 +51,10 @@ import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { holdApartPull, HOLD_APART_CELLS, AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, THIN_GAP_LATER_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, SEALED_TENSION, SEALED_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, NU_REF, dripOf, dripWeightOf, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, oilBodyLn, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { holdApartPull, HOLD_APART_CELLS, AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, THIN_GAP_LATER_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, SEALED_TENSION, SEALED_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, NU_REF, dripOf, dripWeightOf, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, oilBodyLn, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidCover } from './fluid/cover';
 import { phaseCHPlan, phaseCapillaryPull } from './fluid/phase';
-import { heatViscPlan } from './fluid/heat';
+import { heatViscPlan, heatSlots } from './fluid/heat';
 import { soapPlan } from './fluid/soap';
 import { OPEN_RIM } from '../lib/turntable';
 
@@ -415,7 +415,7 @@ export class WebGPUFluid extends FluidCover {
       PLAN 18g: on a thin gap, colour leaves by flushing over the open rim.
       p.evapFactor is retained as a named safety cap (regulator) and for evaporation.
     */
-    f[16] = thin ? 1 : fin(p.damping, 0.99); f[17] = fin(p.heatDecay, 0.98); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
+    f[16] = thin ? 1 : fin(p.damping, 0.99); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
     i[21] = Math.max(1, Math.min(4, Math.round(fin(p.turbDetail, 1))));
     const upright = Math.max(0, Math.min(1, fin(p.plateUpright, 0)));
     // A sealed bottle's heat lift goes round inside the wall (sealWeight), not in the current, whose solve has an open rim (PLAN 27f-9).
@@ -438,12 +438,11 @@ export class WebGPUFluid extends FluidCover {
     }
     f[48] = fin(p.magnetRadius, MAGNET_RADIUS);
     f[49] = p.surfaceClear ? 1 : 0;
-    f[50] = fin(p.dimmer, 1) * LAMP_HEATING;
     f[51] = this.coverGap;
-    // The oil's weight and heat swelling (PLAN 27f-9c, OIL_RHO), for mixForce and sealSource; the lamp's glass cooling (27f-9e).
+    // The oil's weight and heat swelling (PLAN 27f-9c, OIL_RHO), for mixForce and sealSource; the heat's loss, lamp and glass (17, 50, 54; 38f-3).
     const oilRho = oilRhoOf(p.oilWeight);
     f[52] = oilRho; f[53] = OIL_EXPAND;
-    f[54] = lampCoolOf(this.coverGap * GAP_METRES, p.magnetSeconds);
+    heatSlots(f, p.heatDecay, p.dimmer, this.coverGap * GAP_METRES, p.magnetSeconds);
     f[55] = oilBodyLn(1e-6, p.oilThickness);
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
