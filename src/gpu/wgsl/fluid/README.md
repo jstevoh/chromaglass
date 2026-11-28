@@ -18,6 +18,7 @@ The solver's WGSL kernels, one file a pass (PLAN 19ai-6). Each file exports a ta
 - `gridFilter.ts`: the passes that take the grid's own pattern out of the dye.
 - `reactions.ts`: the BZ reaction, Liesegang rings, the Gray-Scott print.
 - `seal.ts`: `SEAL_KERNELS`, a standing plate's weight as a sealed bottle's circulation (`sealSource`, `sealFlow`; PLAN 27f-9), relaxed on thinGap's `hsLiftRelax` and its `LIFT_GRID`.
+- `stir.ts`: `STIR_KERNELS`, Turbulence on the thin gap as the closed dish's stir (PLAN 18a-25): `stirSource`, the right-hand side −∇²ψ of `STIR_PSI`'s curl noise (the stream function `forcesB` takes the curl of on the old plate), relaxed on thinGap's `hsLiftRelax` to Φ = 0 at the rim, and `stirFlow`, ∇⊥Φ added to the flow; `npm run rimstir`.
 - `ouzo.ts`: `OUZO_KERNELS`, the ouzo effect (PLAN 48s): `ouzoCloud`, which moves a cell's anise oil between dissolved and droplets by the measured binodal (`OUZO_BINODAL`, `../../../lib/ouzo.ts`) and empties the solvent field past the rim, and `ouzoView`, the species with the droplets' scattering added for the plate. The solvent field's four numbers are in its header.
 - `fields.ts`: `packView` for the plate, a field boxed to the logical grid, a field cleared.
 

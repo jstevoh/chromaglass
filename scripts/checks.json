@@ -3360,6 +3360,18 @@
       ]
     },
     {
+      "name": "Turbulence and the comet stir the dish without emptying it",
+      "shard": "lab",
+      "run": "npm run rimstir",
+      "timeout": 20,
+      "why": [
+        "Lacing Run and Classical Vibe left dim (PLAN 18a-25): the Turbulence's",
+        "curl noise and the comet's pull were laid into the open-rim solve as",
+        "through-flows and ran the dish out over its rim (7% and 0.04% left in",
+        "the lab); both are now the closed dish's circulation, as strong inside."
+      ]
+    },
+    {
       "name": "Keep Full refills an emptied dish in the app",
       "shard": "plate",
       "run": "npm run keepfullapp",
