@@ -126,7 +126,8 @@ with the frame. At 120 Hz a frame has 8.3 ms; the 11-13 audit measured one desk 
     live pass found GitHub's echo of a step's script (`fail-on-cache-miss: false`, an `echo
     "... failed"`) fingerprinted as failures, which would have made every red Mac app job one
     failure; the stub skips those lines now, and 50j-2 must too.
-  - **50j-2** *`scripts/fingerprints.mjs` on main* (S, Antigravity). The foreman runs a stub
+  - **50j-2** *`scripts/fingerprints.mjs` on main* (S, Antigravity; **shipped** 2026-11-27,
+    `npm run fingerprints`). The foreman runs a stub
     until main has this file, then runs main's copy (read hourly) and falls back to the stub
     if it is missing or prints the wrong shape. The interface it must keep:
     `failureShape(line)` returns the line with everything that changes between runs taken
@@ -135,9 +136,12 @@ with the frame. At 120 Hz a frame has 8.3 ms; the 11-13 audit measured one desk 
     `fingerprint(shape)` returns 12 hex characters of its sha1; `groupFailures(log, { check })`
     returns `[{ fp, shape, check, count, sample }]`; the CLI is
     `node scripts/fingerprints.mjs [--json] [file ...]`, reading stdin when given no file,
-    `--json` printing the `groupFailures` array. Its check: a node harness that feeds it real
-    `gh run view --log-failed` text from two runs of one failure (different times, shas and
-    durations) and two different failures, and requires one and two fingerprints.
+    `--json` printing the `groupFailures` array, plus `--run <id>` (pulls every failed
+    job's log for a run and groups by check script, stripped line, named look/liquid, and
+    job) and `--since <sha>` (first main commit whose deploy each group went red on). Open:
+    its check in `logic` (a node harness that feeds it real `gh run view --log-failed` text
+    from two runs of one failure and two different failures, requiring one and two
+    fingerprints).
 - **50k** *The foreman checks `Measured:` receipts before it merges* (shipped 2026-11-27, the
   foreman on the owner's Mac). A green Antigravity PR used to merge on CI alone, which checks
   that the `Measured:` section is well formed (`scripts/measured.mjs`), not that the command
