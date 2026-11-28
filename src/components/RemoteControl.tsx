@@ -925,6 +925,15 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             </>
           )}
           {/* Polarised light (PLAN 31p-1), and while the sheets are in the analyser's turn and the liquid's strength, as on the desk. */}
+          {/* Dark field and Rheinberg's ring (PLAN 47b): the lamp moved outside the lens, so only bent light reaches the wall; its two gels while it is on. */}
+          <Slider label="Dark Field" field="darkField" step={0.05} value={value('darkField') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.darkField ?? 0) > 0.001 && (
+            <>
+              <Slider label="Ring Colour" field="rheinberg" step={0.05} value={value('rheinberg') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Inner Hue" field="rheinbergInner" step={5} value={value('rheinbergInner') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Outer Hue" field="rheinbergOuter" step={5} value={value('rheinbergOuter') as number | undefined} {...sliderProps} connected={connected} />
+            </>
+          )}
           <Slider label="Polarisers" field="polariser" step={0.05} value={value('polariser') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.polariser ?? 0) > 0.001 && (
             <>

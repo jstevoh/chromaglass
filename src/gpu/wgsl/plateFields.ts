@@ -49,6 +49,8 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'paperA', type: 'vec3f' },
   { name: 'paperB', type: 'vec3f' },
   { name: 'sideColor', type: 'vec3f', note: "the side lamp's colour, linear" },
+  { name: 'ringInner', type: 'vec3f', note: "the dark-field ring's inner zone, linear: Rheinberg's colour for a gentle bend, white for plain dark field (PLAN 47b)" },
+  { name: 'ringOuter', type: 'vec3f', note: "the dark-field ring's outer zone, linear: the colour only a steep bend reaches (PLAN 47b)" },
   { name: 'camCenter', type: 'vec2f', note: 'fluid-UV the frame is centred on (0.5,0.5 = plate centre)' },
   { name: 'filmScale', type: 'vec2f', note: 'cover-fit over Video Zoom: plate uv to frame uv about the centre' },
   { name: 'filmPan', type: 'vec2f', note: 'Video Across and Up, in plate widths and heights (PLAN 14ag)' },
@@ -178,6 +180,7 @@ export const PLATE_FIELDS: Field[] = [
   /* The lens pass after the display (gpu/glint.ts, lib/glint.ts; PLAN 47e, 47d, 47b-side). Read only there; the display ignores them. */
   { name: 'glitter', type: 'f32', note: 'how much of SPECK_MAX glitter is suspended in the liquid, 0 none' },
   { name: 'lensStop', type: 'f32', note: "the lens's f-number: the specks' defocus discs shrink and their diffraction spikes grow as it rises" },
+  { name: 'darkField', type: 'f32', note: 'how much of the lamp is moved from the bulb to the ring outside the pupil: 0 bright field (every look until 47b), 1 dark field' },
   { name: 'sideLight', type: 'f32', note: "the side lamp's radiance against the lamp ground's white, 0 off" },
   /* Polarised light (lib/polar.ts, wgsl/platePolar.ts; PLAN 31p-1). At polariser 0 the display takes a branch and is as it was. */
   { name: 'polariser', type: 'f32', note: 'how far the polarising sheets are in the beam, 0 out, 1 in' },

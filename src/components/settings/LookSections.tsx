@@ -756,6 +756,26 @@ export const LampSection = ({ c }: { c: SectionCtx }) => {
             />
           </>
         )}
+        {/* Dark field and Rheinberg light (PLAN 47b): the lamp moved to a ring
+            outside the lens's pupil, so level liquid goes black and only light
+            the liquid bends reaches the wall; two gels in the ring, and the
+            bend picks which one. The gels while the ring is lit. */}
+        <Slider label="Dark Field" value={settings.darkField ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ darkField: v })}
+          settingKey="darkField"
+        />
+        {(settings.darkField ?? 0) > 0.001 && (
+          <>
+            <Slider label="Ring Colour" value={settings.rheinberg ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ rheinberg: v })}
+              settingKey="rheinberg"
+            />
+            <Slider label="Inner Hue" value={settings.rheinbergInner ?? 330} min={0} max={360} step={5} onChange={(v: number) => onUpdate({ rheinbergInner: v })}
+              settingKey="rheinbergInner"
+            />
+            <Slider label="Outer Hue" value={settings.rheinbergOuter ?? 205} min={0} max={360} step={5} onChange={(v: number) => onUpdate({ rheinbergOuter: v })}
+              settingKey="rheinbergOuter"
+            />
+          </>
+        )}
         {/* Polarised light (PLAN 31p-1): a polariser under the plate and an
             analyser at the lens; the liquid shows Michel-Levy colours where its
             flow stretches it. The analyser and the liquid's strength while the

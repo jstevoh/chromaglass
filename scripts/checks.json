@@ -1987,6 +1987,20 @@
       ]
     },
     {
+      "name": "Dark field and Rheinberg light",
+      "shard": "lab9",
+      "run": "npm run darkfield",
+      "timeout": 6,
+      "why": [
+        "PLAN 47b (gpu/wgsl/plateDarkField.ts, lib/darkField.ts), after the owner's macro foam",
+        "films: level liquid catches none of the ring, no bend makes light, a gentle bend reaches",
+        "the inner zone first, the gels clear at 0. Then the real shaders: Dark Field 0 is the",
+        "plate to the byte with the ring's dials moved; Foam Cells' middles go black and its lit",
+        "pixels sit on the bright-field picture's edges; a bubble's middle is black and its wall",
+        "a ring with the inner gel nearer the middle, the order swapping with the hues."
+      ]
+    },
+    {
       "name": "Polarised light",
       "shard": "lab9",
       "run": "npm run polar",

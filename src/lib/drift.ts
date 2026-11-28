@@ -246,6 +246,12 @@ const NOT_THE_LOOK = new Set([
     is dark); left out, the pool and Evolve's pace are as they were.
   */
   'polariser', 'analyserAngle', 'quarterWave', 'birefringence', 'dishStress',
+  /*
+    Dark field and its ring (PLAN 47b) for the same reason: the lamp is moved
+    by a hand at the projector, and wandering in it would black every level
+    part of the plate out under nobody's hand.
+  */
+  'darkField', 'rheinberg', 'rheinbergInner', 'rheinbergOuter',
   // The mixer is the operator's desk: a grade that wandered on its own would
   // be a film going grey under nobody's hand.
   ...MIX_KEYS.map(String),

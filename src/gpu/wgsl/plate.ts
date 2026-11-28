@@ -2721,7 +2721,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       }
     }
     if (!isCamera && U.derivedOn > 0.5) {
-      outColor *= mix(oplPupilLoss(near0.z, near0.xy, normal0, plateOn, plateAmt), 1.0, phaseCover) * wallLight0(fuv0);
+      outColor *= pupilLight(near0, normal0, plateOn, plateAmt, phaseCover) * wallLight0(fuv0);
     }
     /*
       A pH indicator in the dye (red cabbage's anthocyanin). The indicator
@@ -3117,7 +3117,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         cp = outColor * mix(vec3f(1.0), tint, 0.1 * k1);
         let iridP = clamp((U.iridescence - 0.25) / 0.75, 0.0, 1.0) * (0.4 + 0.6 * k3);
         cp = projectorFilm(cp, filmC, filmP, iridP);
-        cp = cp * (1.0 - AIR_DARK * blackB);
+        cp = darkWall(cp * (1.0 - AIR_DARK * blackB), rimCol, tB);
       }
       let fm = camFilm(filmC, filmP, irid, F);
 
