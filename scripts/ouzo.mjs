@@ -52,10 +52,15 @@
  * And the look's retune (PLAN 48s-6: the Mac's first film of Louche showed
  * dye over half the dish and the cloud late, a tenth of the frame, flat
  * white):
- * 10. Louche's seed colours at most a third of the dish the five pools every
- *     unseeded look opens on do (Night Sea's), with at most a quarter of
- *     their dye, at the app's own grid and lay.
- * 11. Half or more of Louche's drops are Ouzo.
+ * 10. Louche's seed colours between a sixth and a half of the dish the five
+ *     pools every unseeded look opens on do (Night Sea's), with at most a
+ *     third of their dye, at the app's own grid and lay. (48s-6 asked at
+ *     most a third; its three small drops, 9% against 61%, left the film
+ *     72-80% near black, and 48s-7, the owner's middle, is about 24%: the
+ *     bracket fails both the pools and 48s-6's seed.)
+ * 11. Half or more of Louche's drops are Ouzo, and there are two Alcohol
+ *     for every three Ouzo or more (48s-7: the spirit that clears the cloud
+ *     the dish gathers late; 48s-6's one for two left opaque ribbons).
  * 12. The white is translucent: on Louche's own render a drop of the
  *     automation's middle dose reads between TRANSLUCENT[0] and
  *     TRANSLUCENT[1] of 255 at its middle, against a black ground;
@@ -430,12 +435,14 @@ check('9c. control: a kernel reading the mirrored cell\'s gap fails 1',
 check('9b. control: a kernel that makes 2% more droplets than the oil it had fails 3',
   rel(C.laid.sum, C.watered.sum) > SUM_TOL || rel(C.laid.sum, C.alcohol.sum) > SUM_TOL,
   `oil ${C.laid.sum.toFixed(5)} → ${C.watered.sum.toFixed(5)} → ${C.alcohol.sum.toFixed(5)}`);
-check('10. Louche\'s seed colours at most a third of the dish an unseeded look\'s five pools do, with a quarter of their dye',
-  loucheDye.cover > 0.01 && loucheDye.cover <= poolsDye.cover / 3 && loucheDye.mean <= poolsDye.mean / 4,
+check('10. Louche\'s seed colours between a sixth and a half of the dish an unseeded look\'s five pools do, with at most a third of their dye',
+  loucheDye.cover >= poolsDye.cover / 6 && loucheDye.cover <= poolsDye.cover / 2 && loucheDye.mean <= poolsDye.mean / 3,
   `${(100 * loucheDye.cover).toFixed(1)}% of the dish over ${SEEN} against Night Sea's ${(100 * poolsDye.cover).toFixed(1)}%; dye ${loucheDye.mean.toFixed(3)} against ${poolsDye.mean.toFixed(3)} a cell`);
 const dish = app.PRESET_LIQUIDS.louche ?? [];
 const share = dish.filter((b) => b === 'ouzo').length / Math.max(1, dish.length);
-check('11. half or more of Louche\'s drops are Ouzo', share >= 0.5, `${dish.join(', ')}`);
+const spirit = dish.filter((b) => b === 'alcohol').length / Math.max(1, dish.filter((b) => b === 'ouzo').length);
+check('11. half or more of Louche\'s drops are Ouzo, with two Alcohol for every three or more', share >= 0.5 && spirit >= 2 / 3,
+  `${dish.join(', ')}: Ouzo ${(100 * share).toFixed(0)}%, Alcohol ${spirit.toFixed(2)} a drop of Ouzo`);
 check(`12. the white is translucent: a drop at the automation's middle dose reads ${TRANSLUCENT[0]} to ${TRANSLUCENT[1]} of 255 on Louche`,
   louche.now.middle >= TRANSLUCENT[0] && louche.now.middle <= TRANSLUCENT[1] && louche.now.ground < 10,
   `${louche.now.middle.toFixed(0)} at ${(100 * consts.anise).toFixed(1)}% oil, a take of ${consts.evolveTake.toFixed(3)}; ground ${louche.now.ground.toFixed(0)}`);
