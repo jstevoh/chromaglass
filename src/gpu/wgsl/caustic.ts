@@ -373,17 +373,19 @@ fn quadCorner(k: u32) -> vec2f {
 }
 
 @vertex fn vs(@builtin(vertex_index) vi: u32) -> MeshOut {
-  let t = landed(vi / 3u);
-  let k = vi % 3u;
-  var p = t.a;
-  if (k == 1u) { p = t.b; } else if (k == 2u) { p = t.d; }
+  let t = landed(vi / 6u);
+  let lo = min(t.a, min(t.b, t.d)) - 0.25 / f32(P.m);
+  let hi = max(t.a, max(t.b, t.d)) + 0.25 / f32(P.m);
   let share = splatShare(t.gain);
-  if (share >= 1.0) { p = t.a; }
   var o: MeshOut;
-  o.pos = clip(p);
+  // Wholly splatted triangles are put past the clip.
+  o.pos = select(clip(mix(lo, hi, quadCorner(vi % 6u))), vec4f(2.0, 2.0, 0.0, 1.0), share >= 1.0);
   o.gain = t.gain * (1.0 - share) * t.passed;
   o.centre = vec2f(0.0);
-  o.a = vec2f(0.0); o.b = vec2f(0.0); o.d = vec2f(0.0);
+  let px = f32(P.m);
+  o.a = t.a * px;
+  o.b = t.b * px;
+  o.d = t.d * px;
   return o;
 }
 
@@ -425,6 +427,11 @@ fn inside(p0: vec2f, p1: vec2f, p: vec2f, turn: f32) -> bool {
 }
 
 @fragment fn fs(in: MeshOut) -> @location(0) vec4f {
+  let area = cross2(in.b - in.a, in.d - in.a);
+  if (area == 0.0) { discard; }
+  let turn = sign(area);
+  let p = in.pos.xy;
+  if (!(inside(in.a, in.b, p, turn) && inside(in.b, in.d, p, turn) && inside(in.d, in.a, p, turn))) { discard; }
   return vec4f(in.gain, 0.0, 0.0, 1.0);
 }
 

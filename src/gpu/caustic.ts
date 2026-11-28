@@ -174,7 +174,7 @@ export class PlateCaustics {
       r.setPipeline(mesh);
       r.setBindGroup(0, groupOf(this.device, mesh, [u, this.rays!]));
       // Each triangle as the box round it (wgsl/caustic.ts, vs: its texel centres are chosen in fs).
-      r.draw(3 * tris);
+      r.draw(6 * tris);
       // The gathered triangles' light (CAUSTIC_SPLAT_FROM, _FULL), one tent each (wgsl/caustic.ts says why).
       r.setPipeline(splats);
       r.setBindGroup(0, groupOf(this.device, splats, [u, this.rays!]));
