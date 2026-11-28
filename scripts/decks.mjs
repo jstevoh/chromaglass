@@ -35,8 +35,12 @@
  *      darker deck then, and neither rack steps by more than a frame's worth
  *      at the second Go; 2 still holds after it;
  *   5. the look's split: the dish is the solver's settings alone (a plate's
- *      own: `PER_LAYER`), the rest is everything else, and the two together
- *      are the look;
+ *      own: `PER_LAYER`), the rest is everything else but what the decks
+ *      stand on (`DECK_RIG`), and the two together are the look but for that;
+ *   5b. every house look sent by a deck Go leaves two projectors on the wall
+ *      and both plates' levels as they were (the Mac film of the first build:
+ *      the rest of the look switched Two Projectors off mid-dissolve), where
+ *      the same looks' whole targets switch it off (the control);
  *   6. the switch is the rig's: off by default (a Go as before), not
  *      wandered, ridden by a cord or carried by a look, learnable as a
  *      switch; and the wiring reads the source (the App's timers cannot run
@@ -72,11 +76,11 @@ const f3 = (v) => v.toFixed(3);
 
 const out = 'node_modules/.cache/decks.mjs';
 await build({
-  stdin: { contents: "export * from './src/lib/deckDissolve.ts'; export * from './src/lib/focusDissolve.ts'; export { crossfadeWeights } from './src/lib/projectorBank.ts'; export { DEFAULT_SETTINGS } from './src/types.ts'; export { DRIFTABLE } from './src/lib/drift.ts'; export { RIG_KEYS } from './src/lib/lookFade.ts'; export { PATCH_TARGETS, PER_LAYER } from './src/lib/sceneMap.ts'; export { PIN_RANGE } from './src/lib/deskPins.ts'; export { LEARNABLE_SETTINGS } from './src/lib/midi.ts';", resolveDir: '.', loader: 'ts' },
+  stdin: { contents: "export * from './src/lib/deckDissolve.ts'; export * from './src/lib/focusDissolve.ts'; export { crossfadeWeights } from './src/lib/projectorBank.ts'; export { DEFAULT_SETTINGS } from './src/types.ts'; export { DRIFTABLE } from './src/lib/drift.ts'; export { RIG_KEYS } from './src/lib/lookFade.ts'; export { PATCH_TARGETS, PER_LAYER } from './src/lib/sceneMap.ts'; export { PIN_RANGE } from './src/lib/deskPins.ts'; export { LEARNABLE_SETTINGS } from './src/lib/midi.ts'; export { bankHasTwo } from './src/lib/projectorBank.ts'; export { targetLook } from './src/lib/lookFade.ts'; export { PRESETS } from './src/presets.ts';", resolveDir: '.', loader: 'ts' },
   bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning',
 });
 const m = await import(`../${out}`);
-const { darkDeck, deckPlan, crossAt, dishOf, drawingOf, DARK_SHARE, rackClock, walkRack, startDeckRack, crossfadeWeights, DEFAULT_SETTINGS, DRIFTABLE, RIG_KEYS, PATCH_TARGETS, PER_LAYER, LEARNABLE_SETTINGS } = m;
+const { darkDeck, deckPlan, crossAt, dishOf, drawingOf, DECK_RIG, bankHasTwo, targetLook, PRESETS, DARK_SHARE, rackClock, walkRack, startDeckRack, crossfadeWeights, DEFAULT_SETTINGS, DRIFTABLE, RIG_KEYS, PATCH_TARGETS, PER_LAYER, LEARNABLE_SETTINGS } = m;
 
 const T = 4, MS = T * 1000, FPS = 60;
 /* A dissolve from `x0` at `start` on clock `c`, walked frame by frame to `end`: each frame's p, crossfade, lights and shares. */
@@ -200,12 +204,38 @@ function softWhileMoving(frames) {
   let bad = 0;
   for (const k of Object.keys(target)) {
     const own = PER_LAYER.has(k);
+    const rig = DECK_RIG.has(k);
     if (dish[k] !== (own ? target[k] : now[k])) bad++;
-    if (draw[k] !== (own ? now[k] : target[k])) bad++;
-    if (drawingOf(target, dish)[k] !== target[k]) bad++;
+    if (draw[k] !== (own || rig ? now[k] : target[k])) bad++;
+    if (drawingOf(target, dish)[k] !== (rig ? now[k] : target[k])) bad++;
   }
-  check('the look\'s split: the dish is the solver\'s settings alone (what a plate owns), the rest everything else, and the rest laid over the dish is the look',
+  check('the look\'s split: the dish is the solver\'s settings alone (what a plate owns), the rest everything else but what the decks stand on, and the rest laid over the dish is the look but for that',
     bad === 0 && solver > 20 && drawn > 20, `${solver} solver keys and ${drawn} others moved, ${bad} wrong`);
+}
+
+// ── 5b. Every house look, sent by a deck Go, leaves two projectors on the wall ──
+{
+  /*
+    The Mac film of the first build (2026-11-27): every house look carries
+    Two Projectors off and most a lamp ground of 0, so the rest of the look
+    switched the second projector off halfway through its own dissolve.
+    From two projectors on the wall, each look's whole target (the control:
+    what a plain Go lays) and its deck rest, laid over its dish on either
+    side, through the plate's own question.
+  */
+  const wall = { ...DEFAULT_SETTINGS, layerCount: 2, twoProjectors: 1, lampGround: 1, backBlend: 'own', projDeck: 1, projCross: 0, frontLevel: 1, backLevel: 1 };
+  const two = (s) => bankHasTwo(s, Math.round(s.layerCount ?? 1), s.renderStyle === 'photo' ? 0 : s.lampGround ?? 0);
+  let plainOff = 0, deckOff = 0, levels = 0;
+  for (const p of PRESETS) {
+    const full = targetLook(wall, p.settings);
+    if (!two(full)) plainOff++;
+    const front = drawingOf(full, dishOf(full, wall)), back = drawingOf(full, wall);
+    if (!two(front) || !two(back)) deckOff++;
+    for (const k of ['frontLevel', 'backLevel']) if (front[k] !== wall[k] || back[k] !== wall[k]) levels++;
+  }
+  check('every house look, sent by a deck Go either way, leaves two projectors on the wall and both plates\' levels where the operator has them; a plain Go to the same looks would switch the second projector off (the control: the bug the Mac film caught)',
+    PRESETS.length > 20 && deckOff === 0 && levels === 0 && plainOff > PRESETS.length / 2 && DECK_RIG.has('twoProjectors'),
+    `${PRESETS.length} looks: a plain Go takes two projectors off in ${plainOff}, a deck Go in ${deckOff}; levels moved ${levels}`);
 }
 
 // ── 6. The switch, and the wiring ──────────────────────────────────────

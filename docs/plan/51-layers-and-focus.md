@@ -256,7 +256,14 @@ Found while building it, not done:
   the quarter for it to melt before its dish goes in. A second Go mid-dissolve goes to the
   darker deck then, each rack carrying on from its blur. A Go to a dark front pins the lit
   back plate to what it shows (`pinBack`), so it does not follow the front's new dish. A
-  hand on the crossfader during the glide takes it back; a Back, a later Go or a Go to the
+  hand on the crossfader during the glide takes it back. Fixed the same evening (51c-2b,
+  found by the first film on the owner's Mac): every house look carries Two Projectors off
+  and most a lamp ground of 0, so the rest of the look switched the second projector off
+  mid-dissolve (the old dish showed under the new one, and the next Go was a plain one); a
+  deck Go now leaves what the decks stand on alone (`DECK_RIG`: Two Projectors, the plate
+  count, the lamp ground and render style, the back row's blend, both plates' levels), and
+  `npm run decks` sends every house look through it (46 of 46 would switch it off by a plain
+  Go, 0 by a deck Go). A Back, a later Go or a Go to the
   back plate stops what of a deck Go is still to come. And B with no light on the wall is no
   longer blurred at all (`gpu/plateUniforms.ts`), so a dark B's melt costs nothing; A's is
   still drawn, because where neither projector has light the Mixer's rows laid over both
