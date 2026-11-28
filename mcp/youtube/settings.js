@@ -19,9 +19,12 @@
  *  - `settings.json` in that folder holds the choices: `timeZone` (the clock
  *    release times are read in; the computer's own by default) and
  *    `categoryId` (the category a new upload gets when the call names none;
- *    YouTube's own default, 22 People & Blogs, unless set). A key this file
- *    does not know is refused by name, so a typo is an error at start, not a
- *    setting silently ignored for months.
+ *    YouTube's own default, 22 People & Blogs, unless set), and `credits`
+ *    (44i-2b: a line put at the foot of every new upload's description, so
+ *    music under CC BY is never uploaded without its credit; it may hold
+ *    `{music}`, the title of the piece, filled per upload; see describe.js).
+ *    A key this file does not know is refused by name, so a typo is an error
+ *    at start, not a setting silently ignored for months.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -50,7 +53,7 @@ export function configDir(home = homedir(), platform = process.platform) {
   return join(process.env.XDG_CONFIG_HOME || join(home, '.config'), NAME, 'youtube');
 }
 
-const KNOWN = ['timeZone', 'categoryId'];
+const KNOWN = ['timeZone', 'categoryId', 'credits'];
 export const DEFAULT_CATEGORY = '22';
 /* The owner's uploads have always gone up as Music. In the owner's old folder, with no
    settings.json yet, that stays the default, so lifting the server out changes nothing
@@ -71,5 +74,10 @@ export function readSettings(dir, home = homedir()) {
   if (typeof timeZone !== 'string' || !validZone(timeZone)) throw new Error(`${file}: timeZone "${timeZone}" is not a time zone name like "America/New_York".`);
   const categoryId = s.categoryId === undefined ? (dir === legacyDir(home) ? LEGACY_CATEGORY : DEFAULT_CATEGORY) : String(s.categoryId);
   if (!/^\d{1,3}$/.test(categoryId)) throw new Error(`${file}: categoryId must be a YouTube category number like "10" (Music) or "22" (People & Blogs).`);
-  return { file, timeZone, categoryId };
+  /* One line or a list of lines; a list is joined line by line, as it will read under the description. */
+  let credits = s.credits ?? '';
+  if (Array.isArray(credits) && credits.every((l) => typeof l === 'string')) credits = credits.join('\n');
+  if (typeof credits !== 'string') throw new Error(`${file}: credits is a line of text (or a list of lines), like "{music} by An Artist, CC BY 4.0".`);
+  if (/[<>]/.test(credits) || credits.length > 1000) throw new Error(`${file}: credits must be under 1,000 characters with no < or > (YouTube refuses those in a description).`);
+  return { file, timeZone, categoryId, credits: credits.trim() };
 }

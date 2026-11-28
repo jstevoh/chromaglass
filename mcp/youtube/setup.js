@@ -50,7 +50,7 @@ export async function runSetup(deps) {
   if (major < 18) fail('Node.js 18 or later', `This is Node ${process.versions.node}; install a current one from https://nodejs.org.`);
   else pass('Node.js 18 or later', process.versions.node);
 
-  pass('Settings', `${deps.settings.timeZone}, new uploads in category ${deps.settings.categoryId}${existsSync(deps.settings.file) ? '' : ' (defaults; settings.json not made)'}`);
+  pass('Settings', `${deps.settings.timeZone}, new uploads in category ${deps.settings.categoryId}, ${deps.settings.credits ? 'a credits line under each description' : 'no credits line'}${existsSync(deps.settings.file) ? '' : ' (defaults; settings.json not made)'}`);
 
   if (!existsSync(deps.dir)) {
     fail('Key folder', `Make the folder ${deps.dir} and put the client file in it (next step).`);

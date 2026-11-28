@@ -175,9 +175,30 @@ through cords and preset patches, and the plate shader is untouched.
     the owner's Mac keeps one agent; the release renames it and removes the old one.
   - **44i-2a-2.** The Windows drain's output has nowhere to go (Task Scheduler takes no
     redirect without a shell); `upload_status` is the record there.
-  - **44i-2b.** Captions (`.srt`/`.vtt`, `captions.insert`), chapters (description
-    timestamps from a list or the sidecar), a credits footer from settings (the owner's:
-    the music's CC BY line), localized titles and descriptions.
+  - **44i-2b. Captions, chapters, credits, other languages.** **Built 2026-11-28**
+    (`npm run youtube`, `scripts/youtubeText.mjs`): `captions` at upload and
+    `add_captions` / `list_captions` later (`.srt`/`.vtt` looked at before a job is made,
+    `captions.insert` multipart, 400 units); `chapters` written into the description and
+    refused unless YouTube would make them (from 0:00, three or more, ten seconds each, the
+    last ten seconds before the end on an update), a new list replacing the old; `credits`
+    in `settings.json` at the foot of every new description, `{music}` filled per upload
+    and read back from an old description on a replacement, never twice; `localizations`
+    (needs `language`, an update keeps the languages it does not name). All also from the
+    upload card. Modules `mcp/youtube/describe.js`, `mcp/youtube/captions.js`.
+  - **44i-2b-1.** The owner's own `settings.json` on the Mac gets its credits line
+    (`{music} by Scott Buckley – released under CC-BY 4.0. www.scottbuckley.com.au`, the
+    artist's wording) once the Mac's checkout has this change: an older server refuses the
+    unknown key and stops at start.
+  - **44i-2b-2.** Chapters at upload cannot be held to the film's length (no probe of the
+    file; the server has no packages). An update checks it; reading an MP4's `mvhd`
+    duration in Node would close it.
+  - **44i-2b-4.** The check's mutants ran all at once, so lines waiting on a fixed timeout
+    failed on unchanged copies and "caught" mutants by load (found by the check's review
+    2026-11-28); now eight at a time beside an unchanged copy that must fail nothing. The
+    fixed timeouts themselves (`loopback`, `setup`, `settingsKeys`) still wait a set time
+    rather than on an exit.
+  - **44i-2b-3.** A film with several pieces credits one `{music}`; an album film needs a
+    credits line of its own, or a list form of `music`.
   - **44i-2c.** A Shorts check (three minutes or less, vertical or square, tagged) and a
     whole folder queued at once; reelreader's side cuts a 9:16 clip from its best moment.
   - **44i-2d.** Analytics (YouTube Analytics API, its own read-only scope asked only when

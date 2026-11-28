@@ -48,6 +48,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { port } from './ports.mjs';
+import { captionRoutes, textScenario } from './youtubeText.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const SERVER = resolve(import.meta.dirname, '../mcp/youtube-mcp.js');
@@ -83,6 +84,8 @@ function standIn(gport) {
       id, snippet: { ...s.meta.snippet, publishedAt: new Date().toISOString(), channelId: 'UC1', thumbnails: {} },
       // Since 2026-11-02 an upload that names no privacy goes up public.
       status: { uploadStatus: 'uploaded', privacyStatus: s.meta.status?.privacyStatus ?? 'public', ...s.meta.status },
+      // A part the request's `part` does not name is not written (44i-2b: the localizations ride only when named).
+      ...(s.meta.localizations && s.parts.includes('localizations') ? { localizations: s.meta.localizations } : {}),
       statistics: { viewCount: '0', likeCount: '0' }, contentDetails: { duration: 'PT1M' }, bytes: s.data,
     };
     if (!s.meta.status?.privacyStatus) v.status.privacyStatus = 'public';
@@ -92,6 +95,16 @@ function standIn(gport) {
     return v;
   };
   const resource = ({ bytes, ...v }) => v;
+  /* What YouTube refuses in the words (its pages, 2026-11-28): < or > in a title or description, a
+     description past 5,000 bytes, and localizations on a video with no default language. */
+  const wordsRefused = (snippet, localizations, parts) => {
+    const texts = [snippet?.title, snippet?.description, ...Object.values(localizations ?? {}).flatMap((l) => [l?.title, l?.description])];
+    if (texts.some((t) => /[<>]/.test(t ?? ''))) return 'invalidDescription';
+    if ([snippet, ...Object.values(localizations ?? {})].some((l) => Buffer.byteLength(l?.description ?? '') > 5000)) return 'descriptionTooLong';
+    if ([snippet, ...Object.values(localizations ?? {})].some((l) => (l?.title ?? '').length > 100)) return 'invalidTitle';
+    if (localizations && parts.includes('localizations') && !snippet?.defaultLanguage) return 'defaultLanguageNotSet';
+    return null;
+  };
 
   const srv = createServer(async (req, res) => {
     g.requests++;
@@ -160,6 +173,7 @@ function standIn(gport) {
         return res.writeHead(308, { range: `bytes=0-${s.have - 1}` }).end();
       }
       if (!authed(req)) { g.rejected401++; await body(req); return err(res, 401, 'authError', 'Invalid Credentials'); }
+      if (await captionRoutes(g, req, res, p, q, { json, err, body })) return;
       if (p === '/upload/youtube/v3/videos' && req.method === 'POST' && q.get('uploadType') === 'resumable') {
         g.startCalls++;
         if (g.onStartEnter) g.onStartEnter();
@@ -172,7 +186,10 @@ function standIn(gport) {
         const meta = JSON.parse((await body(req)).toString());
         const size = Number(req.headers['x-upload-content-length']);
         if (!size) return err(res, 400, 'missingContentLength', 'X-Upload-Content-Length');
-        const n = g.sessions.push({ meta, size, data: Buffer.alloc(size), have: 0 }) - 1;
+        const parts = (q.get('part') ?? '').split(',');
+        const bad = wordsRefused(meta.snippet, meta.localizations, parts);
+        if (bad) return err(res, 400, bad, bad);
+        const n = g.sessions.push({ meta, parts, size, data: Buffer.alloc(size), have: 0 }) - 1;
         const at = `http://127.0.0.1:${gport}/upload/session/${n}`; g.secrets.add(at);
         return res.writeHead(200, { location: at }).end();
       }
@@ -210,7 +227,10 @@ function standIn(gport) {
       }
       if (p === '/youtube/v3/videos' && req.method === 'GET') {
         const ids = (q.get('id') ?? '').split(',');
-        return json(res, 200, { items: ids.map((i) => g.videos.get(i)).filter(Boolean).map(resource) });
+        // Only the parts named come back, as YouTube's do (44i-2b: a read without localizations has none to keep).
+        const named = (q.get('part') ?? '').split(',');
+        const only = (v) => Object.fromEntries(Object.entries(resource(v)).filter(([k]) => k === 'id' || named.includes(k)));
+        return json(res, 200, { items: ids.map((i) => g.videos.get(i)).filter(Boolean).map(only) });
       }
       if (p === '/youtube/v3/videos' && req.method === 'PUT') {
         const b = JSON.parse((await body(req)).toString());
@@ -218,7 +238,12 @@ function standIn(gport) {
         if (!v) return err(res, 404, 'videoNotFound', b.id);
         // A snippet replaces the whole snippet, and must carry its title and category.
         if (b.snippet && (!b.snippet.title || !b.snippet.categoryId)) return err(res, 400, b.snippet.title ? 'invalidCategoryId' : 'invalidTitle', 'The request metadata specifies an invalid video title or category.');
+        const parts = (q.get('part') ?? '').split(',');
+        const bad = wordsRefused(b.snippet ?? v.snippet, b.localizations, parts);
+        if (bad) return err(res, 400, bad, bad);
         if (b.snippet) v.snippet = { ...b.snippet, publishedAt: v.snippet.publishedAt };
+        // Every part named is replaced whole: named with no localizations in the body, they are wiped.
+        if (parts.includes('localizations')) v.localizations = b.localizations ?? {};
         if (b.status) { g.lastStatusSent = b.status; v.status = { uploadStatus: v.status.uploadStatus, madeForKids: v.status.madeForKids, ...b.status }; }
         g.updates++;
         return json(res, 200, resource(v));
@@ -327,7 +352,7 @@ async function scenario(server, gport) {
     const init = await a.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'check', version: '1' } });
     const list = await a.rpc('tools/list', {});
     const names = (list.result?.tools ?? []).map((t) => t.name);
-    line('protocol', `it speaks MCP: initialize with a guide, and its fourteen tools listed (${names.join(', ')})`, init.result?.serverInfo?.name === 'youtube' && /PRIVATE/.test(init.result?.instructions ?? '') && names.length === 14);
+    line('protocol', `it speaks MCP: initialize with a guide, and its sixteen tools listed (${names.join(', ')})`, init.result?.serverInfo?.name === 'youtube' && /PRIVATE/.test(init.result?.instructions ?? '') && names.length === 16 && names.includes('add_captions') && names.includes('list_captions'));
     const before = g.refreshes;
     const ch = await a.tool('channel');
     line('refresh', 'an access key Google refuses is refreshed once and the call goes through', !ch.error && ch.v.title === 'Stand-in Channel' && g.refreshes === before + 1 && g.rejected401 >= 1, ch.text.slice(0, 160));
@@ -742,6 +767,9 @@ async function scenario(server, gport) {
     c2.child.stdin.end();
     await Promise.race([c2.exited, sleep(3000)]);
 
+    // (m) the words around a video (44i-2b): credits, chapters, captions, other languages (scripts/youtubeText.mjs)
+    await textScenario({ server, start, env, conf, dir, g, line, logs, chunk: CHUNK });
+
     // (i) nothing secret in any reply, the log, the manifest, uploads.json or the plist
     const manifestRaw = readText(join(conf, 'manifest.json'));
     const uploadsRaw = readText(join(conf, 'uploads.json'));
@@ -799,6 +827,43 @@ const MUTANTS = [
   { rule: 'setup', find: 'process.exit(r.ok ? 0 : 1);', replace: 'process.exit(0);' },
   { rule: 'settingsKeys', find: 'try { SETTINGS = readSettings(DIR); } catch (e) { log(e.message); process.exit(2); }', replace: "try { SETTINGS = readSettings(DIR); } catch (e) { SETTINGS = { timeZone: 'UTC', categoryId: '22' }; }" },
   { rule: 'manifestViews', find: '...(v?.statistics ? { views: Number(v.statistics.viewCount ?? 0), likes: Number(v.statistics.likeCount ?? 0) } : {}),', replace: '' },
+  // The words around a video (44i-2b): the server's wiring, then the rules in youtube/describe.js and youtube/captions.js.
+  { rule: 'credits', find: 'const credits = creditsLine(SETTINGS.credits, a.credits, a.music, a.description);', replace: "const credits = '';" },
+  { rule: 'updateChapters', in: 'youtube/describe.js', find: 'if (credits) text = text.split(credits).join', replace: 'if (false) text = text.split(credits).join', as: 'creditsOnce' },
+  { rule: 'creditsNeedMusic', in: 'youtube/describe.js', find: "if (!piece) throw new Error('The credits line", replace: "if (false) throw new Error('The credits line" },
+  { rule: 'replaceCredits', in: 'youtube/describe.js', find: "if (!piece) piece = musicIn(line, body) ?? '';", replace: '' },
+  { rule: 'chapterRules', in: 'youtube/describe.js', find: 'if (list[0].at !== 0) throw', replace: 'if (false) throw', as: 'chapterZero' },
+  { rule: 'chapterRules', in: 'youtube/describe.js', find: 'if (list[i].at - list[i - 1].at < 10) throw', replace: 'if (false) throw', as: 'chapterGap' },
+  { rule: 'updateChapters', in: 'youtube/describe.js', find: 'if (chapters) text = stripChapters(text);', replace: '', as: 'chapterStrip' },
+  { rule: 'updateChapters', in: 'youtube/describe.js', find: 'if (Number.isFinite(durationSec) && durationSec > 0 && durationSec - list[list.length - 1].at < 10)', replace: 'if (false)', as: 'chapterEnd' },
+  { rule: 'captions', find: 'for (const c of job.captions ?? []) job.after.push(', replace: 'for (const c of []) job.after.push(' },
+  { rule: 'captions', find: "query: { part: 'snippet', uploadType: 'multipart' }", replace: "query: { part: 'snippet' }", as: 'captionsMultipart' },
+  { rule: 'captionFiles', in: 'youtube/captions.js', find: '} else if (!SRT_CUE.test(body)) {', replace: '} else if (false) {' },
+  { rule: 'localizations', find: "part: job.meta.localizations ? 'snippet,status,localizations' : 'snippet,status'", replace: "part: 'snippet,status'" },
+  { rule: 'localizationsLanguage', in: 'youtube/describe.js', find: "if (!validLanguage(language)) throw new Error('Titles in other languages", replace: "if (false) throw new Error('Titles in other languages" },
+  { rule: 'updateLocalizations', find: 'localizations = { ...(cur.localizations ?? {}) };', replace: 'localizations = {};' },
+  { rule: 'addCaptions', find: "const [c] = captionsFor({ captions: [{ file: a.file, language: a.language, name: a.name, draft: a.draft }] });", replace: "const c = { file: a.file, language: 'en' };" },
+  { rule: 'cardWords', find: "const here = (f) => resolve(dir,", replace: 'const here = (f) => String(f) || resolve(dir,' },
+  { rule: 'creditsFalse', in: 'youtube/describe.js', find: "if (own === false || own === 'false') return '';", replace: '' },
+  { rule: 'creditsFalse', find: 'catch { lenient = { credits: false }; }', replace: 'catch { /* none */ }', as: 'lenientUpdate' },
+  { rule: 'drainedWords', find: 'if (raw.credits !== undefined) out.credits = raw.credits === false ? false : String(raw.credits);', replace: '', as: 'cardCredits' },
+  { rule: 'updateLocalizations', find: "part: 'snippet,status,statistics,contentDetails,localizations'", replace: "part: 'snippet,status,statistics,contentDetails'", as: 'readLocalizations' },
+  { rule: 'updateLocalizations', find: "part: localizations ? 'snippet,status,localizations' : 'snippet,status'", replace: "part: 'snippet,status,localizations'", as: 'alwaysPart' },
+  { rule: 'updateLocalizations', find: "part: localizations ? 'snippet,status,localizations' : 'snippet,status'", replace: "part: 'snippet,status'", as: 'neverPart' },
+  { rule: 'updateLocalizations', find: 'if (v === null) delete localizations[lang]; else localizations[lang] = v;', replace: 'localizations[lang] = v;', as: 'nullRemoves' },
+  { rule: 'chapterRules', in: 'youtube/describe.js', find: 'if (list.length < 3) throw', replace: 'if (false) throw', as: 'chapterThree' },
+  { rule: 'processingLength', in: 'youtube/describe.js', find: 'durationSec > 0 && ', replace: '' },
+  { rule: 'limits', in: 'youtube/describe.js', find: 'if (ANGLE.test(out)) throw', replace: 'if (false) throw', as: 'descAngle' },
+  { rule: 'limits', in: 'youtube/describe.js', find: 'if (bytes > DESCRIPTION_BYTES) throw', replace: 'if (false) throw', as: 'descBytes' },
+  { rule: 'limits', in: 'youtube/describe.js', find: 'if (t.length > TITLE_CHARS) throw', replace: 'if (false) throw', as: 'titleChars' },
+  { rule: 'limits', in: 'youtube/describe.js', find: 'if (ANGLE.test(t)) throw', replace: 'if (false) throw', as: 'titleAngle' },
+  { rule: 'captionFiles', in: 'youtube/captions.js', find: 'if (!/^WEBVTT', replace: 'if (false && !/^WEBVTT', as: 'vttHeader' },
+  { rule: 'captionFiles', in: 'youtube/captions.js', find: 'if (!VTT_CUE.test(body)) throw', replace: 'if (false) throw', as: 'vttCue' },
+  { rule: 'captionFiles', in: 'youtube/captions.js', find: "new TextDecoder('utf-8', { fatal: true })", replace: "new TextDecoder('utf-8', { fatal: false })", as: 'utf8' },
+  { rule: 'captionFiles', in: 'youtube/captions.js', find: 'if (size > MAX_BYTES) throw', replace: 'if (false) throw', as: 'captionSize' },
+  { rule: 'captions', find: "query: { part: 'snippet', uploadType: 'multipart' }", replace: "query: { uploadType: 'multipart' }", as: 'captionsPart' },
+  { rule: 'addCaptions', find: 'language: t.snippet?.language,', replace: '', as: 'listLanguage' },
+  { rule: 'addCaptions', find: "...(o.draft ? { draft: true } : {})", replace: '', as: 'captionDraft' },
   { rule: 'releasePlan', find: 'const slotMs = every % 24 === 0\n      ? zoneWall(y, mo, d + i * (every / 24), h, min, 0)\n      : slot0Ms + i * every * 3600_000;', replace: 'const slotMs = slot0Ms + i * every * 3600_000;' },
 ];
 
@@ -806,12 +871,15 @@ function mutant(m) {
   const dir = join(ROOT, 'scratch', 'youtube-mutants', m.as ?? m.rule);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
-  const src = readFileSync(SERVER, 'utf8');
-  if (!src.includes(m.find)) return { why: `its text is not in mcp/youtube-mcp.js: "${m.find}"` };
   const file = join(dir, 'youtube-mcp.js');
-  writeFileSync(file, src.replace(m.find, m.replace));
-  // The server's own modules beside it (44i-2a), unchanged, so the copy imports what the original does.
+  // The server's own modules beside it (44i-2a), so the copy imports what the original does;
+  // a mutant that names a module (`in`, 44i-2b) is cut there instead of in the server.
   cpSync(MODULES, join(dir, 'youtube'), { recursive: true });
+  const target = m.in ? join(dir, m.in) : file;
+  const src = readFileSync(m.in ? join(MODULES, '..', m.in) : SERVER, 'utf8');
+  if (!src.includes(m.find)) return { why: `its text is not in mcp/${m.in ?? 'youtube-mcp.js'}: "${m.find}"` };
+  if (m.in) writeFileSync(file, readFileSync(SERVER, 'utf8'));
+  writeFileSync(target, src.replace(m.find, m.replace));
   return { file };
 }
 
@@ -839,10 +907,26 @@ for (const l of await scenario(SERVER, BASE_PORT)) say(l.ok, `${l.name}${l.ok ? 
 
 if (MUTANTS_ON) {
   console.log('\nThe mutants (each must fail its own line):');
-  const results = await Promise.all(MUTANTS.map(async (m, i) => {
-    const { file, why } = mutant(m);
-    return { m, why, lines: file ? await scenario(file, BASE_PORT + 1 + i) : [] };
+  /* A few at a time, not all at once. With every scenario started together (46 of them by 44i-2b)
+     the lines that wait on a fixed timeout (a server's exit, a drain) failed on copies that changed
+     nothing, so those rules' mutants were "caught" by load, not by the rule (a review of the check,
+     2026-11-28: 20 unchanged copies in parallel each failed some of loopback, setup, settingsKeys,
+     progress, agentLinux). So at most POOL run together, and the first copy is the server
+     unchanged, which must fail no line at all: any line it fails makes the verdicts void. */
+  const POOL = Number(process.env.YOUTUBE_POOL ?? 8);
+  const jobs = [{ rule: '(control)', control: true, find: '', replace: '', as: 'control' }, ...MUTANTS];
+  const results = new Array(jobs.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(POOL, jobs.length) }, async () => {
+    for (let i = next++; i < jobs.length; i = next++) {
+      const m = jobs[i];
+      const { file, why } = m.control ? mutant({ ...m, find: '', replace: '' }) : mutant(m);
+      results[i] = { m, why, lines: file ? await scenario(file, BASE_PORT + 1 + i) : [] };
+    }
   }));
+  const control = results.shift();
+  const controlFailed = control.lines.filter((l) => !l.ok);
+  say(!control.why && control.lines.length > 0 && controlFailed.length === 0, `an unchanged copy, run beside the mutants, fails no line${controlFailed.length ? `: ${controlFailed.map((l) => l.name.slice(0, 60)).join(' | ')}` : ''}`);
   for (const { m, why, lines } of results) {
     if (why) { say(false, `mutant without ${m.rule}: ${why}`); continue; }
     const crashed = lines.find((l) => l.rule === 'crash' && !l.ok);
