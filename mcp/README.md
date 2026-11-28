@@ -125,8 +125,14 @@ Mac app, and not named on any page a visitor or customer reads.
   `probe.js` (`probeVideo`: length and shown size from an MP4/MOV/M4V's boxes or a
   WebM/MKV's EBML, `null` when not known; `clock`), `shorts.js` (`SHORT_MAX_SEC`,
   `SHORTS_TAG`, `wouldBeShort`, `checkShort`, `tagShort`, `shortsNote`) and `folder.js`
-  (`FOLDER_MAX`, `filmsIn`, `titleFromName`). They import only
-  Node's modules and each other.
+  (`FOLDER_MAX`, `filmsIn`, `titleFromName`), and, moved out of the server unchanged by
+  44i-2c-2 (it was 96 KB of the 100 KB ceiling), `manifest.js` (`bindManifest`,
+  `MANIFEST_STATUS`, `readManifestStrict`, `readManifest`, `writeManifest`,
+  `recordPlaylistInManifest`, `jobPlaylists`, `recordUploadedManifest`, `syncManifest`,
+  `formatManifestTable`, `markVideo`) and `release.js` (`bindRelease`, `parseReleasePlanArgs`,
+  `releasePlan`). Those two are not pure: the server hands each its file, clock, queue and
+  Google calls once at start (`bindManifest`, `bindRelease`), so their lines stay the
+  server's own. They import only Node's modules and each other.
 - `youtube-mcp.js` imports nothing from the repo but `youtube/` (the two move to a
   repository of their own, 44i-2), uploads private unless told otherwise (Google's own default is public
   since 2026-11-02), and never puts a key, the client secret or an upload session's
