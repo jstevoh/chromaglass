@@ -278,6 +278,13 @@ Open, from building 9i:
   wavelength the solver resolves sits near the grid's pitch so a pool either breaks into
   pieces or stays joined by thin necks. Don't lower the bar: those two lines are quarantined on
   PRs and main's deploys 2026-11-22 to 2026-12-06 (19ak-18); the fix takes them out.
+  At the real onset (9t-2 + 38k-7, 2026-11-28, Mac at b9595e82) the first line passes and
+  the lighting line reads 8 of 8 domes lit against 3.0 bright points half a pitch off (the
+  bar wants three times as many; main read 16 of 27 against 0.5): the pool now gathers
+  into a heap and stands 8 full domes in 4 pieces where main stood 27 in 18, so the few
+  domes leave the off-pitch control with a third of their points. The lighting line's
+  control wants a ratio over domes of this size (the off-pitch points per dome, not a
+  count), read from the optics, before the quarantine ends.
 
 - **9ag. The ferrofluid looks lit from the front, in the photos' colours** (S-M). Held
   against the owner's photos (2026-11-12, the looks-against-references read), Ferro Paint
