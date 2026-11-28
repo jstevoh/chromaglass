@@ -21,8 +21,10 @@
  *   2. so the ferrofluid's outline near it is no longer a blob's: its edge
  *      is at least twice as long, for its area, as with either control
  *   3. the plate lights a point on the domes: at least half of them have a
- *      bright point on their top, three times as many as have one half a
- *      pitch off it (where a dome's edge, its glint and meniscus, is). The
+ *      bright point on their top, three times as many as have one at their
+ *      feet (half the domes' spacing off the top, across its crest: where a
+ *      dome's edge, its glint and meniscus, is; PLAN 9e-1), most of those
+ *      feet over the ferrofluid so the control reads something. The
  *      magnet is off the plate's middle in both axes, so a plate that drew
  *      its domes mirrored against the solver's would light them round the
  *      mirror, outside the patch counted
@@ -105,7 +107,7 @@ try {
    * (or none), then read: mass, peak, and at each place asked about the
    * domes, the pieces, the outline and the lit points within `near`.
    */
-  const run = (over, pools, places) => page.evaluate(async ({ over, pools, places, STEPS, N }) => {
+  const run = (over, pools, places) => page.evaluate(async ({ over, pools, places, STEPS, N, PITCH }) => {
     const pool = pools[0];
     await lab.create(N);
     const cols = [[0.02, 0.36, 2.0], [2.0, 0.4, 0.48], [0.02, 0.8, 1.05]];
@@ -223,7 +225,7 @@ try {
       (spikes.ts's spikeTip), and this asked what the magnet added to the
       picture; now the plate needs no telling.
 
-      The control: the same half a pitch (0.02) off each top, the four
+      The control until PLAN 9e-1 (below): the same half a pitch (0.02) off each top, the four
       ways, averaged, which is a dome's foot or the water between domes.
       Counted first as any local bright point past 170 within 0.01 of the
       top, it read 16 of 28 domes lit against 13.8 half a pitch off (the
@@ -253,8 +255,87 @@ try {
       }
       return best;
     };
-    const onTops = (a, dx = 0, dy = 0) => a.tops.filter(([u, v]) => litAt(drawn, u + dx, v + dy) > 182).length;
-    const offTops = (a) => [[0.02, 0], [-0.02, 0], [0, 0.02], [0, -0.02]].reduce((t, [dx, dy]) => t + onTops(a, dx, dy), 0) / 4;
+    const onTops = (a) => a.tops.filter(([u, v]) => litAt(drawn, u, v) > 182).length;
+    /*
+      The control, since PLAN 9e-1 (2026-11-28): each dome's foot, half the
+      domes' own spacing off its top, the two ways its surface falls away
+      fastest (across its crest), averaged.
+
+      It was half a pitch (0.02) off each top, the four ways, which was a
+      dome's foot while the domes stood a pitch apart in water. At the
+      liquid's own onset (9t-2 + 38k-7) the pull gathers the pool into a
+      heap and the domes stand on it as bumps along ridges, 0.74 of a pitch
+      apart (0.0297 in the cloud lab): half a pitch off a top was two thirds
+      of the way to the next top, and of the 13 control places lit there
+      (3.25 a dome, against 11 of 12 tops), 2 were on the next dome's top
+      and 8 on the crest of the ridge between two domes. A crest is lit
+      along its length by real optics: the light the plate reflects at a
+      dome's top (the white dot, plate.ts) is wherever the surface faces
+      straight up, and along a ridge's crest it does, in a line. That is
+      not the light missing the domes; it is the domes' own ridge.
+
+      So the foot is found the way the surface says. The 3×3 mean of the
+      phase gives the top's curvatures (its Hessian, from cells two either
+      side); the direction of the most negative is across the crest, the
+      way the dome falls to its foot, and along the other the crest runs
+      on. Half the domes' spacing (the median distance from a top to the
+      nearest other, as line 1 measures it) is where one dome's foot meets
+      the next one's; across a ridge it reaches the ridge's edge. On domes standing apart at the pitch, round ones,
+      that is the old control, half a pitch off in a direction that no
+      longer matters. Cloud lab at the real onset, on the plate as main
+      draws it: 2.5 of the 24 places lit a dome (2 of them the meniscus,
+      0.85 and 0.59 full, the edge glint the control was built for), where
+      the old control read 3.75; 21 of the 24 reach ferrofluid, so it reads
+      the dome's foot and not the water beside it. The check-skeptic's
+      controls of the control, on that run's picture and phase (offline):
+      a plate painted white wherever the phase is past full reads 11 lit
+      tops against 10 at the feet, and white past twice full 11 against
+      6.5, both red, so a plate that lights the heap or its crests wholesale
+      does not pass; the same places along the crest instead read 7 on
+      main's plate, the crests' light (PLAN 9e-2), printed but not a bar,
+      since a crest lit along its length is the optics and not a fault.
+    */
+    const acrossOf = (u, v) => {
+      const x = Math.floor(u * n), y = Math.floor(v * n), h = 2;
+      const s = (i, j) => { let t = 0; for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) t += at(x + i + c, y + j + b); return t / 9; };
+      const xx = s(h, 0) + s(-h, 0) - 2 * s(0, 0), yy = s(0, h) + s(0, -h) - 2 * s(0, 0);
+      const xy = (s(h, h) + s(-h, -h) - s(h, -h) - s(-h, h)) / 4;
+      // The eigenvector of [[xx, xy], [xy, yy]] with the smaller eigenvalue.
+      const lo = (xx + yy) / 2 - Math.hypot((xx - yy) / 2, xy);
+      const ex = Math.abs(xy) > 1e-9 ? lo - yy : (xx <= yy ? 1 : 0), ey = Math.abs(xy) > 1e-9 ? xy : (xx <= yy ? 0 : 1);
+      const l = Math.hypot(ex, ey) || 1;
+      return [ex / l, ey / l];
+    };
+    const feet = (a) => {
+      const half = (a.spacing > 0 ? a.spacing : PITCH) / 2;
+      return a.tops.flatMap(([u, v]) => { const [ex, ey] = acrossOf(u, v); return [[u + ex * half, v + ey * half], [u - ex * half, v - ey * half]]; });
+    };
+    const offTops = (a) => feet(a).filter(([u, v]) => litAt(drawn, u, v) > 182).length / 2;
+    // The same places turned a quarter, along the crest: printed, not a bar.
+    const crest = (a) => {
+      const half = (a.spacing > 0 ? a.spacing : PITCH) / 2;
+      return a.tops.flatMap(([u, v]) => { const [ex, ey] = acrossOf(u, v); return [[u - ey * half, v + ex * half], [u + ey * half, v - ex * half]]; })
+        .filter(([u, v]) => litAt(drawn, u, v) > 182).length / 2;
+    };
+    /*
+      How many of the feet reach ferrofluid at all: litAt reads only pixels
+      over it, so a foot wholly in the water reads 0 whatever the plate
+      draws, and a control there would measure nothing. A foot whose disc
+      touches the ferrofluid only at its edge is kept, on purpose: across a
+      ridge the foot is the ridge's own edge (in the cloud lab the phase
+      under the feet is 0.60 on average, against 3.47 under the tops, and 9
+      of the 24 centres are past half full), and the meniscus and the edge's
+      glint there are what this control was built to catch.
+    */
+    const overFerro = (u, v) => {
+      const x0 = (0.5 + (u - 0.5) * 1.5) * S, y0 = (0.5 - (v - 0.5) * 1.5) * S, rp = 0.006 * 1.5 * S;
+      for (let y = Math.floor(y0 - rp); y <= Math.ceil(y0 + rp); y++) for (let x = Math.floor(x0 - rp); x <= Math.ceil(x0 + rp); x++) {
+        if (x >= 0 && y >= 0 && x < S && y < S && Math.hypot(x + 0.5 - x0, y + 0.5 - y0) <= rp && phaseAt(0.5 + ((x + 0.5) / S - 0.5) / 1.5, 0.5 - ((y + 0.5) / S - 0.5) / 1.5) >= 0.5) return true;
+      }
+      return false;
+    };
+    const onFerro = (a) => feet(a).filter(([u, v]) => overFerro(u, v)).length;
+    const meanPhase = (pts) => pts.reduce((t, [u, v]) => t + phaseAt(u, v), 0) / Math.max(1, pts.length);
     return {
       mass, mass0, peak,
       /*
@@ -277,10 +358,10 @@ try {
       })(),
       at: places.map((m) => {
         const a = around(m.x, m.y, m.near), pts = lit(drawn, m.x, m.y, m.near);
-        return { ...a, points: pts.length, lit: onTops(a), off: offTops(a) };
+        return { ...a, points: pts.length, lit: onTops(a), off: offTops(a), feet: 2 * a.tops.length, feetOn: onFerro(a), crest: crest(a), half: (a.spacing > 0 ? a.spacing : PITCH) / 2, footPhase: meanPhase(feet(a)), topPhase: meanPhase(a.tops) };
       }),
     };
-  }, { over, pools, places, STEPS, N });
+  }, { over, pools, places, STEPS, N, PITCH });
 
   const near = 0.12;
   // A pool inside the spikes' reach (about 0.15 from a hand's magnet at the
@@ -325,7 +406,7 @@ try {
   const pools = [{ ...A, r: 0.15 }, { ...B, r: 0.15 }];
   const two = await run({ ...HAND, magnetX: A.x, magnetY: A.y, extraMagnets: [{ x: B.x, y: B.y }] }, pools, [A, B]);
   const one = await run({ ...HAND, magnetX: A.x, magnetY: A.y }, pools, [A, B]);
-  const say = (r) => { const a = r.at[0]; return `${a.domes} domes (${a.standing} past full, ${a.spacing.toFixed(3)} apart), ${a.pieces} pieces (${a.piecesFull} past full), outline ${a.outline.toFixed(2)} of a disc's, ${a.lit} of them lit, ${a.off.toFixed(1)} half a pitch off (${a.points} bright points in all)`; };
+  const say = (r) => { const a = r.at[0]; return `${a.domes} domes (${a.standing} past full, ${a.spacing.toFixed(3)} apart), ${a.pieces} pieces (${a.piecesFull} past full), outline ${a.outline.toFixed(2)} of a disc's, ${a.lit} of them lit, ${a.off.toFixed(1)} at their feet and ${a.crest.toFixed(1)} along their crests (${a.feetOn} of ${a.feet} feet reach ferrofluid; ${a.points} bright points in all)`; };
   const each = (r) => r.at.map((a) => `${a.domes} domes (${a.standing} past full, ${a.spacing.toFixed(3)} apart), ${a.pieces} pieces (${a.piecesFull} past full), ${a.lit} of them lit`).join(' | ');
   console.log(`  within ${near} of the magnet —\n  no magnet: ${say(none)}\n  the hand's: ${say(hand)}\n  under the onset (0.8 of it): ${say(far)}`);
   console.log(`  two fingers, at each: ${each(two)}; the first alone: ${each(one)}\n`);
@@ -359,8 +440,8 @@ try {
     `${h.domes} domes within ${near} of it, ${h.standing} of them past full, ${h.spacing.toFixed(3)} apart (pitch ${PITCH}, bar 0.6 to 1.5 of it), in ${h.pieces} pieces; against ${z.domes} (${z.standing} past full) in ${z.pieces} with none and ${f.domes} (${f.standing}) in ${f.pieces} under the onset`);
   check('so its outline is no longer a blob\'s', h.outline >= 2 * Math.max(z.outline, f.outline),
     `the edge ${h.outline.toFixed(2)} times a disc's of the same area, against ${z.outline.toFixed(2)} with none and ${f.outline.toFixed(2)} under the onset`);
-  check('the plate lights a point on the domes', h.lit >= 8 && h.lit >= 0.5 * h.domes && h.lit >= 3 * h.off,
-    `${h.lit} of the ${h.domes} domes near it have a bright point on their top, against ${h.off.toFixed(1)} with one half a pitch off it`);
+  check('the plate lights a point on the domes', h.lit >= 8 && h.lit >= 0.5 * h.domes && h.lit >= 3 * h.off && h.feetOn >= 0.5 * h.feet,
+    `${h.lit} of the ${h.domes} domes near it have a bright point on their top, against ${h.off.toFixed(1)} with one at their feet (${h.half.toFixed(4)} off the top across its crest, the phase ${h.footPhase.toFixed(2)} there against ${h.topPhase.toFixed(2)} on the tops; ${h.feetOn} of the ${h.feet} feet reach ferrofluid)`);
   check('a magnet under the onset leaves the pool whole and unlit', f.domes <= 1 && f.pieces <= 2 && f.lit === 0,
     `at 0.8 of the onset (strength ${FAR.magnetStrength.toFixed(3)} at Magnet Garden's depth): ${f.domes} domes in ${f.pieces} pieces, ${f.lit} lit`);
   const b2 = two.at[1], b1 = one.at[1];
