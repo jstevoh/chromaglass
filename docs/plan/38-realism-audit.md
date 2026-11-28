@@ -671,10 +671,24 @@ Shipped with this pass (the closeup, `npm run stillcloseup`):
   `platePressure` (and Moiré Ripple), and Clock Glass's kick adds 8% to dt. Drop the terms and
   retune Speed per look. Check: dt equal under kicks and in silence; `npm run quick` green.
   (S; Medium; from RS-45.)
-- **38u-10. The dye's refractive index is three times a stand-in** (S; Medium, changes the
-  Becke lines on every dye-only look). calcOpl adds d·0.015·max(1, 3·Boundary Contrast). A
-  few percent of dye raises water's index by about 1e-3 (dn/dc near 0.15 mL/g). A measured
-  dn/dc for each dye, and any boost a dial that says so. none (beside 18e-2).
+- **38u-19. Every dye bends light as tartrazine does, at one wavelength** (S; Low, found doing
+  38u-10). `DYE_DN_PER_ABSORBANCE` is tartrazine's dn/dc (0.41 mL/g, arXiv 2503.05105) over its
+  peak absorptivity, applied to every dye's summed absorbance; and the index is one number, not
+  one per channel. A dye's dn/dc follows its own absorption band (Kramers–Kronig): red light
+  is bent more beside a blue-absorbing dye's band than blue light is, a coloured fringe on a
+  defocused edge. Measured dn/dc for the palette's dyes (food dyes, ink) and an index per
+  channel carried through the derive pass (it writes one path today). Check: `derive` asks two
+  dyes of equal absorbance to step the path by their own ratio. none.
+- **38u-21. Glossiness has nothing to scale on a real dye** (S; Medium, found landing 38u-10,
+  2026-11-27). Glossiness multiplies the slope the optics read (`plateTransmit.ts`
+  reliefGain), and what a slope does to transmitted light goes as the index step across it.
+  At the dye's measured index that step is about 1500 to 3400 times under the old stand-in,
+  so on a dye-only look Glossiness at 1 darkens 0.00% of the plate (`npm run nolight` line 2, which
+  now asks its "darker" half at Dye Index Boost 3210, the level wash's old stand-in). The
+  dial is honest and nearly inert at the default. The real relief is the liquid's surface, not its dye: feed reliefGain the
+  height field's slope (31s-1) once 31s-2 traces light through it (meanwhile the dial's help
+  says that on dye alone it shows only with Dye Index Boost up, shipped with 38u-10). Check: `nolight` line 2 at Boost 1 on a plate
+  whose surface slopes darkens over 0.20%.
 - ~~**38u-11. Glass Smear slides the cover glass along a noise path, always**~~ — **Shipped
   2026-11-15** (the story is in `docs/plan-shipped.md`). Default 0; the 22 looks that slid
   carry the slide as an LFO 1 cord whose top is their old speed; `npm run glassstill`. The

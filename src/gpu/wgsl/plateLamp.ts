@@ -34,7 +34,8 @@ export const LAMP_MIX_WGSL = /* wgsl */ `
 
   The solver's optical path is in derived0's .w (calcOpl, the derive pass):
   n·h, h in rest gaps, the oil's, the film's and the poured liquids' indices
-  in n, and the dye's named stand-in (refractionOptics note 6). The ray's
+  in n, and the dye's at its measured strength (dyeIndex.ts), all less clear
+  water's 1.333 (PLAN 38u-20), a constant the gradient below does not see. The ray's
   delay against the air it replaces is that less h, (n - 1)h, with h read
   from the view as calcOpl reads it (the gap in rest gaps), so
   a pool of glycerine at the water's depth bends by its index step and a
