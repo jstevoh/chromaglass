@@ -42,7 +42,7 @@
  */
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -51,6 +51,8 @@ import { port } from './ports.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const SERVER = resolve(import.meta.dirname, '../mcp/youtube-mcp.js');
+// The server's own modules (44i-2a), named as a path so the reach trace counts them as read here.
+const MODULES = resolve(import.meta.dirname, '../mcp/youtube');
 const MUTANTS_ON = !process.argv.includes('--no-mutants');
 const BASE_PORT = port(5381, 'YOUTUBE_PORT');
 const CHUNK = 256 * 1024;
@@ -273,7 +275,16 @@ async function scenario(server, gport) {
   mkdirSync(binDir, { recursive: true });
   writeFileSync(join(binDir, 'launchctl'), `#!/bin/sh\necho "$@" > "${join(dir, 'launchctl-ran')}"\nexit 0\n`, { mode: 0o755 });
   writeFileSync(join(binDir, 'osascript'), `#!/bin/sh\necho "$@" > "${join(dir, 'osascript-ran')}"\nexit 0\n`, { mode: 0o755 });
-  const env = { PATH: `${binDir}:${process.env.PATH}`, CHROMAGLASS_YOUTUBE_DIR: conf, CHROMAGLASS_YOUTUBE_GOOGLE: `http://127.0.0.1:${gport}`, CHROMAGLASS_YOUTUBE_NO_BROWSER: '1', CHROMAGLASS_YOUTUBE_CHUNK: String(CHUNK), CHROMAGLASS_YOUTUBE_WAIT_MS: '800', CHROMAGLASS_YOUTUBE_BACKOFF_MS: '40', CHROMAGLASS_YOUTUBE_NO_NOTIFY: '1' };
+  // Linux's and Windows' notifier and schedulers too (PLAN 44i-2a): the cloud runs this check on
+  // Linux, where the server's notifier is notify-send, so a fake osascript alone would let a
+  // mutant without the notify guard pass there unseen.
+  for (const b of ['notify-send', 'powershell', 'systemctl', 'schtasks']) writeFileSync(join(binDir, b), `#!/bin/sh\necho "$@" > "${join(dir, `${b}-ran`)}"\nexit 0\n`, { mode: 0o755 });
+  // Release times are read in the settings' zone (44i-2a), and the DST line below is written in
+  // Pacific; every server here runs with TZ=UTC, so this file is what makes that line pass, which proves the
+  // server reads it (the settingsZone mutant pins the zone and must fail there).
+  mkdirSync(conf, { recursive: true, mode: 0o700 });
+  writeFileSync(join(conf, 'settings.json'), JSON.stringify({ timeZone: 'America/Los_Angeles', categoryId: '10' }));
+  const env = { TZ: 'UTC', PATH: `${binDir}:${process.env.PATH}`, CHROMAGLASS_YOUTUBE_DIR: conf, CHROMAGLASS_YOUTUBE_GOOGLE: `http://127.0.0.1:${gport}`, CHROMAGLASS_YOUTUBE_NO_BROWSER: '1', CHROMAGLASS_YOUTUBE_CHUNK: String(CHUNK), CHROMAGLASS_YOUTUBE_WAIT_MS: '800', CHROMAGLASS_YOUTUBE_BACKOFF_MS: '40', CHROMAGLASS_YOUTUBE_NO_NOTIFY: '1' };
   const logs = [];
   try {
     // The override names another host: the server stops before anything.
@@ -409,7 +420,7 @@ async function scenario(server, gport) {
     const lastA = storeA.lastUploadAt ? Date.parse(storeA.lastUploadAt) : 0;
     const statusA = await c.tool('upload_status', { job: qJob?.id });
     line('limitQueue', 'an upload refused by the daily limit a minute after the last upload waits exactly lastUploadAt + 24 h 10 min',
-      !resA.error && g.sessions.length === sessionsBeforeA && qJob?.state === 'queued' && g.limitNext === 0 && lastA > 0 && nbA === lastA + 24 * 3600_000 + 10 * 60_000 && nbA >= t0 + 2 * 3600_000 && /queued, the Mac retries after/.test(resA.text) && Boolean(statusA.v?.not_before || statusA.v?.[0]?.not_before),
+      !resA.error && g.sessions.length === sessionsBeforeA && qJob?.state === 'queued' && g.limitNext === 0 && lastA > 0 && nbA === lastA + 24 * 3600_000 + 10 * 60_000 && nbA >= t0 + 2 * 3600_000 && /queued, this computer retries after/.test(resA.text) && Boolean(statusA.v?.not_before || statusA.v?.[0]?.not_before),
       `state ${qJob?.state}, nb ${nbA}, last+24h ${lastA + 24 * 3600_000}, now+2h ${t0 + 2 * 3600_000}`);
 
     // (b) drain before notBefore sends nothing to the stand-in
@@ -536,29 +547,67 @@ async function scenario(server, gport) {
     mkdirSync(fakeBin, { recursive: true });
     writeFileSync(join(fakeBin, 'launchctl'), `#!/bin/sh\necho "$@" > "${launchMarker}"\nexit 0\n`, { mode: 0o755 });
     writeFileSync(join(fakeBin, 'osascript'), `#!/bin/sh\necho "$@" > "${notifyMarker}"\nexit 0\n`, { mode: 0o755 });
-    const agentEnv = { ...env, HOME: fakeHome, PATH: `${fakeBin}:${process.env.PATH}`, CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL: '1' };
-    const inst = start(server, agentEnv, ['install-agent']);
-    logs.push(inst.out);
-    const instCode = await Promise.race([inst.exited, sleep(5000).then(() => 'timeout')]);
-    if (instCode === 'timeout') await inst.kill();
+    const ran = (b) => { try { statSync(join(dir, `${b}-ran`)); return true; } catch { return false; } };
+    // Each system's plan, written for real into a fake home under the switch that keeps every
+    // scheduler command printed and not run (44i-2a): the cloud is Linux and nobody's CI is
+    // Windows, so PLATFORM is how one machine reads all three.
+    const agentRun = async (platform, cmd) => {
+      const p = start(server, { ...env, HOME: fakeHome, XDG_CONFIG_HOME: join(fakeHome, '.config'), PATH: `${fakeBin}:${process.env.PATH}`, CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL: '1', CHROMAGLASS_YOUTUBE_PLATFORM: platform }, [cmd]);
+      logs.push(p.out);
+      const code = await Promise.race([p.exited, sleep(5000).then(() => 'timeout')]);
+      if (code === 'timeout') await p.kill();
+      return { code, err: p.out.stderr };
+    };
+    const exists = (f) => { try { statSync(f); return true; } catch { return false; } };
+    const inst = await agentRun('darwin', 'install-agent');
+    const instCode = inst.code;
     const plistFile = join(fakeHome, 'Library', 'LaunchAgents', 'art.chromaglass.youtube-drain.plist');
     const plistText = readText(plistFile);
-    let launchRan = false;
-    try { statSync(launchMarker); launchRan = true; } catch { /* expected */ }
-    const uninst = start(server, agentEnv, ['uninstall-agent']);
-    logs.push(uninst.out);
-    const uninstCode = await Promise.race([uninst.exited, sleep(5000).then(() => 'timeout')]);
-    if (uninstCode === 'timeout') await uninst.kill();
-    let plistRemoved = false;
-    try { statSync(plistFile); } catch { plistRemoved = true; }
-    try { statSync(launchMarker); launchRan = true; } catch { /* expected */ }
-    // No mutant for this line, on purpose. A mutant that dropped the NO_LAUNCHCTL guard would
-    // run the real launchctl on whatever machine runs the check; the fake one on PATH should
-    // catch it, but a server that called launchctl by its full path would load a real agent
-    // that drains the real queue every hour. The line reads the plist and the marker file.
+    const uninstCode = (await agentRun('darwin', 'uninstall-agent')).code;
+    const plistRemoved = !exists(plistFile);
+    const unitDir = join(fakeHome, '.config', 'systemd', 'user');
+    const lin = await agentRun('linux', 'install-agent');
+    const svcText = readText(join(unitDir, 'art.chromaglass.youtube-drain.service'));
+    const timerText = readText(join(unitDir, 'art.chromaglass.youtube-drain.timer'));
+    const linUn = await agentRun('linux', 'uninstall-agent');
+    const unitsRemoved = !exists(join(unitDir, 'art.chromaglass.youtube-drain.service')) && !exists(join(unitDir, 'art.chromaglass.youtube-drain.timer'));
+    const win = await agentRun('win32', 'install-agent');
+    const launchRan = ran('launchctl');
     line('plist', 'install-agent writes a plist naming drain, the real script path and StartInterval 3600 without running launchctl under the env var',
       instCode === 0 && uninstCode === 0 && !launchRan && plistRemoved && plistText.includes('<string>drain</string>') && plistText.includes(realpathSync(server)) && plistText.includes('<key>StartInterval</key><integer>3600</integer>'),
       `inst ${instCode}, uninst ${uninstCode}, launchRan ${launchRan}, removed ${plistRemoved}`);
+    line('agentLinux', 'install-agent on Linux writes a systemd user service running drain on the real script and an hourly persistent timer, enables it (printed, not run), and uninstall removes both',
+      lin.code === 0 && linUn.code === 0 && !ran('systemctl') && unitsRemoved && svcText.includes(`"${realpathSync(server)}" drain`) && /OnUnitActiveSec=1h/.test(timerText) && /Persistent=true/.test(timerText) && /would run: systemctl "--user" "enable" "--now" "art\.chromaglass\.youtube-drain\.timer"/.test(lin.err),
+      `inst ${lin.code}, uninst ${linUn.code}, removed ${unitsRemoved}, timer ${/OnUnitActiveSec=1h/.test(timerText)}`);
+    line('agentWindows', 'install-agent on Windows makes an hourly Task Scheduler task running drain on the real script (printed, not run)',
+      win.code === 0 && !ran('schtasks') && /would run: schtasks "\/Create" "\/F" "\/SC" "HOURLY"/.test(win.err) && win.err.includes(`"/TR" ${JSON.stringify(`"${process.execPath}" "${realpathSync(server)}" drain`)}`),
+      `inst ${win.code}, ${win.err.split('\n').find((l) => l.includes('schtasks')) ?? 'no schtasks line'}`);
+
+    // setup (44i-2a): with nothing set up it names the client file as the first thing to do and
+    // exits 1; signed in against the stand-in it finds the channel and exits 0.
+    const setupRun = async (extra) => {
+      const p = start(server, { ...env, ...extra }, ['setup']);
+      logs.push(p.out);
+      const code = await Promise.race([p.exited, sleep(8000).then(() => 'timeout')]);
+      if (code === 'timeout') await p.kill();
+      return { code, text: p.out.all };
+    };
+    const emptyConf = join(dir, 'empty-conf');
+    const setupEmpty = await setupRun({ CHROMAGLASS_YOUTUBE_DIR: emptyConf });
+    const setupFull = await setupRun({});
+    line('setup', 'setup with no client file exits 1 naming the client file and the Cloud console pages; signed in, it exits 0 and names the channel',
+      setupEmpty.code === 1 && /TODO {2}Google client file/.test(setupEmpty.text) && setupEmpty.text.includes('youtube.googleapis.com') && !/TODO/.test(setupFull.text) && setupFull.code === 0 && /ok {4}YouTube channel: /.test(setupFull.text),
+      `empty ${setupEmpty.code}, full ${setupFull.code}: ${setupFull.text.split('\n').filter((l) => /TODO|channel/.test(l)).join(' | ').slice(0, 200)}`);
+
+    // settings.json with a key this version does not know stops the server at start, naming it.
+    const badConf = join(dir, 'bad-conf');
+    mkdirSync(badConf, { recursive: true, mode: 0o700 });
+    writeFileSync(join(badConf, 'settings.json'), JSON.stringify({ timezone: 'Europe/London' }));
+    const badSettings = start(server, { ...env, CHROMAGLASS_YOUTUBE_DIR: badConf });
+    const badCode = await Promise.race([badSettings.exited, sleep(3000).then(() => 'running')]);
+    if (badCode === 'running') await badSettings.kill();
+    line('settingsKeys', 'a settings.json key the server does not know stops it at start with the key named',
+      badCode === 2 && /timezone/.test(badSettings.out.stderr) && /Known: timeZone, categoryId/.test(badSettings.out.stderr), `exit ${badCode}`);
 
     // ── Replace, sidecar card, release plan, progress, notify (PLAN 44i-4, 44i-7..10) ─
     const c2 = start(server, { ...env, CHROMAGLASS_YOUTUBE_NOW: String(tF + 60_000) });
@@ -620,7 +669,7 @@ async function scenario(server, gport) {
     const drainReplCode = await Promise.race([drainRepl.exited, sleep(15_000).then(() => 'timeout')]);
     if (drainReplCode === 'timeout') await drainRepl.kill();
     let notifyRan = false;
-    try { statSync(notifyMarker); notifyRan = true; } catch { /* expected */ }
+    notifyRan = ['osascript', 'notify-send', 'powershell'].some((b) => { try { statSync(join(dir, `${b}-ran`)); return true; } catch { return false; } });
     const vNew = g.sessions.slice(sessionsBeforeJ).map((s) => s.video).find((vv) => vv && sha(vv.bytes) === sha(bytesRepl));
     const manifestAfterJ = readJson(join(conf, 'manifest.json'));
     const oldAfterJ = (manifestAfterJ.videos ?? []).find((e) => e.videoId === 'vidOld');
@@ -630,7 +679,9 @@ async function scenario(server, gport) {
     line('replaceVideo', 'replace_video queues old metadata and replaces without uploading yet; drain adds new id to all old playlists and marks manifest old replaced, new ok',
       queuedOkJ && drainReplCode === 0 && Boolean(vNew?.id) && inPl1 && inPl2 && oldAfterJ?.status === 'replaced' && oldAfterJ?.replacedBy === vNew?.id && newAfterJ?.status === 'ok' && newAfterJ?.key === 'old-ambient' && newAfterJ?.replaces === 'vidOld',
       `queued ${queuedOkJ}, drain ${drainReplCode}, vNew ${vNew?.id}, pl1 ${inPl1}, pl2 ${inPl2}, old ${oldAfterJ?.status}, new ${newAfterJ?.status}`);
-    line('notifyGuard', 'drain never invokes osascript when CHROMAGLASS_YOUTUBE_NO_NOTIFY=1 is set',
+    // What this holds is the guard as a whole (a drain against a stand-in Google never notifies); the
+    // NO_NOTIFY switch alone is not separable here, since every drain in the check names the stand-in.
+    line('notifyGuard', 'drain never invokes a notifier (osascript, notify-send, powershell) when run against a stand-in Google with CHROMAGLASS_YOUTUBE_NO_NOTIFY=1',
       drainReplCode === 0 && !notifyRan,
       `drain ${drainReplCode}, notifyRan ${notifyRan}`);
 
@@ -740,19 +791,27 @@ const MUTANTS = [
   { rule: 'progress', find: 'if (moved) { onProgress?.(job.sent, job.size); fails = 0; continue; }', replace: 'if (moved) { fails = 0; continue; }' },
   { rule: 'replaceVideo', find: 'const playlists = Array.isArray(oldEntry?.playlists) ? oldEntry.playlists : await findVideoPlaylists(oldId);', replace: 'const playlists = [];' },
   { rule: 'sidecar', find: 'if (unknown.length) {', replace: 'if (false) {' },
-  { rule: 'notifyGuard', find: "if (process.platform !== 'darwin' || process.env.CHROMAGLASS_YOUTUBE_NO_LAUNCHCTL === '1' || process.env.CHROMAGLASS_YOUTUBE_NO_NOTIFY === '1' || process.env.CHROMAGLASS_YOUTUBE_GOOGLE) return;", replace: '' },
+  { rule: 'notifyGuard', find: "if (env('NO_SCHEDULER') === '1' || env('NO_LAUNCHCTL') === '1' || env('NO_NOTIFY') === '1' || env('GOOGLE')) return;", replace: '' },
+  // The regression that matters is a server reading the computer's zone instead of the settings';
+  // the servers run with TZ=UTC, so on the owner's Pacific Mac too this mutant reads UTC and fails.
+  { rule: 'releasePlan', find: 'const ZONE = SETTINGS.timeZone;', replace: 'const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;', as: 'settingsZone' },
+  { rule: 'agentLinux', find: "const dryScheduler = () => env('NO_SCHEDULER') === '1' || env('NO_LAUNCHCTL') === '1';", replace: 'const dryScheduler = () => false;' },
+  { rule: 'setup', find: 'process.exit(r.ok ? 0 : 1);', replace: 'process.exit(0);' },
+  { rule: 'settingsKeys', find: 'try { SETTINGS = readSettings(DIR); } catch (e) { log(e.message); process.exit(2); }', replace: "try { SETTINGS = readSettings(DIR); } catch (e) { SETTINGS = { timeZone: 'UTC', categoryId: '22' }; }" },
   { rule: 'manifestViews', find: '...(v?.statistics ? { views: Number(v.statistics.viewCount ?? 0), likes: Number(v.statistics.likeCount ?? 0) } : {}),', replace: '' },
-  { rule: 'releasePlan', find: 'const slotMs = every % 24 === 0\n      ? pacificWallToMs(y, mo, d + i * (every / 24), h, min, 0)\n      : slot0Ms + i * every * 3600_000;', replace: 'const slotMs = slot0Ms + i * every * 3600_000;' },
+  { rule: 'releasePlan', find: 'const slotMs = every % 24 === 0\n      ? zoneWall(y, mo, d + i * (every / 24), h, min, 0)\n      : slot0Ms + i * every * 3600_000;', replace: 'const slotMs = slot0Ms + i * every * 3600_000;' },
 ];
 
 function mutant(m) {
-  const dir = join(ROOT, 'scratch', 'youtube-mutants', m.rule);
+  const dir = join(ROOT, 'scratch', 'youtube-mutants', m.as ?? m.rule);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   const src = readFileSync(SERVER, 'utf8');
   if (!src.includes(m.find)) return { why: `its text is not in mcp/youtube-mcp.js: "${m.find}"` };
   const file = join(dir, 'youtube-mcp.js');
   writeFileSync(file, src.replace(m.find, m.replace));
+  // The server's own modules beside it (44i-2a), unchanged, so the copy imports what the original does.
+  cpSync(MODULES, join(dir, 'youtube'), { recursive: true });
   return { file };
 }
 
@@ -762,7 +821,18 @@ const failures = [];
 const say = (ok, l) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${l}`); if (!ok) failures.push(l); };
 
 const src = readFileSync(SERVER, 'utf8');
-say(!/^import .* from '\.\.?\//m.test(src), 'the server imports nothing from the repo (it can be lifted out on its own, 44i-2)');
+// It imports only Node's own modules and its own folder (mcp/youtube/, 44i-2a), and that folder
+// imports only Node's and its own siblings, so the server and the folder lift out together.
+const modDir = MODULES;
+// Every static, re-export, bare and dynamic form, either quote, any indent; the sample below must
+// yield each of its five specifiers, so a narrowed pattern fails here rather than passing quietly.
+const importsOf = (text) => [...text.matchAll(/(?:\bfrom|\bimport)\s*\(?\s*(['"])([^'"]+)\1/g)].map((m) => m[2]);
+const sampleImports = importsOf(`import a from "../a.js";\n  export { b } from '../b.js';\nimport '../c.js';\nconst d = await import('../d.js');\nimport {\n  e,\n} from '../e.js';`);
+say(['../a.js', '../b.js', '../c.js', '../d.js', '../e.js'].every((x) => sampleImports.includes(x)), `the import reader finds every import form (${sampleImports.join(', ')})`);
+const serverForeign = importsOf(src).filter((p) => !p.startsWith('node:') && !/^\.\/youtube\/[a-z]+\.js$/.test(p));
+const modFiles = readdirSync(modDir).filter((f) => f.endsWith('.js'));
+const modForeign = modFiles.flatMap((f) => importsOf(readFileSync(join(modDir, f), 'utf8')).filter((p) => !p.startsWith('node:') && !/^\.\/[a-z]+\.js$/.test(p)).map((p) => `${f}: ${p}`));
+say(serverForeign.length === 0 && modForeign.length === 0 && modFiles.length > 0, `the server imports nothing from the repo but its own folder, so the two lift out on their own (44i-2)${serverForeign.length || modForeign.length ? `: ${[...serverForeign, ...modForeign].join(', ')}` : ''}`);
 
 console.log('\nThe scenario, against mcp/youtube-mcp.js:');
 for (const l of await scenario(SERVER, BASE_PORT)) say(l.ok, `${l.name}${l.ok ? '' : `  [${l.detail}]`}`);
