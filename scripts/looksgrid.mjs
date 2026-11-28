@@ -17,12 +17,14 @@
  *            in `PRESETS` with its still:
  *              the Perform desk (1440 wide): a control `looks-grid-open` on
  *                the desk opens `looks-grid`, a card `looks-grid-<id>` a look.
- *                The desk has no look menu today (`PresetMenu` is the narrow
- *                window's), so this is where a person at the desk browses;
- *                where the control sits is the build's;
+ *                This is where a person at the desk browses; where the
+ *                control sits is the build's;
  *              the narrow laptop window (900 wide, under the desks' 1024):
- *                `PresetMenu` (`preset-menu` from `preset-title-button`), its
- *                cards `preset-menu-<id>`;
+ *                the folded desk's same `looks-grid-open` and cards. This
+ *                was the old overlay's `PresetMenu` until 49c-3 (#981) gave
+ *                every mouse window the folded desk and 49c-2 deleted the
+ *                overlay; the narrow window keeps its own surface because the
+ *                folded header is where a grid opener would fall off;
  *              the phone (390 x 844): the Looks sheet (`phone-sheet-looks`
  *                from `phone-open-looks`), its cards `phone-look-<id>`.
  *            The card is the test id's element, or its parent when that holds
@@ -287,7 +289,7 @@ const decode = (page, srcs) => page.evaluate(async (srcs) => {
  */
 const SURFACES = [
   { name: 'the Perform desk', w: 1440, h: 900, touch: false, opener: 'looks-grid-open', root: 'looks-grid', prefix: 'looks-grid-' },
-  { name: 'the narrow window', w: 900, h: 800, touch: false, opener: 'preset-title-button', root: 'preset-menu', prefix: 'preset-menu-' },
+  { name: 'the narrow window', w: 900, h: 800, touch: false, opener: 'looks-grid-open', root: 'looks-grid', prefix: 'looks-grid-' },
   { name: 'the phone', w: 390, h: 844, touch: true, opener: 'phone-open-looks', root: 'phone-sheet-looks', prefix: 'phone-look-' },
 ];
 
@@ -297,8 +299,8 @@ async function openSurface(sf, query) {
   const page = await ctx.newPage();
   page.setDefaultTimeout(60_000);
   await page.goto(`${base}/?${query}`, { waitUntil: 'load' });
-  // The app is up when the surface's own frame is: the desk, the overlay's title, the phone's stage.
-  const up = sf.touch ? 'phone-open-looks' : sf.w >= 1024 ? 'perform-desk' : 'preset-title-button';
+  // The app is up when the surface's own frame is: the desk (folded or not), the phone's stage.
+  const up = sf.touch ? 'phone-open-looks' : 'perform-desk';
   for (let i = 0; i < 240 && !(await page.getByTestId(up).count()); i++) await page.waitForTimeout(250);
   await page.waitForTimeout(800);
   const opener = page.getByTestId(sf.opener).first();
