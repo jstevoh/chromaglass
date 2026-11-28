@@ -2046,8 +2046,9 @@ check('and neither starts over the limit',
   const read = (f) => readFileSync(join(root, f), 'utf8');
   const ui = read('src/components/ui/Playful.tsx');
   const css = read('src/index.css');
-  const cueSrc = read('src/components/CueBar.tsx');
-  const menuSrc = read('src/components/PresetMenu.tsx');
+  // The cue bar and the narrow window's preset menu wore the slide too; both
+  // went with the old overlay (49c-2), so the slide is checked where it is
+  // still drawn and the tray where it still clicks: the phone.
   const deskPanelsSrc = read('src/components/desk/DeskPanels.tsx');
   const playSrc = read('src/components/phone/PhonePlay.tsx');
   const stageSrc = read('src/components/phone/PhoneStage.tsx');
@@ -2070,13 +2071,12 @@ check('and neither starts over the limit',
     drum === 0 && trayDeg(drum) === 0 && drum2 === 3 && trayDeg(drum2) === 3 * SLOT_DEG, `net ${drum}, then ${drum2}`);
 
   const chip = (who) => new RegExp(`<LookChip\\s+key=\\{${who}\\.id\\}\\s+lookId=\\{${who}\\.(lookId|id)\\}[^>]*swatch=\\{${who}\\.swatch\\}`);
-  check('a look is a slide on the cue bar and preset menu, a chip of its picture on the Cues panel and the phone (34b-6)',
-    /<SlideMount swatch=\{liveSwatch\}/.test(cueSrc) && /<SlideMount swatch=\{cuedSwatch\}/.test(cueSrc) && (menuSrc.match(/<SlideMount swatch=\{swatchOf\(p\.id\)\}/g) ?? []).length === 2 &&
+  check('a look is a chip of its picture on the Cues panel and the phone (34b-6)',
     chip('c').test(deskPanelsSrc) && chip('l').test(deskPanelsSrc) && chip('l').test(stageSrc) && /<LookPicture lookId=\{p\.activeLookId\} swatch=\{p\.lookSwatch\}/.test(stageSrc) &&
     /<LookPicture lookId=\{l\.id\} swatch=\{l\.swatch\} size=\{60\}/.test(playSrc) && !/SlideMount/.test(deskPanelsSrc + stageSrc + playSrc));
-  check('the tray is on the cue bar and the phone\'s look button and Looks strip, each given the look\'s place in its own list',
-    /<SlideTray at=\{liveAt\}/.test(cueSrc) && /<SlideTray at=\{p\.lookSlot \?\? null\}/.test(stageSrc) && /<SlideTray at=\{p\.lookSlot \?\? null\}/.test(playSrc) &&
-    /liveAt=\{deskLookSlot\}/.test(panel0app) && (panel0app.match(/lookSlot=\{phoneLookSlot\}/g) ?? []).length === 2);
+  check('the tray is on the phone\'s look button and Looks strip, given the look\'s place in the phone\'s list',
+    /<SlideTray at=\{p\.lookSlot \?\? null\}/.test(stageSrc) && /<SlideTray at=\{p\.lookSlot \?\? null\}/.test(playSrc) &&
+    (panel0app.match(/lookSlot=\{phoneLookSlot\}/g) ?? []).length === 2);
   check('the Looks strip flicks one slide at a time: it snaps, and every slide stops it',
     /snap-x snap-mandatory/.test(playSrc) && /snap-start snap-always/.test(playSrc));
   const mountFn = ui.slice(ui.indexOf('export function SlideMount'), ui.indexOf('export function SlideTray'));

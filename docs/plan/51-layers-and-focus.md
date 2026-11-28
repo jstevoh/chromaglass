@@ -284,6 +284,14 @@ Found while building it, not done:
   look carries Two Projectors off and most a lamp ground of 0, so with Decks off a Go fades
   the second projector out (the 51c-2 films). Either looks stop carrying the rig (make it
   `RIG_KEYS`), or keep it as the look's and say so on the Projectors box.
+- **51c-8 · A deck show's held lamp under a look made dark** (S, the owner's call). With
+  51c-2c a deck Go keeps the operator's lamp ground (1 in the films); Solar Flare's clear
+  water then passes that lamp and reads white, and the third Mac film of two deck Gos ran at
+  a mean of up to about 200 of 255 where the plain take, whose Go turns the lamp ground off as
+  the house looks carry it, ran 67 to 93. Real: a clear plate on an overhead lets the lamp
+  through. Either leave it (the lamp is the operator's), cap a held lamp ground under looks
+  tuned at 0, or hold `blendMode` in `DECK_RIG` too (Solar Flare's switches from screen to
+  lighter at the fade's middle, which adds to the white).
 - **51c-4 · Each deck its own drawing** (M, after 16b). A deck Go changes the rest of a look
   (lamp ground, glass, lacing, blend) on both projectors at once, hidden in the middle half;
   with 16b's own sources each projector would take its own and nothing would change on the lit one.

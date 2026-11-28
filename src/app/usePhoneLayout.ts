@@ -4,9 +4,9 @@ import type { DeskLayout } from '../lib/deskLayout';
 
 /**
  * Which screen this is: a phone (`lib/phone.ts`, `components/phone/`), a
- * window with room for the desks, or the narrow overlay between; and on the
- * desks, whether the plate is Perform's live one or Design's Preview. Read
- * again on every resize and turn.
+ * window with the desks (folded when narrow); and on the desks, whether the
+ * plate is Perform's live one or Design's Preview. Read again on every resize
+ * and turn.
  */
 interface PhoneLayoutDeps {
   deskLayout: DeskLayout;
@@ -18,7 +18,7 @@ export function usePhoneLayout({
   /*
     The phone (components/phone/PhoneStage.tsx, lib/phone.ts): a touch screen
     with a phone's short side gets the plate edge to edge and the tools under
-    the thumb, instead of the narrow-screen overlay below. Read again on every
+    the thumb, instead of the folded desk. Read again on every
     resize and turn, because a phone turned to landscape is still a phone
     (844 wide, which is under the desks' 1024 anyway) and a laptop window
     dragged narrow is still a laptop.
@@ -71,7 +71,7 @@ export function usePhoneLayout({
    * it draws both side columns; from 768 px to 1023 px it folds them into one
    * column beside the plate; below 768 px it stacks that folded column under
    * the plate. Touch phones and `/play` still get the phone layout. The old
-   * floating overlay is unhooked.
+   * floating overlay's code was deleted in 49c-2.
    */
   const deskUp = !phone;
   // A phone is never a desk, whatever its width turned sideways.
@@ -92,10 +92,7 @@ export function usePhoneLayout({
   */
   const designing = deskLayout.plateMode === 'preview' && deskUp;
 
-  /** The old floating overlay is retired and unhooked (PLAN 49c). */
-  const overlayUp = false;
-
   return {
-    phone, setPhone, phoneScreenUp, choosePhoneScreen, performing, designing, deskUp, overlayUp,
+    phone, setPhone, phoneScreenUp, choosePhoneScreen, performing, designing, deskUp,
   };
 }
