@@ -680,6 +680,7 @@
       "name": "reelreader's public copy is whole and runs as npx runs it",
       "shard": "sound",
       "run": "npm run reelpack",
+      "always": true,
       "why": [
         "reelreader's public repository and npm package are builds of this one",
         "(scripts/reelreaderpack.mjs, PLAN 47p-6). This builds a copy into a temp",

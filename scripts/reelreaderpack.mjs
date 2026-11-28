@@ -43,7 +43,7 @@
  * - `--test`: runs the copy's own `npm test` in DIR.
  *
  * Then it scans every text file it wrote for what a public copy must not
- * carry: a person's home folder, an address, a model's name. The code's
+ * carry: a home or machine folder, an address, a model's name. The code's
  * comments do name ChromaGlass, its plan items and "the owner's Mac": that is
  * where each measure was calibrated and why, the same text as in this public
  * repository, and the comments are the reasons the code is the way it is.
@@ -86,21 +86,24 @@ export const TESTS = [
   'watchshotstest.mjs', 'watchbatchtest.mjs', 'reelsettest.mjs',
 ];
 
-// What no shipped text may hold: a person's home folder, an address, a model's
-// name. The tests are scanned for the first two only: reelsettest holds the
-// model names as the patterns its own scan looks for.
+// What no shipped text may hold: a home folder or a machine's own folders, an
+// address, a model's name. Two kinds of line are let through, both in the tests:
+// a regex literal in a list (reelsettest's own scan patterns) and the line that
+// plants what that scan must catch.
 export const BANNED = [
-  [/\/Users\/[a-z]|\/home\/(?!user\b)[a-z]/i, "a person's home folder"],
+  [/\/Users\/[a-z]|\/home\/[a-z]|\/root\/|\/mnt\/[a-z]/i, 'a home or machine folder'],
   [/[A-Za-z0-9._%+-]+@(?!anthropic\.com)[A-Za-z0-9.-]+\.[a-z]{2,}/, 'an address'],
   [/\b(opus|sonnet|haiku|fable|gpt-?\d|gemini|hydrogen|carbon)(?![a-z])/i, 'a model'],
 ];
 // "libopus" and "the Opus ones" are the sound codec, not a model.
 const CODEC = /libopus|Opus ones/g;
+const PATTERN_LINE = /^\s*\[\/.*\/[a-z]*,\s*['"][^'"]+['"]\],?\s*$|^const PLANTED = /;
 export const scanText = (name, src, { test = false } = {}) => {
   const hits = [];
   src.split('\n').forEach((line, i) => {
+    if (test && PATTERN_LINE.test(line)) return;
     const l = line.replace(CODEC, '');
-    for (const [re, what] of BANNED) if ((!test || what !== 'a model') && re.test(l)) hits.push(`${name}:${i + 1} ${what}`);
+    for (const [re, what] of BANNED) if (re.test(l)) hits.push(`${name}:${i + 1} ${what}`);
   });
   return hits;
 };
@@ -168,9 +171,16 @@ export function build(out) {
   return { mods, pkg };
 }
 
+// Every text file, the demo's too (its page with the pictures inside it taken
+// out, since a data: URI is base64, not words). Returns the hits and how many
+// files it read, so a scan that read nothing cannot pass as clean.
 export function scan(out) {
-  const files = walk(out).filter(f => TEXT.test(f) && !f.includes(`${path.sep}docs${path.sep}demo${path.sep}`));
-  return files.flatMap(f => scanText(path.relative(out, f), fs.readFileSync(f, 'utf8'), { test: TESTS.includes(path.basename(f)) }));
+  const files = walk(out).filter(f => TEXT.test(f) || f.endsWith('.csv'));
+  const hits = files.flatMap(f => {
+    const src = fs.readFileSync(f, 'utf8').replace(/data:[a-z/+-]+;base64,[A-Za-z0-9+/=]+/g, 'data:');
+    return scanText(path.relative(out, f), src, { test: TESTS.includes(path.basename(f)) });
+  });
+  return Object.assign(hits, { files: files.length });
 }
 
 const sh = (cmd, args, cwd, extra = {}) => {
@@ -235,7 +245,7 @@ if (isMain) {
   if (argv.includes('--demo')) console.log(`demo: docs/demo/ ${demo(out).join(', ')}`);
   const hits = scan(out);
   if (hits.length) { console.log(`FAIL the copy holds what a public copy must not:\n  ${hits.join('\n  ')}`); process.exit(1); }
-  console.log('scan: nothing of this project\'s places, no address, no model name');
+  console.log(`scan: ${hits.files} files, no home or machine folder, no address, no model name`);
   if (argv.includes('--zip')) console.log(`zip: ${zip(out)}`);
   if (argv.includes('--test')) {
     const r = sh('npm', ['test'], out, { stdio: 'inherit' });
