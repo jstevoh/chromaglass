@@ -895,11 +895,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       The press is the flux form of the old −(1/h)∂h/∂t: −∂h/∂t itself, since
       the h is in the mobility now, in the rest gap's units and in the flow's
       clock. And it is the gap's own change since the last step, kept here a
-      cell at a time in \`gapBefore\`, not the squeeze field's rate. That rate is a
+      cell at a time in \`gapBefore\`, not the squeeze field's rate. That rate was a
       press's push drawn out over a quarter of a second by \`gapMemory\`
-      while the dent itself lands at once, so the liquid it moved was not the
+      while the dent itself landed at once, so the liquid it moved was not the
       liquid the glass displaced: integrated, it moved what the memory said,
-      whatever the gap did. Read off the gap, what leaves is exactly what the
+      whatever the gap did. (A thin gap runs no memory now, PLAN 18a-5, and
+      the rate is the gap's change too; the gap is still the one read.) Read off the gap, what leaves is exactly what the
       glass pushed out, and what the spring lets back in comes back. No plate
       mean is taken off it, because the rim is open: that uniform sink is
       what made a press push nothing in particular.

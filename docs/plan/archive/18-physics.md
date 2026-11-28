@@ -106,3 +106,19 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   none out. Then the looks 28i-8 calmed can have their stir back. Measure with the dish's
   own mean over 60 s at Turbulence 0.5 and the comet at 1.5 on Classical Vibe's saved
   settings (a mean under 0.4 at 60 s means it still leaks).
+- **18a-5, the press over its own time: shipped** (2026-11-28). The physical and
+  numerical halves (Stefan's closing in `squeezeUpdate`, the carries' substeps) shipped
+  on 2026-10-03 (`docs/plan-shipped.md`, "the Press draws the liquid back"). What was
+  left: a held press (the Press tool's hand, a bubble's standing squeeze) laid the same
+  dent every solver step, and the governor's step rate is not fixed, so at 30 steps a
+  second the glass came down at 0.64–0.68 of the speed it did at 60 (and faster at
+  120), while the spring, the lift, a kick's hold and release and the clock glass all
+  counted seconds. A hand is a load, and Stefan's rate is per second: the press is now
+  laid as each step's share of its rate (`pressOverStep`, sim/pressLay.ts), which
+  `squeezeUpdate` integrates exactly (1/h² linear in the rate), so 30 and 120 steps a
+  second close within 2% of 60 (0.98–1.01), and 60 is bit for bit as it was. And
+  `gapMemory` is not run on a thin gap: a Stokes film has no inertia to carry a press
+  past its hand, and the thin solve reads the gap's change (hsDivergence), never the
+  rate the memory padded. Let go, that rate read 7.96× off the gap's change on main
+  (the memory remembering the spring's own motion) and 3e-8 now; the old plate keeps
+  its memory. `npm run pressclock`.
