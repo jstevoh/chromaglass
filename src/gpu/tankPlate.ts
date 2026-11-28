@@ -26,7 +26,9 @@
  * Off (Tank at 0, every look but the tank's) nothing here is made or run;
  * turned off, it goes, and the next time it is clear water.
  */
+import { PipelineCache, type Prep } from './kit';
 import { createTankGpu, type TankGpu, type TankField } from './tank';
+import { TANK_KERNELS, type TankKernel } from './wgsl/tank';
 
 /** The tank's grid and size: 16:9, 0.94 mm cells. */
 export const TANK_PLATE_NX = 256;
@@ -92,6 +94,16 @@ export class TankPlate {
   // Reused every step: no new objects in the frame.
   private readonly opts = { gPrime: 0, feed: 0, nozzleX: 0.5, nozzleW: TANK_NOZZLE_W, drain: 1 };
   readonly field: TankPlateField;
+
+  /**
+   * The tank's ten compute kernels, built behind the show (`gpu/prepare.ts`):
+   * every look opens with Tank at 0, so waiting for them would slow the opening
+   * while building them behind it keeps turning Tank on from compiling on a frame.
+   */
+  static prepare(device: GPUDevice): Prep[] {
+    const cache = PipelineCache.for(device, 'tank');
+    return (Object.keys(TANK_KERNELS) as TankKernel[]).map((k) => cache.computePrep(k, TANK_KERNELS[k], true));
+  }
 
   constructor(device: GPUDevice) {
     this.tank = createTankGpu(device, { nx: TANK_PLATE_NX, ny: TANK_PLATE_NY, width: TANK_PLATE_WIDTH });

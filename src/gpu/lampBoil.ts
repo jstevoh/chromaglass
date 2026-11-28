@@ -9,6 +9,7 @@
  *     flux-limited upwind advection on the GPU (`device.queue.submit`).
  *   - Every `read()` maps a `GPUBuffer` (`mapAsync`) and returns float32 `{ T, alpha, u, v, source, starts, dTnuc }`.
  */
+import { PipelineCache, type Prep } from './kit';
 import {
   ALPHA_MAX,
   BOIL_BUOY_PER_KG_M3,
@@ -17,6 +18,7 @@ import {
   K_GLASS,
   K_WATER,
   LATENT,
+  PLATE_BOIL_WGSL,
   RHO_C,
   RHO_C_GLASS,
   RHO_V,
@@ -241,6 +243,14 @@ function getPipelines(device: GPUDevice): BoilPipelines {
   };
   pipelineCache.set(device, pipes);
   return pipes;
+}
+
+/**
+ * The plate's boil compute kernel (`fluid/plateBoilStep`, `gpu/fluid/passes.ts`),
+ * built behind the show (`gpu/prepare.ts`): every look opens with Heat at 0.
+ */
+export function preparePlateBoil(device: GPUDevice): Prep[] {
+  return [PipelineCache.for(device, 'fluid').computePrep('plateBoilStep', PLATE_BOIL_WGSL, true)];
 }
 
 export function createBoilPlateGpu(
