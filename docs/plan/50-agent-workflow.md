@@ -31,12 +31,21 @@ with the frame. At 120 Hz a frame has 8.3 ms; the 11-13 audit measured one desk 
   snapshot is serialised every 80 ms with no phone connected; **46j** the frame's own
   garbage. Each already names its check or the check Claude writes first. The cheapest
   smoothness there is, because the causes are found and placed.
-- **50b** *One smoothness number per look* (rank 2, S, Antigravity). Not a gate: an
-  instrument. On the owner's Mac, every look for 30 s with the band: the 99th-percentile frame
-  time, frames over one refresh, and long tasks over 8 ms, at 60 and 120 Hz (46c's
-  `npm run stutter`, 46e-2's real ProMotion stamps), written as one table into the owner's
-  files, best and worst first. It tells 50a and 50c where the jitter is and whether a PR
-  made it smaller.
+- ~~**50b**~~ *One smoothness number per look* (rank 2, S, Antigravity; **50b shipped**): `npm run smooth`
+  (`scripts/smooth.mjs`, reusing `stutter.mjs` and `rungs-120.mjs`), not a gate. On the owner's
+  Mac, every look for 30 s with the band: the 99th-percentile frame time, frames over one
+  refresh, and long tasks over 8 ms, at 60 and 120 Hz (46c's `npm run stutter`, 46e-2's
+  replay stamps), written as one worst-first table into `~/chromaglass-films/smooth/<date>-<sha>.md`.
+  Measured on main (`53f5aee7`, 46 looks, 60 Hz Air): worst by frame p99 and dropped refreshes
+  are `mushy-mushy` (83.3 ms p99, 208/1289 >1, 143 tasks >8 ms, dropped to `256²@1 30/s`),
+  `soapy-mess` (66.7 ms, 262/1404, 113 tasks >8 ms), `acid-trip` (66.6 ms, 186/1492),
+  `lace-run` (66.7 ms, 171/1479), `oil-and-water` (66.7 ms, 158/1505, 101 tasks >8 ms),
+  `bass-drop` (66.6 ms, 71/1672), `stardust-collapse` (50.0 ms, 223/1524), `neon-coral-reef`
+  (50.0 ms, 222/1526), `solar-flare` (50.0 ms, 190/1567) and `moire-groove` (50.0 ms,
+  186/1590); worst main-thread >8 ms tasks also include `moire-press` (354, max 47 ms),
+  `velvet-underground` (140, max 39 ms), `home-movie` (103), `crowd-plate` (98) and
+  `red-cabbage` (90). Only six looks held `512²@1 60/s` with 0–1 missed refreshes (`cell-bloom`,
+  `turing-print`, `night-sea`, `classic`, `soap-film`, `chemical-clock`).
 - **50c** *The frame loop out of React, a piece at a time* (rank 3, M ongoing; Claude writes
   the seam, Antigravity moves the pieces). 19ai-10 done as a programme, not when a PR happens
   to touch it: the loop becomes `src/engine/`, a plain module that owns the plate's per-frame
