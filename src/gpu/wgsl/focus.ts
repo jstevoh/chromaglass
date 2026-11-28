@@ -25,9 +25,26 @@
  * the same, so the light is kept: a blurred cell is a glow. There is no
  * noise in it, and nothing moves from frame to frame but the picture: a
  * jittered tap pattern would make the melt shimmer, the one thing the owner
- * asks the visuals not to do. Past that (a melt, far past the rack's
- * real travel) the taps spread more than two pixels apart; PLAN 51b-3 is to
- * take a melt at a lower resolution instead.
+ * asks the visuals not to do.
+ *
+ * A melt at a smaller picture (PLAN 51b-3, 51c). Two projectors melted on a
+ * 1600-square frame took 19.6 ms a draw on the Air, against 8.6 sharp: the
+ * passes read 128 taps a pixel at full size for a picture with nothing in it
+ * finer than its box. So once every soft projector's box is wide enough
+ * (`focusScale`, lib/projectorFocus.ts: its short side at least LOW_MIN_PX
+ * pixels of the smaller picture), the light is first taken down to a half, a
+ * quarter, an eighth or a sixteenth of the frame's size by `down`, each small pixel the mean of the
+ * light of the d × d it covers, in linear light and split by B's share, so
+ * nothing is lost or mixed; `lowRows` and `lowCols` box it there, A's and B's
+ * added; and `compose` draws it back at full size through one bilinear tap
+ * and lays the finish. The box over a smooth picture has nothing at the small
+ * picture's pixel scale to alias, so this is the same blur at a sixteenth of
+ * the taps, not a coarser one. A projector sharp beside a melted one is not
+ * taken down (that would soften it by the small pixel): `compose` adds its
+ * light straight from the full-size picture. The taps stay under two small
+ * pixels apart up to a half-width of FOCUS_TAPS − 1 of them, so a melt of a
+ * tenth of a 2560-wide frame (128 pixels, 32 at a quarter) is whole, and a
+ * dissolve's glow there (320 pixels, 20 at a sixteenth).
  */
 
 import { PLATE_STRUCT } from './plateFields';
@@ -116,6 +133,116 @@ fn col(t: texture_2d<f32>, uv: vec2f, h: f32) -> vec3f {
   let uv = in.uv;
   var lin = col(rowsA, uv, U.projFocus.y);
   if (U.projA.w > 0.5) { lin += col(rowsB, uv, U.projFocus.w); }
+  let shown = toDisplay(lin);
+  let fragGl = vec2f(in.pos.x, U.resolution.y - in.pos.y);
+  if (U.lensFinish == 1) { return finishFrame(shown, uv, fragGl, markTex); }
+  if (U.lensFinish == 2) { return ditherOut(shown, fragGl); }
+  return vec4f(shown, 1.0);
+}
+`;
+
+/* Down to a d-th of the frame's size (SCALE, 2, 4, 8 or 16): each small pixel the mean light of the d × d it covers, A's and B's apart. */
+export const DOWN_WGSL = /* wgsl */ `${HEAD}
+override SCALE: f32 = 2.0;
+@group(0) @binding(2) var scene: texture_2d<f32>;
+@group(0) @binding(3) var share: texture_2d<f32>;
+struct Low {
+  @location(0) a: vec4f,
+  @location(1) b: vec4f,
+};
+@fragment fn fs(in: VsOut) -> Low {
+  let d = i32(SCALE);
+  let corner = vec2i(floor(in.pos.xy)) * d;
+  let last = vec2i(textureDimensions(scene)) - vec2i(1);
+  let two = U.projA.w > 0.5;
+  var a = vec3f(0.0);
+  var b = vec3f(0.0);
+  for (var y = 0; y < d; y++) {
+    for (var x = 0; x < d; x++) {
+      let p = min(corner + vec2i(x, y), last);
+      let l = toLinear(textureLoad(scene, p, 0).rgb);
+      var s = vec3f(0.0);
+      if (two) { s = textureLoad(share, p, 0).rgb; }
+      a += l * (vec3f(1.0) - s);
+      b += l * s;
+    }
+  }
+  let n = SCALE * SCALE;
+  var o: Low;
+  o.a = vec4f(a / n, 1.0);
+  o.b = vec4f(b / n, 1.0);
+  return o;
+}
+`;
+
+/* The small picture's scale, from the frame's size over its own (a ceil of the frame over d, so rounded). */
+const LOW_HEAD = /* wgsl */ `${HEAD}
+fn scaleOf(t: texture_2d<f32>) -> f32 { return round(U.resolution.x / f32(textureDimensions(t).x)); }
+fn soft(h: f32) -> bool { return h >= ${f(SHARP)}; }
+fn boxAlong(t: texture_2d<f32>, uv: vec2f, h: f32, step: vec2f) -> vec3f {
+  let n = tapsOf(h);
+  var sum = vec3f(0.0);
+  for (var i = 0.0; i < n; i += 1.0) { sum += tex2(t, uv + tapAt(i, n, h) * step).rgb; }
+  return sum / n;
+}
+`;
+
+/* Along x on the small picture, each projector over its own box in small pixels. A sharp projector is left out: compose lays it at full size. */
+export const LOW_ROWS_WGSL = /* wgsl */ `${LOW_HEAD}
+@group(0) @binding(2) var lowA: texture_2d<f32>;
+@group(0) @binding(3) var lowB: texture_2d<f32>;
+struct Rows {
+  @location(0) a: vec4f,
+  @location(1) b: vec4f,
+};
+@fragment fn fs(in: VsOut) -> Rows {
+  let k = scaleOf(lowA);
+  let step = vec2f(1.0 / f32(textureDimensions(lowA).x), 0.0);
+  var o: Rows;
+  o.a = vec4f(0.0, 0.0, 0.0, 1.0);
+  o.b = vec4f(0.0, 0.0, 0.0, 1.0);
+  if (soft(U.projFocus.x)) { o.a = vec4f(boxAlong(lowA, in.uv, U.projFocus.x / k, step), 1.0); }
+  if (U.projA.w > 0.5 && soft(U.projFocus.z)) { o.b = vec4f(boxAlong(lowB, in.uv, U.projFocus.z / k, step), 1.0); }
+  return o;
+}
+`;
+
+/* Down y on the small picture, each over its own box, the soft ones added (light adds). */
+export const LOW_COLS_WGSL = /* wgsl */ `${LOW_HEAD}
+@group(0) @binding(2) var rowsA: texture_2d<f32>;
+@group(0) @binding(3) var rowsB: texture_2d<f32>;
+@fragment fn fs(in: VsOut) -> @location(0) vec4f {
+  let k = scaleOf(rowsA);
+  let step = vec2f(0.0, 1.0 / f32(textureDimensions(rowsA).y));
+  var lin = vec3f(0.0);
+  if (soft(U.projFocus.x)) { lin += boxAlong(rowsA, in.uv, U.projFocus.y / k, step); }
+  if (U.projA.w > 0.5 && soft(U.projFocus.z)) { lin += boxAlong(rowsB, in.uv, U.projFocus.w / k, step); }
+  return vec4f(lin, 1.0);
+}
+`;
+
+/* Back at full size: the small wall through one bilinear tap, a sharp projector's light straight from the full picture, and the finish. */
+export const COMPOSE_WGSL = /* wgsl */ `${LOW_HEAD}
+@group(0) @binding(2) var wall: texture_2d<f32>;
+@group(0) @binding(3) var scene: texture_2d<f32>;
+@group(0) @binding(4) var share: texture_2d<f32>;
+@group(0) @binding(5) var markTex: texture_2d<f32>;
+${FINISH_WGSL}
+@fragment fn fs(in: VsOut) -> @location(0) vec4f {
+  let uv = in.uv;
+  // The small picture covers a whole number of its pixels, a little past the frame's edge when the frame is not a multiple of them.
+  let k = scaleOf(wall);
+  var lin = tex2(wall, uv * U.resolution.xy / (k * vec2f(textureDimensions(wall)))).rgb;
+  let two = U.projA.w > 0.5;
+  let sharpA = !soft(U.projFocus.x);
+  let sharpB = two && !soft(U.projFocus.z);
+  if (sharpA || sharpB) {
+    let l = toLinear(tex2(scene, uv).rgb);
+    var s = vec3f(0.0);
+    if (two) { s = tex2(share, uv).rgb; }
+    if (sharpA) { lin += l * (vec3f(1.0) - s); }
+    if (sharpB) { lin += l * s; }
+  }
   let shown = toDisplay(lin);
   let fragGl = vec2f(in.pos.x, U.resolution.y - in.pos.y);
   if (U.lensFinish == 1) { return finishFrame(shown, uv, fragGl, markTex); }

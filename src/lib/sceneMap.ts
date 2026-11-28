@@ -82,7 +82,7 @@ import { MIX_FADE_KEYS } from './mixer.ts';
   projectors. Whether a lamp may follow the sound (a colour organ) is 51a-2.
 */
 const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors', 'filmRing',
-  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross', 'projFocusA', 'projFocusB',
+  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross', 'projFocusA', 'projFocusB', 'projRack',
   'lfo1Bars', 'lfo1Shape', 'lfo1Restart', 'lfo2Bars', 'lfo2Shape', 'lfo2Restart',
   'lfo3Bars', 'lfo3Shape', 'lfo3Restart', 'lfo4Bars', 'lfo4Shape', 'lfo4Restart',
   'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',

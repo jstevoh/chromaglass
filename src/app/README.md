@@ -28,7 +28,7 @@ comments, which moved with it.
 | `usePhoneLayout` | phone or desks (the old narrow overlay is unhooked, PLAN 49c); Live or Preview |
 | `useWallLook` | Preview's copy for the wall, and Send to wall |
 | `useBlackout` | blackout and the dimmer's fades |
-| `useLookFades` | Go, Go now, the back plate, Revert; sets `setNow.ts`'s Go door for the assistant |
+| `useLookFades` | Go, Go now, the back plate, Revert; sets `setNow.ts`'s Go door for the assistant; with Focus Dissolve up, a Go's look change waits inside the visualizer's `rack` (PLAN 51c) |
 | `useTimecode` | MIDI timecode, for the sequence |
 | `useShowLibrary` | songs' shows, action sets, what a cloud sync reloads; Follow songs for the assistant (`songShowNow.ts`) |
 | `useSetActions` | the set list's own edits and files; sets `editNow.ts`'s door for the owner's assistant (PLAN 44k-16a) |

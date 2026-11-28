@@ -256,6 +256,7 @@ export const CONTROL_HELP: Record<string, string> = {
   projShutterB: 'A vane over the back projector\'s lens (with Two Projectors).',
   projFocusA: 'Racks the front projector\'s head out of focus: sharp at the middle, either way a soft glow the lamp\'s shape, past halfway a melt.',
   projFocusB: 'Racks the back projector\'s head out of focus (with Two Projectors), so one layer can go soft while the other stays sharp.',
+  projRack: 'Each Go with a fade racks the projectors out and back, the look changing behind the blur: half the real rack, past it a glow.',
   projCross: 'Fades the wall from projector A to projector B, linear in light so the middle is no brighter than the ends (with Two Projectors).',
   layerCount: 'How many plates are stacked, one or two.',
   rotationSpeed: 'How fast the dish turns.',
