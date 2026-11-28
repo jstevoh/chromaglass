@@ -93,6 +93,14 @@ export interface LiquidBehaviour {
   density?: number;
   /** Surface tension against air, mN/m (water 72.8). */
   tension?: number;
+  /**
+   * For a liquid that will not mix with water, the tension of its interface
+   * with water, mN/m: what rounds an oil drop between the glasses, and the
+   * one of these the oil's capillary force reads (PLAN 38e; lib/liquidProps.ts
+   * interfacialTension, which falls back to Antonow's rule on `tension` for
+   * a bottle without it).
+   */
+  interfacial?: number;
   /** Refractive index (water 1.333). */
   index?: number;
   /**

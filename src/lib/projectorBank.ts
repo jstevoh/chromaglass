@@ -136,6 +136,48 @@ export function bankHasTwo(s: { twoProjectors?: number; backBlend?: unknown }, p
   return (s.twoProjectors ?? 0) > 0.5 && plates > 1 && lampGround > 0.001 && mixBlendIndex(s.backBlend) === 0;
 }
 
+/** The same question of a whole set of settings: its own plate count, and its lamp ground through the render style (a photograph has no lamp). */
+export const wallHasTwo = (s: WallSettings): boolean =>
+  bankHasTwo(s, Math.round(s.layerCount ?? 1), s.renderStyle === 'photo' ? 0 : s.lampGround ?? 0);
+
+/** What `wallHasTwo` reads that a look also carries. */
+export interface WallSettings { twoProjectors?: number; backBlend?: unknown; layerCount?: number; lampGround?: number; renderStyle?: string }
+
+/*
+ * What a plain Go leaves alone while two projectors are on the wall (PLAN
+ * 51c-7). Every house look carries Two Projectors off, one plate and most a
+ * lamp ground of 0 (lookFade's lookOf lays them from the base), so with Decks
+ * off a Go faded the second projector out of a two-projector wall: the 51c-2
+ * Mac films showed it as a deck Go's bug, and the owner's answer to the plain
+ * Go (2026-11-28) was that a look leaves the wall as the operator built it.
+ * Holding the switch alone would not do it: under a look whose lamp ground is
+ * 0 the wall still drops to one lamp (`bankHasTwo` asks for a lamp), and a
+ * look of one plate leaves no B. So the three are held together, and only
+ * while the wall has two: a one-projector wall is a look's to change, as
+ * before, and a look that adds a second plate still adds it.
+ *
+ * Not `RIG_KEYS` (lib/lookFade.ts): those are the room's in every show, and
+ * the same set reaches preset matching, the Design desk's live edits, the
+ * Preview wall and the assistant's looks, where a look's plate count and lamp
+ * ground are the look's. Not the render style either: a photograph is a
+ * look's way of being drawn, and a look that asks for one gets it. Which is
+ * why the hold asks whether the operator built two projectors (the switch,
+ * the plates, the lamp ground, the back row's blend) and not `wallHasTwo`:
+ * a photograph draws no lamp, so under the owner's one photo look the wall
+ * reads one projector, and a Go out of it asking `wallHasTwo` let the next
+ * look switch the rig off (the check's first run). Held through the photo,
+ * the next show look has the two projectors back.
+ */
+export const WALL_RIG = ['twoProjectors', 'layerCount', 'lampGround'] as const;
+
+/** `target` with the wall's projectors kept as `now` has them, when `now` is built as two (whatever its render style); `target` itself otherwise. */
+export function keepWall<T extends WallSettings>(target: T, now: WallSettings): T {
+  if (!bankHasTwo(now, Math.round(now.layerCount ?? 1), now.lampGround ?? 0)) return target;
+  const out = { ...target };
+  for (const k of WALL_RIG) (out as Record<string, unknown>)[k] = now[k];
+  return out;
+}
+
 /** The crossfade's two weights, linear in light: A at (1 − x), B at x. */
 export const crossfadeWeights = (x: number | undefined): [number, number] => {
   const t = clamp01(Number.isFinite(x) ? x as number : 0.5);

@@ -107,12 +107,25 @@ fn heldAt(t: texture_2d<f32>, air: texture_2d<f32>, uv: vec2f, dC: f32, hasAir: 
   from the middle weighed a sixth too little. Below 1.5 texels a cell the
   one read already covers it.
 */
+/*
+  The side reads' weight for s texels a cell, 0 where the one read already
+  covers it. One definition for both cell readers, this one and cellDye
+  (dyeIndex.ts), which the projector's derive pass reads since 38u-10: the
+  flower's point-read control (scripts/flower.mjs) cuts here, and while
+  cellDye held its own copy the control cut only the camera's reader, drew
+  the build again on the projector, and refused every film (PLAN 31s-14).
+*/
+fn cellSide(s: f32) -> f32 {
+  if (s < 1.5) { return 0.0; }
+  return (s - 1.0) * 0.5;
+}
+
 fn cellDensity(t: texture_2d<f32>, air: texture_2d<f32>, uv: vec2f, dC: f32, hasAir: bool) -> f32 {
   let dims = vec2f(textureDimensions(t));
   let s = dims.x / U.logicalGrid;
-  if (s < 1.5) { return heldAt(t, air, uv, dC, hasAir); }
+  let side = cellSide(s);
+  if (side == 0.0) { return heldAt(t, air, uv, dC, hasAir); }
   let a = (s / 3.0) / dims;
-  let side = (s - 1.0) * 0.5;
   var acc = 0.0;
   for (var j = -1; j <= 1; j++) {
     let wj = select(side, 1.0, j == 0);

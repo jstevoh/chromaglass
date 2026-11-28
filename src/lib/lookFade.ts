@@ -31,6 +31,7 @@
 import { DEFAULT_SETTINGS, type SceneMapping, type VisualizerSettings } from '../types';
 import { PIN_RANGE } from './deskPins';
 import { MIX_KEYS, MIX_FADE_KEYS } from './mixer';
+import { keepWall } from './projectorBank';
 
 /**
  * What belongs to the room rather than to a look.
@@ -364,12 +365,15 @@ export const STRUCTURE: ReadonlySet<keyof VisualizerSettings> = new Set<keyof Vi
 
 /**
  * Where an unattended look change is aiming: the look, with this plate's own
- * structure kept over the top of it.
+ * structure kept over the top of it, and a two-projector wall's lamp ground
+ * with it (lib/projectorBank's `keepWall`, PLAN 51c-7): structure holds the
+ * switch and the plates, but a song's look with a lamp ground of 0 still faded
+ * the wall down to one lamp, and what a pressed Go leaves alone a song's must too.
  */
 export function evolvedLook(current: VisualizerSettings, look: Partial<VisualizerSettings>): VisualizerSettings {
   const held: Partial<VisualizerSettings> = {};
   for (const key of STRUCTURE) Object.assign(held, { [key]: current[key] });
-  return { ...targetLook(current, look), ...held };
+  return keepWall({ ...targetLook(current, look), ...held }, current);
 }
 
 /** Ease in and out: a fade that starts and stops gently reads as a hand, not a switch. */

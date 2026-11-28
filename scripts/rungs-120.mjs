@@ -131,12 +131,14 @@ export function replayAt({ QualityGovernor, DrawGate, ladder, start, machine, hz
   let k = 0, lastDrawn = -Infinity, lastImage = -Infinity, lastImageRate = 0;
   let skipped = 0, uneven = 0, holds = 0;
   const moves = [];
+  const frameS = [];
   while (stamp(k) < seconds * 1000) {
     const t = stamp(k);
     // A frame the gate turns away costs nothing and the loop asks again next refresh.
     if (!gate.offer('frame', t)) { k += 1; continue; }
     const dtS = Number.isFinite(lastDrawn) ? (t - lastDrawn) / 1000 : R / 1000;
     lastDrawn = t;
+    frameS.push(dtS);
     // LiquidVisualizer's catch-up cap (the GPU path, where a step's JavaScript is a submission).
     const catchUp = g.frameMs > 40 ? 1 : g.frameMs > 24 ? 2 : 4;
     const rate = g.stepRate;
@@ -160,7 +162,7 @@ export function replayAt({ QualityGovernor, DrawGate, ladder, start, machine, hz
     if (g.sample(dtS, 1, t / 1000, false, cost, m.step, steps)) moves.push({ at: t / 1000, index: g.rungIndex, stepRate: g.stepRate });
     k += held;
   }
-  return { g, skipped, uneven, holds, moves };
+  return { g, skipped, uneven, holds, moves, frameS };
 }
 
 export function lines120({ line, check, ladderAt, QualityGovernor, DrawGate }) {

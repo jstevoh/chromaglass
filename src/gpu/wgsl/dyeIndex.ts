@@ -1,7 +1,7 @@
 /**
  * The dye's own refractive index, for the derive pass's optical path
  * (plate.ts, DERIVE_WGSL), PLAN 38u-10. Kept beside plate.ts, which is held
- * at its size ceiling. Reads decodeDensity, tex2 and AIR_HELD (plate.ts's
+ * at its size ceiling. Reads decodeDensity, tex2, airShare and cellSide (plate.ts's
  * SAMPLING and DECODE, plateSlope.ts) and the plate's uniforms, so it is
  * joined in after them.
  */
@@ -86,7 +86,7 @@ fn cellDye(t: texture_2d<f32>, air: texture_2d<f32>, uv: vec2f, c: vec2f, hasAir
   let dims = vec2f(textureDimensions(t));
   let s = dims.x / U.logicalGrid;
   let a = (s / 3.0) / dims;
-  let side = select((s - 1.0) * 0.5, 0.0, s < 1.5);
+  let side = cellSide(s);
   var acc = vec2f(0.0);
   for (var j = -1; j <= 1; j++) {
     let wj = select(side, 1.0, j == 0);
