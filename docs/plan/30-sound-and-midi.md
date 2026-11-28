@@ -66,7 +66,6 @@ analyzer look; Chladni figures, real physics). Pricing was left out at the owner
 - **30c-5** (S) A layout that claims more than the grid (51h's projector layout wants the
   crossfader and the Activator, Solo and A|B rows): `isGridBinding` is one set for every
   layout; give each layout the sources it lays, so switching away gives them back.
-
 ## ~~30a. A sound cord has only a depth~~ (shipped 2026-10-26)
 - **30a-1. The dragged band on the cast display and the phone remote.** Decided with 30a:
   on a second screen attached to the laptop (`StageMirror` in `CastDisplay.tsx`), the

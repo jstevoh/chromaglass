@@ -55,3 +55,4 @@ named in the code and each is an item:
   lamp and lens, the crossfader and cue encoder the tilt. `applyGesture` carries a pad's
   own liquid and size (`PlateGesture.liquid`, `gain`). The phone: Motion → Pads, the same
   three layouts through lib/padDoor.ts into the same holds. Check `npm run padhits`.
+- **30c-6** **shipped** (S, found 2026-11-28 running the checks for 49c-2) `npm run switches` is red on main, 1119/1127: eight phone Pads lines (`phone-pads-pick-5` to `-7` among them) read "on lights against off 1.00:1 by fill" (`#101012` both ways), so a picked pad on the phone's Pads sheet does not look picked. Make the picked pad lit the way the desk's is. **Shipped:** the picked pad takes `LIT`, as the layout row above it does; `npm run switches` 1133/1133 (was 1119/1127), `npm run phone` 367/367.

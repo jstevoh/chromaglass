@@ -32,6 +32,7 @@ import { DROP_LENS_WGSL } from './dropLens';
 import { EDGE_LIGHT_WGSL, TRANSMIT_WGSL } from './plateTransmit';
 import { INTERFACE_WGSL } from './plateInterface';
 import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
+import { BUBBLE_FILM_WGSL } from './bubbleFilm';
 import { VIEW_OPTICS } from './platePolar';
 import { BUBBLE_SHAPE_WGSL } from './bubbleShape';
 import { BEAD_SHAPE_WGSL } from './beadShape';
@@ -39,6 +40,7 @@ import { FILM_DYE_WGSL } from './filmDye';
 import { FILM_FRAME_WGSL } from './plateFilm';
 import { LAMP_MIX_WGSL } from './plateLamp';
 import { PROJECTOR_WGSL } from './projectors';
+import { LIGHT_WGSL } from './plateLight';
 import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
 import { FINE_WINDOW_WGSL } from './fineWindow';
 import { DYE_INDEX_WGSL } from './dyeIndex';
@@ -141,35 +143,7 @@ fn lampThrough(unit: vec3f, amount: f32) -> vec3f {
   return mix(rgb, spectralThrough(unit, max(amount, 0.0)), U.spectral);
 }
 
-/*
-  Dyes mixed across six bands of the spectrum instead of three.
-
-  A dye's colour is a spectrum, and light through two dyes is the product of
-  their transmissions wavelength by wavelength; only then does the eye sum it
-  into three responses. Doing the product on the three sums instead is the
-  shortcut every RGB mixer takes, and it is why mixtures go muddy and
-  thickness only darkens instead of shifting hue (dichromatism, which is why
-  a deep glass of a yellow dye goes red). So the RGB absorbance is spread
-  over six overlapping bands (420–670 nm), each band is attenuated by the
-  path on its own, and the eye's three responses sum them back. White stays
-  white: every row of the response sums to one.
-*/
-fn spectralThrough(unit: vec3f, path: f32) -> vec3f {
-  let a = -log(max(unit, vec3f(1e-4)));
-  let b0 = dot(a, vec3f(0.10, 0.10, 0.80));
-  let b1 = dot(a, vec3f(0.05, 0.35, 0.60));
-  let b2 = dot(a, vec3f(0.05, 0.80, 0.15));
-  let b3 = dot(a, vec3f(0.35, 0.60, 0.05));
-  let b4 = dot(a, vec3f(0.80, 0.20, 0.00));
-  let b5 = dot(a, vec3f(0.95, 0.05, 0.00));
-  let t0 = exp(-b0 * path); let t1 = exp(-b1 * path); let t2 = exp(-b2 * path);
-  let t3 = exp(-b3 * path); let t4 = exp(-b4 * path); let t5 = exp(-b5 * path);
-  return vec3f(
-    0.30 * t3 + 0.45 * t4 + 0.25 * t5,
-    0.05 * t0 + 0.20 * t1 + 0.45 * t2 + 0.30 * t3,
-    0.45 * t0 + 0.40 * t1 + 0.15 * t2);
-}
-
+${LIGHT_WGSL}
 fn lightThrough(unit: vec3f, thickness: f32) -> vec3f {
   var base = unit;
   if (U.spectral > 0.001) { base = mix(unit, spectralThrough(unit, gapScale), U.spectral); }
@@ -233,13 +207,13 @@ fn onGround(bg: vec3f, f: vec4f, through: vec3f) -> vec3f {
     painted = mix(effBg, f.rgb, f.a);
   }
   if (U.lampGround <= 0.001) { return painted; }
-  return onWall(mix(painted, lampBg * through, U.lampGround));
+  return onWall(mixLight(painted, lampBg * through, U.lampGround));
 }
 
 /* The bare ground, where no plate is: the black one, the lamp, or between. */
 fn groundOf(bg: vec3f) -> vec3f {
   if (U.lampGround <= 0.001) { return bg; }
-  return onWall(mix(bg, lampBg, U.lampGround));
+  return onWall(mixLight(bg, lampBg, U.lampGround));
 }
 
 /*
@@ -351,7 +325,7 @@ fn reliefOf(tintNow: vec3f, tintDecoded: vec3f, aDecoded: f32) -> f32 {
 */${PH_WGSL}
 fn chemOnGround(c: vec3f, painted: vec3f, tint: vec3f, w: f32) -> vec3f {
   if (U.lampGround <= 0.001) { return painted; }
-  return mix(painted, c * pow(max(tint, vec3f(1e-3)), vec3f(w)), U.lampGround);
+  return mixLight(painted, c * pow(max(tint, vec3f(1e-3)), vec3f(w)), U.lampGround);
 }
 `;
 
@@ -497,6 +471,7 @@ ${filmTableWgsl()}
 ${LAMP_FIELD_WGSL}
 ${EDGE_LIGHT_WGSL}
 ${CLOSEUP_DEPTH_WGSL}
+${BUBBLE_FILM_WGSL}
 
 // Read one of the two tables at t rainbow periods, one period being one
 // interference order of soap (FILM_NM_PER_T nm), linearly between entries.
@@ -1414,6 +1389,13 @@ fn mixBlendOf(v: f32) -> i32 { return i32(v + 0.5); }
 
 const MIX_KEY_LO = 0.18;
 
+/*
+  A row's named blend (the Mixer's Blend picker: Screen, Add, Multiply, Key)
+  stays the operation it is named, on display values, as the second plate's
+  Blend Mode does (PLAN 38p-2): it is a chosen operation, not two lights.
+  A row's own way (mode 0, in mixSourcesAt and mixLamp) is the physics, and
+  that is done on light (plateLight.ts).
+*/
 fn blendRowKeyed(c: vec3f, s: vec3f, a: f32, mode: i32, keyLo: f32) -> vec3f {
   if (mode == 1) { return mix(c, 1.0 - (1.0 - c) * (1.0 - clamp(s, vec3f(0.0), vec3f(1.0))), a); }
   if (mode == 2) { return c + s * a; }
@@ -1421,7 +1403,6 @@ fn blendRowKeyed(c: vec3f, s: vec3f, a: f32, mode: i32, keyLo: f32) -> vec3f {
   if (mode == 4) { return mix(c, s, a * smoothstep(keyLo, keyLo + 0.18, dot(s, vec3f(0.299, 0.587, 0.114)))); }
   return mix(c, s, a);
 }
-
 fn blendRow(c: vec3f, s: vec3f, a: f32, mode: i32) -> vec3f { return blendRowKeyed(c, s, a, mode, MIX_KEY_LO); }
 
 /*
@@ -1838,10 +1819,10 @@ struct FsOut {
   the picture does not change.
 */
 fn mixLevelled(under: vec3f, over: vec3f, level: f32) -> vec3f {
-  // Not mix(a, b, 1): a compiler is free to write that as a + (b - a) * 1,
-  // which is not b in the last bit.
-  if (level >= 1.0) { return over; }
-  return mix(under, over, level);
+  // A fader of light, its level a dimmer's (levelShare), exact at both ends
+  // (plateLight.ts): mix(a, b, 1) may be written a + (b - a) * 1, which is
+  // not b in the last bit.
+  return mixLight(under, over, levelShare(level));
 }
 
 /** The LED platform's light at uv: its wheel of colour, graded, and the bevel toward its rim. */
@@ -1886,10 +1867,8 @@ fn lumiaLight(uv: vec2f) -> vec3f {
 ${FILM_FRAME_WGSL}
 ${LAMP_MIX_WGSL}
 
-/** Light laid over light: screened, so it adds and cannot clip past white. */
-fn screenOver(c: vec3f, light: vec3f) -> vec3f {
-  return 1.0 - (1.0 - c) * (1.0 - clamp(light, vec3f(0.0), vec3f(1.0)));
-}
+/** A beam over the plate, k of its light: it adds, as light (plateLight.ts). */
+fn screenOver(c: vec3f, light: vec3f, k: f32) -> vec3f { return displayOf(lightOf(c) + lightOf(light) * levelShare(k)); }
 
 /**
  * The movers whose place is in [lo, hi), laid over color bottom first. Only
@@ -1907,7 +1886,7 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
     if (fp < lo || fp >= hi) { continue; }
     if (U.ledPlatform != 0 && U.mixPos.x == fp) {
       let m = mixBlendOf(U.mixBlend.x);
-      if (m == 0) { c = screenOver(c, ledLight(uv) * U.mixLevel.x); } else { c = blendRow(c, ledLight(uv), U.mixLevel.x, m); }
+      if (m == 0) { c = screenOver(c, ledLight(uv), U.mixLevel.x); } else { c = blendRow(c, ledLight(uv), U.mixLevel.x, m); }
     }
     if (U.gelWheel > 0.001 && U.mixPos2.x == fp) {
       let m = mixBlendOf(U.mixBlend.y);
@@ -1915,7 +1894,7 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
     }
     if (U.lumia > 0.001 && U.mixPos2.y == fp) {
       let m = mixBlendOf(U.mixBlend.z);
-      if (m == 0) { c = screenOver(c, lumiaLight(uv) * U.lumia); } else { c = blendRow(c, lumiaLight(uv), U.lumia, m); }
+      if (m == 0) { c = screenOver(c, lumiaLight(uv), U.lumia); } else { c = blendRow(c, lumiaLight(uv), U.lumia, m); }
     }
     /*
       The film lands on the front plate's dye, tinted by it and bent by its
@@ -3125,7 +3104,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
           a quarter, is what every look has always had, and the camera's
           bubble still wears it; the plate takes only what is asked above
           that, as a performer turning a soap film up (the looks that set
-          0.6 and 0.9 get most of it; a look at 0.3, a trace).
+          0.6 and 0.9 get most of it; a look at 0.3, a trace), as the
+          light through it, never more than the lamp (bubbleFilm.ts).
         - **No highlight**, the second lamp's included: its glint was a
           reflection toward the screen, which the lamp beneath never makes.
 
@@ -3136,19 +3116,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       if (dropCam < 0.999) {
         let blackB = smoothstep(AIR_CORE - softB, AIR_CORE + softB, tB);
         cp = outColor * mix(vec3f(1.0), tint, 0.1 * k1);
-        let cp0 = cp;
         let iridP = clamp((U.iridescence - 0.25) / 0.75, 0.0, 1.0) * (0.4 + 0.6 * k3);
-        cp = mix(cp, cp * (0.45 + 1.25 * filmC), clamp(iridP * 0.6, 0.0, 1.0));
-        // With Film Physics up, the projector's film is the one it really
-        // throws: the light through the film, 1 - R, which for soap is 92 to
-        // 100 per cent of the lamp in pale complements of the reflected
-        // colours (the research, item 8). So the reflected film above gives
-        // way to that, as the setting rises; a soap film on a projected
-        // plate is a faint tint, not a rainbow.
-        if (U.filmPhysics > 0.0) {
-          let cpT = cp0 * filmTableAt(filmP, true);
-          cp = mix(cp, mix(cp0, cpT, clamp(iridP, 0.0, 1.0)), U.filmPhysics);
-        }
+        cp = projectorFilm(cp, filmC, filmP, iridP);
         cp = cp * (1.0 - AIR_DARK * blackB);
       }
       let fm = camFilm(filmC, filmP, irid, F);

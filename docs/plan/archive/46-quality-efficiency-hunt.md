@@ -60,3 +60,16 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   and no Oil Bodies skip the full-grid dispatch; Oil Bodies stays outside the gate because
   `bodyUnspread` clamps `dye` against `oilDye` after `slump` and `decayDye`; `samelook`,
   `physics`, `encode`; story in `docs/plan-shipped.md`).
+
+## Items
+
+- **46b · The frame budget's written items** (Antigravity): H2c-7, H2c-labels, ~~H2c-6~~ (shipped, 2026-11-13), ~~H2c-9~~ (shipped, 2026-11-26, 19ak-24a), ~~H2c-8 and H2c-5~~ (**shipped**: `encode` cleared `h2c5` and `h2c8`, `samelook` passed), then H2c-2 once H2c-3 and H2c-1 merge. Each
+  takes its id out of its owed line and carries `same-look`; H2c-5 (first-order velocity) is
+  a physics trade and ships only if `samelook` stays green.
+
+## The audit of 2026-11-13: where a frame's CPU and GPU go, measured and read
+
+- ~~**46o · Song ID listens and matches on the page's thread**~~ **retired with Song ID (2026-11-27)**: the owner retired automatic song identification, so nothing captures or matches any more and the hitch is gone with it; the brief was pulled from Antigravity's queue. The item stands for the day Song ID comes back from `archive/song-id/` (M): every six seconds with a
+  local library, a new AudioContext and a ScriptProcessor for four seconds, then the match
+  (a 192k-sample resample, about 86 FFTs) in one block. Into the ear's context by a worklet
+  and the index's worker. Check: long tasks over 8 ms in 30 s with the band and one track.

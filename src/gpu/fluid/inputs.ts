@@ -14,7 +14,10 @@ import { pressShare } from '../../lib/pressRing';
 import { dyeAbsorbances } from '../../lib/dye';
 import { pouredOf } from '../../lib/bubbleLiquid';
 import { LIQUID_SIGMA } from '../../lib/bubbles';
-import { LIES_B0, BZ_GRID, CHEM_REF, CHEM_STABLE, CHEM_MOST, LIES_GRID, R32, RG32, RGBA32, type FieldCarry } from './constants';
+import { interfacialTension } from '../../lib/liquidProps';
+import type { LiquidBehaviour } from '../../types';
+import { OIL_TENSION_SIGMA, LIES_B0, BZ_GRID, CHEM_REF, CHEM_STABLE, CHEM_MOST, LIES_GRID, R32, RG32, RGBA32, type FieldCarry } from './constants';
+import { SurfaceHeight } from '../surfaceHeight';
 import { FluidPasses } from './passes';
 import type { CoverState } from '../../lib/cover';
 import { captureFluidSnapshot, restoreFluidSnapshot, type FieldSnapshot, type SnapshotScalars, type SnapshotTargets } from './snapshot';
@@ -870,7 +873,15 @@ export class FluidInputs extends FluidPasses {
    * Pour into the mix: oil, surfactant and acidity (+ acid, − base), each an
    * amount in `what`, as a soft disc at (x, y) in plate units.
    */
-  addLiquidDrop(x: number, y: number, radius: number, what: { soap?: number; body?: number; repel?: number; weight?: number; polarity?: number; bz?: number }, amount: number, seconds?: number): void {
+  addLiquidDrop(x: number, y: number, radius: number, what: { soap?: number; body?: number; repel?: number; weight?: number; polarity?: number; bz?: number; viscosity?: number; tension?: number; density?: number }, amount: number, seconds?: number): void {
+    if ((what.polarity ?? 0) <= -0.5 && (what.viscosity || what.tension || what.density)) {
+      const sh = this.ensureSurfaceHeight();
+      sh.setProps({
+        ...(what.viscosity && what.viscosity > 0 ? { oilMu: what.viscosity * 1e-3 } : {}),
+        ...(what.tension && what.tension > 0 ? { oilSigma: what.tension * 1e-3 } : {}),
+        ...(what.density && what.density > 0 ? { oilRho: what.density * 1e3 } : {}),
+      });
+    }
     /*
       The BZ gel's activator (PLAN 25i, bottles.ts): the gel fires where it
       lands and a ring runs out from there, the reaction's own colour; it
@@ -915,7 +926,12 @@ export class FluidInputs extends FluidPasses {
     this.liquidsLive = true;
   }
 
-  addMix(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void {
+  protected ensureSurfaceHeight(): SurfaceHeight {
+    if (!this.surfaceHeight) this.surfaceHeight = new SurfaceHeight(this.device, this.N);
+    return this.surfaceHeight;
+  }
+
+  addMix(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number; viscosity?: number; tension?: number; density?: number; of?: LiquidBehaviour }): void {
     const m = this.ensureMix();
     const enc = this.device.createCommandEncoder({ label: 'add mix' });
     const pass = enc.beginComputePass({ label: 'add mix' });
@@ -923,9 +939,19 @@ export class FluidInputs extends FluidPasses {
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     this.run(pass, 'mixSplat', m.write, [m.read],
       this.arg('mix splat', [x, y, radius, 1, what.oil ?? 0, what.soap ?? 0, what.acid ?? 0, 0]));
+    if ((what.oil ?? 0) > 0) {
+      // The bottle the oil came from (38e's `of`) carries its viscosity, tension and density to the height field (31s-1).
+      this.ensureSurfaceHeight().seedFromMix(pass, m.read, m.write, 'add', what.of ?? what);
+    }
     // Flat to its edge (mixSplat), so a disc's worth; the clamp at full is not counted.
     // A negative oil cuts a hole (a compound drop's, oilLay.ts), and is taken off.
-    this.oilPoured = Math.max(0, this.oilPoured + Math.max(-1, Math.min(1, what.oil ?? 0)) * Math.PI * radius * radius);
+    const was = this.oilPoured;
+    this.oilPoured = Math.max(0, was + Math.max(-1, Math.min(1, what.oil ?? 0)) * Math.PI * radius * radius);
+    // The oil's tension (oilSigma, PLAN 38e), the plate's oil averaged by what each pour covers; a hole leaves it as it was.
+    // Oil with no bottle (a look's bodies, a lamp's wax) is at the looks' tuned tension (core.ts oilSigma says why).
+    const added = this.oilPoured - was;
+    const sigma = what.of ? interfacialTension(what.of) : OIL_TENSION_SIGMA;
+    if (added > 0) this.oilSigma = (this.oilSigma * was + sigma * added) / this.oilPoured;
     m.swap();
     pass.end();
     this.submit(enc);
@@ -951,7 +977,17 @@ export class FluidInputs extends FluidPasses {
     }
     this.device.queue.writeTexture({ texture: m.read }, data, { bytesPerRow: n * 16 }, [n, n]);
     this.oilPoured = sum / (n * n);
+    // A look's own oil, laid with no bottle: the tension the looks were tuned at (core.ts oilSigma, PLAN 38e-3).
+    this.oilSigma = OIL_TENSION_SIGMA;
     this.mixLive = true;
+    if (sum > 0 || this.surfaceHeight) {
+      const enc = this.device.createCommandEncoder({ label: 'lay oil surface' });
+      const pass = enc.beginComputePass({ label: 'lay oil surface' });
+      if (sum > 0) this.ensureSurfaceHeight().seedFromMix(pass, this.blank('rgba'), m.read, 'replace');
+      else this.surfaceHeight?.clear(pass);
+      pass.end();
+      this.submit(enc);
+    }
   }
 
   /**
@@ -1046,6 +1082,7 @@ export class FluidInputs extends FluidPasses {
     if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.liquidsLive = false;
+    if (this.surfaceHeight) this.surfaceHeight.clear(pass);
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
     this.solventLive = this.cloudFresh = false;
@@ -1055,6 +1092,7 @@ export class FluidInputs extends FluidPasses {
     // With the oil gone its colour is the water's: the share is emptied, the dye kept.
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;
+    this.oilSigma = OIL_TENSION_SIGMA;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
     // Gray–Scott too: it was left out, so a look's coral kept growing, and
@@ -1111,6 +1149,16 @@ export class FluidInputs extends FluidPasses {
       made.push(t);
       return t;
     };
+    const copyTex = (src: GPUTexture | null): GPUTexture | null => {
+      if (!src) return null;
+      const t = this.device.createTexture({
+        label: `carried ${src.label}`, size: [src.width, src.height], format: src.format,
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST,
+      });
+      enc.copyTextureToTexture({ texture: src }, { texture: t }, [src.width, src.height]);
+      made.push(t);
+      return t;
+    };
     const carry: FieldCarry = {
       n: this.N,
       device: this.device,
@@ -1118,7 +1166,9 @@ export class FluidInputs extends FluidPasses {
       mix: copy(this.mix, this.mixLive),
       rxn: copy(this.rxn, this.rxnLive),
       lies: copy(this.lies, this.liesLive),
+      surfaceHeight: copyTex(this.surfaceHeight?.live ? this.surfaceHeight.field : null),
       oilPoured: this.oilPoured,
+      oilSigma: this.oilSigma,
       species: copy(this.species, this.speciesLive),
       liquids0: copy(this.liquids0, this.liquidsLive),
       liquids1: copy(this.liquids1, this.liquidsLive),
@@ -1163,7 +1213,17 @@ export class FluidInputs extends FluidPasses {
       m.swap();
       this.mixLive = true;
       this.oilPoured = carry.oilPoured;
+      this.oilSigma = carry.oilSigma;
       this.oilDyeStale = true;
+    }
+    let carriedSurf: GPUTexture | null = null;
+    if (carry.surfaceHeight) {
+      carriedSurf = this.device.createTexture({
+        label: 'surface carry tmp', size: [this.N, this.N], format: R32,
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+      });
+      this.run(pass, 'carryArea', carriedSurf, [carry.surfaceHeight], this.arg('carry surface', [carry.n, this.N, 0, 0]));
+      this.ensureSurfaceHeight().seedFromMix(pass, this.blank('rgba'), carriedSurf, 'replace', undefined, 1.0);
     }
     /*
       The poured liquids, by area as the mix is (PLAN 18d-10). What was
@@ -1221,6 +1281,7 @@ export class FluidInputs extends FluidPasses {
     if (carry.rxn && same(carry.rxn, this.ensureRxn())) this.rxnLive = true;
     if (carry.lies && same(carry.lies, this.ensureLies())) this.liesLive = true;
     this.submit(enc);
+    carriedSurf?.destroy();
     return true;
   }
 
@@ -1269,6 +1330,7 @@ export class FluidInputs extends FluidPasses {
         phaseLive: this.phaseLive,
         mixLive: this.mixLive,
         oilPoured: this.oilPoured,
+        oilSigma: this.oilSigma,
         oilDyeStale: this.oilDyeStale,
         bodiesWanted: this.bodiesWanted,
         oilLayPending: this.oilLayPending,
@@ -1321,6 +1383,7 @@ export class FluidInputs extends FluidPasses {
     this.phaseLive = s.phaseLive;
     this.mixLive = s.mixLive;
     this.oilPoured = s.oilPoured;
+    this.oilSigma = s.oilSigma;
     this.oilDyeStale = s.oilDyeStale;
     this.bodiesWanted = s.bodiesWanted;
     this.oilLayPending = s.oilLayPending;

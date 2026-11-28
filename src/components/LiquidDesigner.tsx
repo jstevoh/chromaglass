@@ -48,13 +48,13 @@ function Row({ label, hint, value, min, max, step, onChange, fmt }: {
 }) {
   return (
     <label className="block mb-2" title={hint}>
-      <div className="flex justify-between text-[12px] opacity-70">
+      <div className="flex justify-between text-[12px] text-text-2">
         <span>{label}</span>
-        <span className="tabular-nums opacity-70">{fmt ? fmt(value) : value.toFixed(2)}</span>
+        <span className="tabular-nums text-muted">{fmt ? fmt(value) : value.toFixed(2)}</span>
       </div>
       <input type="range" className="w-full" min={min} max={max} step={step} value={value}
         aria-label={label} onChange={(e) => onChange(Number(e.target.value))} />
-      <div className="text-[11px] opacity-35 leading-snug">{hint}</div>
+      <div className="text-[12px] text-muted leading-snug">{hint}</div>
     </label>
   );
 }
@@ -124,7 +124,7 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
 
   return (
     <div data-testid="liquid-designer">
-      <p className="text-[12px] opacity-50 mb-3 leading-snug">
+      <p className="text-[12px] text-muted mb-3 leading-snug">
         {canMake ? (
           <>Make a liquid by what it is — how heavy, how oily, what it does to the surface — and the plate works out how it
           meets every other bottle. Saved in this browser and on the shelf; a <code>.liquids.json</code> file takes them
@@ -141,8 +141,15 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
       </ProMakerUpsell>
 
       <div className="flex flex-wrap gap-2 mb-3">
+        {/*
+          aria-expanded: the button opens the draft editor below it, a part of
+          the panel that is closed until pressed. Saying so tells a screen
+          reader there is more, and is how `npm run readable` finds the draft
+          to measure its type (PLAN 49i-guard-2), as it finds every other
+          closed part of a panel, without a list of them kept by hand.
+        */}
         {canMake && (
-          <button type="button" onClick={() => startFrom()} data-testid="liquid-design"
+          <button type="button" onClick={() => startFrom()} data-testid="liquid-design" aria-expanded={!!draft}
             className="px-3 py-1.5 pointer-coarse:min-h-11 rounded-md bg-white/10 hover:bg-white/15 text-[12px] flex items-center gap-1.5">
             <Plus size={12} /> Design a liquid
           </button>
@@ -178,9 +185,9 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
               <span className="w-4 h-4 rounded-full border border-white/20 shrink-0" style={bottleSwatch(l)} />
               <button type="button" className="text-left flex-1 min-w-0" onClick={() => onPick?.(l.id)} title="Pick this bottle">
                 <div className="text-[13px] truncate">{l.name}</div>
-                {l.description && <div className="text-[11px] opacity-40 truncate">{l.description}</div>}
+                {l.description && <div className="text-[12px] text-muted truncate">{l.description}</div>}
               </button>
-              {canMake && <button type="button" data-testid="liquid-edit" className="text-[11px] px-2 py-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded bg-white/5 hover:bg-white/10" onClick={() => edit(l)}>Edit</button>}
+              {canMake && <button type="button" data-testid="liquid-edit" className="text-[12px] px-2 py-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded bg-white/5 hover:bg-white/10" onClick={() => edit(l)}>Edit</button>}
               <button type="button" aria-label={`Save ${l.name} to a file`} className="flex items-center justify-center p-1.5 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded bg-white/5 hover:bg-white/10"
                 onClick={() => download(fileName(l.name), writeLiquidFile([l]))}><Download size={12} /></button>
               <button type="button" aria-label={`Remove ${l.name}`} className="flex items-center justify-center p-1.5 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded bg-white/5 hover:bg-red-500/20"
@@ -189,14 +196,14 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
           ))}
         </ul>
       ) : (
-        <div className="text-[12px] opacity-35 mb-4">None yet.</div>
+        <div className="text-[12px] text-muted mb-4">None yet.</div>
       )}
 
       {draft && finished && canMake && (
         <div className="rounded-lg border border-white/10 p-3 mb-2" data-testid="liquid-draft">
           <div className="flex items-center gap-2 mb-3">
-            <FlaskConical size={14} className="opacity-50" />
-            <span className="text-[12px] uppercase tracking-[0.2em] opacity-40">{draft.id ? 'Edit liquid' : 'New liquid'}</span>
+            <FlaskConical size={14} className="text-muted" />
+            <span className="text-[12px] uppercase tracking-[0.2em] text-muted">{draft.id ? 'Edit liquid' : 'New liquid'}</span>
             {!draft.id && (
               <select className="ml-auto bg-white/5 rounded px-2 py-1 text-[12px]" value="" aria-label="Start from a bottle"
                 onChange={(e) => { const b = shelf.find((l) => l.id === e.target.value); if (b) startFrom(b); }}>
@@ -217,13 +224,13 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.2em] opacity-30 mb-2">The drop</div>
+              <div className="text-[12px] uppercase tracking-[0.2em] text-muted mb-2">The drop</div>
               <Row label="Drop size" {...DROP_RANGES.size} value={draft.injectRadius} onChange={(v) => setDraft({ ...draft, injectRadius: v })} fmt={(v) => v.toFixed(1)} />
               <Row label="Colour amount" {...DROP_RANGES.amount} value={draft.injectAmount} onChange={(v) => setDraft({ ...draft, injectAmount: v })} />
               <Row label="Heat" {...DROP_RANGES.heat} value={draft.heatAmount} onChange={(v) => setDraft({ ...draft, heatAmount: v })} />
             </div>
             <div>
-              <div className="text-[11px] uppercase tracking-[0.2em] opacity-30 mb-2">What it is</div>
+              <div className="text-[12px] uppercase tracking-[0.2em] text-muted mb-2">What it is</div>
               {BEHAVIOUR_PROPERTIES.map((p) => (
                 <Row key={p.key} label={p.label} hint={p.hint} min={p.min} max={p.max} step={p.step}
                   value={draft.behaviour?.[p.key] ?? 0} onChange={(v) => setB(p.key, v)} />
@@ -231,7 +238,7 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
             </div>
           </div>
 
-          <div className="text-[11px] uppercase tracking-[0.2em] opacity-30 mt-2 mb-1">How it meets the others</div>
+          <div className="text-[12px] uppercase tracking-[0.2em] text-muted mt-2 mb-1">How it meets the others</div>
           <div className="max-h-56 overflow-y-auto mb-3" data-testid="liquid-meets">
             <table className="w-full text-[12px]">
               <tbody>
@@ -243,7 +250,7 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
                         <span className="inline-block w-2.5 h-2.5 rounded-full mr-1.5 align-middle" style={{ background: o.color }} />{o.name}
                       </td>
                       <td className={`py-1 pr-2 whitespace-nowrap ${m.mixing === 'blends' ? 'text-emerald-300/80' : m.mixing === 'soft edge' ? 'text-amber-200/80' : 'text-sky-300/80'}`}>{m.mixing}</td>
-                      <td className="py-1 opacity-50">{m.notes.join('; ')}</td>
+                      <td className="py-1 text-muted">{m.notes.join('; ')}</td>
                     </tr>
                   );
                 })}

@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The optical path is stored less clear water's, so a real dye's step is kept and not rounded
   to ten times its size (PLAN 38u-20).
 
+### Fixed — the Magnet's domes have depth in the closeup (PLAN 29a-13)
+
+- Zoomed in, the domes a magnet stands out of the ferrofluid show a dark glossy sheen down
+  their sides (the lit liquid round them, mirrored) and a glint on each top, where they were
+  flat black blobs. The plate at 1x is unchanged.
+
 ### Added — Keep it full, for a plate left running (PLAN 18a-22)
 
 - **Keep it full** (`keepFull`): when the dish runs below the amount its look is made with,

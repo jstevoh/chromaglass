@@ -100,6 +100,14 @@ export function PhonePads({ testId = 'phone-pads' }: { testId?: string }) {
           </button>
         ))}
       </div>
+      {/*
+        The picked colour or tool is lit the way every chosen state on the
+        phone is (LIT, as the layout row above): `npm run switches` found the
+        old white border alone read on against off at 1.00:1 by fill, so on
+        a dark sheet a picked pad did not look picked (PLAN 30c-6). The dye
+        swatch stays as the inset bar along the bottom, so the colour still
+        shows through the lit fill.
+      */}
       <div className="grid grid-cols-8 gap-1">
         {pickers.map((b, i) => (
           <button
@@ -110,7 +118,7 @@ export function PhonePads({ testId = 'phone-pads' }: { testId?: string }) {
             }}
             aria-pressed={picked === i}
             aria-label={caption(b.target, layout)}
-            className={`min-h-[44px] overflow-hidden rounded-md border text-[12px] leading-tight ${picked === i ? 'border-white text-white' : 'border-white/10 text-text-2'}`}
+            className={`min-h-[44px] overflow-hidden rounded-md border text-[12px] leading-tight ${picked === i ? LIT : 'border-white/10 text-text-2'}`}
             style={b.target.kind === 'dye' ? { boxShadow: `inset 0 -6px 0 ${swatch(b.target)}` } : undefined}
             data-testid={`${testId}-pick-${i}`}
           >

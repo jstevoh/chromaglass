@@ -68,9 +68,15 @@ const RAINBOW_ONLY = {
       const mixFn = /fn filmColourAt\(tR: f32, tP: f32\) -> vec3f \{[\s\S]*?\n\}/;
       if (!mixFn.test(src)) throw new Error('filmlook: the rainbow-only control could not find filmColourAt in plate.ts');
       src = src.replace(mixFn, 'fn filmColourAt(tR: f32, tP: f32) -> vec3f {\n  return thinFilmColour(tR);\n}');
-      const tint = 'if (U.filmPhysics > 0.0) {\n          let cpT';
-      if (!src.includes(tint)) throw new Error('filmlook: the rainbow-only control could not find the projector\'s tint in plate.ts');
-      src = src.replace(tint, 'if (false) {\n          let cpT');
+      return { contents: src, loader: 'ts' };
+    });
+    // The projector's film moved beside plate.ts (bubbleFilm.ts, 38h-14),
+    // so its Film Physics branch is taken out there.
+    b.onLoad({ filter: /src[\\/]gpu[\\/]wgsl[\\/]bubbleFilm\.ts$/ }, (args) => {
+      let src = readFileSync(args.path, 'utf8');
+      const tint = 'if (U.filmPhysics > 0.0) {\n    let cpT';
+      if (!src.includes(tint)) throw new Error('filmlook: the rainbow-only control could not find the projector\'s tint in bubbleFilm.ts');
+      src = src.replace(tint, 'if (false) {\n    let cpT');
       return { contents: src, loader: 'ts' };
     });
   },

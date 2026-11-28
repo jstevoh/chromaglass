@@ -27,3 +27,7 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
 
 - ~~**14a-timers · A covered window still glides** (B, S).~~ **Shipped**: `pumpShowIntervals(now)` in `src/lib/showClock.ts`, driven from the ear worker's 16 ms tick in `src/hooks/useAudioAnalyzer.ts`, and `src/lib/simulatedMusic.ts` on `showInterval`; a 4 s look fade steps 121 times hidden (was 4) and 121 visible (`npm run timers`). Story in [`docs/plan-shipped.md`](../plan-shipped.md) §14.
 - ~~**14j-gamepad · No timer without a pad** (B, S).~~ **Shipped**: `src/hooks/useGamepad.ts` arms its 16 ms poll on `gamepadconnected` (or at mount when `navigator.getGamepads()` already has a pad) and clears it on the last `gamepaddisconnected` (0 timers with no pad, was 1; `npm run timers`). Story in [`docs/plan-shipped.md`](../plan-shipped.md) §14.
+
+## The frame budget (Wave 4, lane C, M or S each)
+
+- ~~**H2c-9 · Pack only after a step**~~ (**shipped**, 2026-11-26, 19ak-24a) (C, S, with 14j). `packDye` and `packVel` also ran on frames the solver did not step, half of all frames at 120 Hz. Skip both when no step ran since the last pack and nothing was drawn into the fields (`WebGPUFluid.fieldWrites`, skipping unchanged layers and empty `pack` passes in `WebGPUPlate.draw`); `h2c9` out of `--owed` in `scripts/checks.json` (`npm run framereads` 18/18: 30 frames packed with 30 dispatches against 60 and 240 on main). **Phone:** none. Rides with 14j's draw cap (14-show-at-the-gig.md §14j); this is the part that stays after the cap.
