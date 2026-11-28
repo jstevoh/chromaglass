@@ -3816,6 +3816,20 @@
       ]
     },
     {
+      "name": "The A/B deck dissolve",
+      "shard": "open",
+      "run": "npm run decks",
+      "why": [
+        "Decks (PLAN 51c-2): a Go goes to the dark projector, its dish changes",
+        "there, the crossfade carries the light over the middle half and the",
+        "racks take the lit one out and the dark one in. On a made-up clock:",
+        "nothing lit changes sharp, a rack jumps only in the dark, a second Go",
+        "carries on from its blur. Through the real pass: the light kept within",
+        "1%, a dark deck off the wall to the byte (and its melt not drawn), the",
+        "ends the plain A and B. Beside `focus` in the open shard."
+      ]
+    },
+    {
       "name": "The heat",
       "shard": "open",
       "run": "npm run heat",

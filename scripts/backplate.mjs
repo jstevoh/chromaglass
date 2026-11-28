@@ -325,7 +325,9 @@ check('Follow the front keeps the back plate on the stage while it fades back, t
   /setBackLook\(b => \(b && seconds > 0 \? \{ \.\.\.b, leaving: true \} : null\)\);/.test(app)
   && /setTimeout\(\(\) => \{ backLeavingTimer\.current = null; setBackLook\(null\); \}, seconds \* 1000\)/.test(app));
 check('App sends the look a Go would send (targetLook over the live settings) with a user look\'s dyes, and spends the cue',
-  /visualizerRef\.current\?\.sendBack\(next\.id, targetLook\(settingsRef\.current, next\.settings\), seconds, next\.name, up/.test(app)
+  /visualizerRef\.current\?\.sendBack\(next\.id, targetLook\(settingsRef\.current, next\.settings\), seconds, next\.name, backExtras\(next\.id\)\)/.test(app)
+  // The user look's dyes, read in one place since the deck Go (PLAN 51c-2) sends them too.
+  && /const backExtras = \(id: string\) => \{\s*const up = isUserPresetId\(id\) \? userPresetsRef\.current\.find\(p => p\.id === id\) : null;\s*return up \? \{ contract: up\.contract \?\? null, injectStyles: up\.injectStyles \?\? null, liquids: up\.liquids \?\? null \} : undefined;/.test(app)
   && /setBackLook\(\{ id: next\.id, name: next\.name \}\);\s*setCued\(null\);/.test(app));
 check('and keeps the back plate on the stage while it has a look, whatever the front look\'s plate count',
   /return \(s\.layerCount \?\? 1\) < stageLayers \? \{ \.\.\.s, layerCount: stageLayers \} : s;/.test(app) && /settings=\{effectiveSettings\}/.test(app));

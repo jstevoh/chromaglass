@@ -120,7 +120,7 @@ const EVOLVE_OWN = new Set(['hueJourney', 'surge', 'tiltDirection', 'cometAngle'
 const NOT_THE_LOOK = new Set([
   'markMix', 'markScale', 'markX', 'markY',
   // The projector bank (PLAN 51a): the operator's lamps, shutters and crossfade; a wandered lamp is the wall amber or overdriven.
-  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross', 'projFocusA', 'projFocusB', 'projRack',
+  'projLampA', 'projLampB', 'projShutterA', 'projShutterB', 'projCross', 'projFocusA', 'projFocusB', 'projRack', 'projDeck',
   // Where the video sits on the plate (PLAN 14ag): a hand frames it, nothing wanders it.
   'filmZoom', 'filmX', 'filmY', 'filmRing',
   // The song's title as ink (PLAN 37x-10): where it lands and how fast it goes are the show's, never a wander.

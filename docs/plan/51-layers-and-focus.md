@@ -238,11 +238,37 @@ counts is this run's full size against its smaller picture, which halves two mel
 
 Found while building it, not done:
 
-- **51c-2 · An A/B deck dissolve** (S to M). The plan's two-projector form, A racking out while
-  B racks in with the next look, 51a's crossfade carrying the light, needs B to draw a look of
-  its own: the back plate's look is its solver's and dyes only (16a), drawn with the front's
-  settings in one display. With 16b's own sources or 51a-3's plates, a Go could go to the dark
-  projector, rack it in under the crossfade and leave the lit one to rack out.
+- **51c-2 · An A/B deck dissolve.** *Shipped 2026-11-28: **Decks** (`projDeck`, a switch, off
+  by default), the button beside the A/B Crossfade in the Mixer's Projectors box (desk,
+  settings, phone Mix sheet, remote; MIDI-learnable as a switch); `lib/deckDissolve.ts`,
+  `focusDissolve.ts`'s rack kinds, `app/useLookFades.ts` (`deckGo`); `npm run decks`.* With
+  Decks on and two projectors on the wall, a Go with a fade goes to the darker projector (B on
+  a tie). What was in the way: B could not draw a look of its own. What it can own is what 16a
+  gave the back plate, its dish (every solver setting and the dyes); how the plates are drawn
+  is one pass for both. So a deck Go splits the look: the dish to the dark deck while it is
+  dark (over the first quarter; the front's solver keys, or the back plate's own look), the
+  crossfade glided over the middle half along sin²(πq/2), the rest of the look on the front
+  over the same middle half (51c's window, where both decks are melted or both half lit).
+  The leaving projector racks out over the first half and holds the melt while its light
+  goes; the arriving one racks out over the first quarter, still dark, holds, and racks in as
+  its light comes up. A Go when the arriving deck is lit (the crossfade in the middle) waits
+  the quarter for it to melt before its dish goes in. A second Go mid-dissolve goes to the
+  darker deck then, each rack carrying on from its blur. A Go to a dark front pins the lit
+  back plate to what it shows (`pinBack`), so it does not follow the front's new dish. A
+  hand on the crossfader during the glide takes it back. And a projector with no light on
+  the wall is no longer blurred at all (`gpu/plateUniforms.ts`): the deck's dark melt costs
+  nothing, so the pass runs only through the middle half, where 51c's 4.91 ms for two melted
+  at 1600² on the Air applies. Checked on a made-up clock (nothing lit changes sharp; a rack
+  jumps only in the dark; a second Go before and past the middle steps no rack by more than
+  a frame) and through the real pass at 256 (the wall's light within 0.10% across the
+  dissolve; B dark is off the wall to the byte, sharp or melted, while at the middle its
+  melt moves 77 levels; the first and last frames the plain A and B to the byte).
+- **51c-4 · Each deck its own drawing** (M, after 16b). A deck Go changes the rest of a look
+  (lamp ground, glass, lacing, blend) on both projectors at once, hidden in the middle half;
+  with 16b's own sources each projector would take its own and nothing would change on the lit one.
+- **51c-5 · Decks on the APC40** (S, with 51h). The crossfader drives `projCross` and the deck
+  glide hands it back on a touch; the Projectors layout should light a pad for Decks and show
+  which deck is dark.
 - **51c-3 · A short dissolve's ring** (S). Under 2 s the look's fade is under a second, and the
   handover never runs shorter than one, so the ferrofluid ring's swap falls past the rack's
   middle. Hold the handover inside the rack's middle half too, or give Focus Dissolve a 2 s floor.
