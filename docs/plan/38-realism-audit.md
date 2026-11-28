@@ -128,6 +128,31 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   h²σ/(12μR) for two oils.
   38v (2026-11-21): the ferrofluid's own rounding runs by steps, with no seconds and no grid
   size in its Cahn–Hilliard mobility (`fluid.ts:1393-1401`): 9ae.
+  - ~~**38e-1**~~ σ in N/m from each bottle: shipped 2026-11-27 (from PR #624, ported onto
+    38r's gap and the sealed bottle). The thin gap's pull is `oilMobility(σ)`, Darcy's
+    h₀²σ/12μ_ref, times the cover's (h/h₀)² as before; σ is each pour's own against water
+    (`interfacialTension`: the bottle's `interfacial`, sunflower 27 mN/m, silicone 37, or
+    Antonow's |γ_w − γ_o| for a Designer oil), averaged over the plate by what each covers
+    (`oilSigma`, carried and snapshotted with the oil). The dial keeps its 0–1 and is the share
+    of the oil's own. The old `OIL_TENSION_GAP` was σ = 0.0239 by the same law, so oil looks
+    round 13% faster with sunflower and 55% with silicone. `npm run gap` part 4 holds it.
+    Oil a look lays with no bottle (its bodies, a lava lamp's wax) stays at 0.0239, the
+    tension the looks were tuned at: with sunflower's 27 for it, `lavacycle`'s no-cool-glass
+    control fell 0.88 to 0.71 by 40 s on the Mac (main holds it), so only poured bottles change.
+  - **38e-3** A lava lamp's wax at a measured σ of its own (paraffin against water, about
+    0.04–0.05 N/m, against the 0.0239 the lamp was tuned at), after 19ak-25b says why the
+    no-cool-glass control's window in the wax's weight and tension is narrow. Shortcut in the
+    meantime: a look's bottle-less oil is held at the looks' tuned tension (`fluid/core.ts`
+    `oilSigma`).
+  - **38e-2** The cap, still there (`OIL_CELLS` 0.5, `SEALED_CELLS` 1 cell a step). PR #624
+    took it off the thin gap outright and needed three things with it, measured on the lab in
+    October before 38r: a held film taking the blur's concave waist pull back out (Film Hold's
+    crowd fell 35 → 19 uncapped, back to 31 with it), `airblow` part 5 measuring a drop as one
+    body (written against the Blow before its rebuild as a jet, #852), and `npm run oiltension`
+    (a drop's rounding against h²σ/4μR³, the silicone's ratio, twice the dial in half the
+    time, and stability at three times real). Since then 27f-9q found the explicit force at
+    nine times sheds the sealed lamp's interface as haze, and PLAN 27f-9s plans the capillary
+    implicit. Redo on the lab, after 27f-9s or as CFL sub-steps; the PR branch has the three.
 
 - **38f. The lamp's heat lifts the liquid as a force, and cools by the plate's own losses**
   (S for the force, M for the cooling; Medium: plumes on the upright looks and Lava).
@@ -148,6 +173,18 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   - ~~**The heat is not carried on a thin gap.**~~ **Shipped** (38f-1, 2026-11-11): the heat
     rides the liquid as the colour does, h·T beside h through the thin solve's faces
     (`carryHeat`, heatPack in `wgsl/fluid/dye.ts`). Story in `docs/plan-shipped.md` §38f-1.
+  - **38f-2. The cooling in watts and seconds, redone on today's plate** (M, lab; Medium).
+    The October build of 38f and 38t (#614) was read against main on 2026-11-27 and not
+    landed: its carry is 38f-1's by another road, its lift went through the open rim, which
+    18a-17 showed empties the dish (main lifts by the sealed bottle's closed circulation,
+    `sealWeight`, 27f-9), and its Updraft was the through-flow 18a-16 took out. What is still
+    wanted is the cooling: C dΔT/dt = I·a − 2h_air·ΔT − 2εσ(T⁴ − T₀⁴), C = ρc_w·h + 2ρc_g·t
+    (water 4.18e6 J/m³K, glass 2500 × 840 at 2 mm, lamp 1000 W/m², ε 0.9), so Heat Decay
+    reads h_air (7200·(−ln v) a face) and the lamp warms at I/C, about 0.06 K/s at the 2 mm
+    gap against today's `LAMP_HEATING` 0.24. It moves every heated look (14 presets at Heat
+    Decay 0.99) and Lava Lamp's wax needs its lamp (27f-9h), so it is measured first:
+    `heat`, `lavacycle`, `lavaround`, `dispersion`, `draught`, and a `plume` rewritten
+    against heatPack and sealWeight. The branch of #614 keeps the old code to read. none.
 - **38g-2. Facets and Plateau borders drawn** (M, GPU; Medium-High for the straw's rafts).
   The air field still draws every pocket as a disc (`gpu/wgsl/air.ts`), so two big ones
   pressed together overlap rather than meet in a wall, and a stretched one is drawn round
@@ -185,6 +222,15 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
     tint is a level or two a channel and falls under the two levels that count a pixel. Count
     the middle by the bubble's footprint instead and hold the projector's tint to the same
     thickness swing. *Measure:* the projector's swing in filmlook's thickest-film renders.
+  - **38h-12. The bubbles' walls reflect display values, found doing 29a-13** (S, nil).
+    The closeup's ferrofluid now works its reflection in light and encodes it as a camera
+    records it (29a-13): multiplied straight into the display's values, 2% of a white came
+    out 5 of 255 rather than about 39. `closeupDepth.ts` multiplies the plate's colour by
+    Fresnel's reflectance the same way (the wall's bounce, `camBounce`, the second wall's
+    loss), with the softbox's gain (80 times the pad) tuned by eye on top of it. Take the
+    same step there, then set the softbox's gain again against the photos, since the eye's
+    tuning absorbed part of the curve. *Measure:* `npm run closeupdepth`'s wall lines before
+    and after, and a bubble's dark band against encode(R x the liquid behind it).
   - **38h-8. The rest of the closeup's depth, found doing 38h-7** (M, nil). The owner's
     photos (drops/references) have two more cues the bubbles now show and the rest of the
     closeup does not. *The beads:* an oil drop in water is traced the same way (Snell into
@@ -227,16 +273,10 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
     = 1.6, drop the star, and drive the halo from `defocusShadow`. Check: a projected ferro
     look added to `scripts/nolight.mjs` gains no pixel over the lamp. (S–M; Medium; from
     RS-27.)
-  - **38h-14. The projector's bubble film still reflects at Film Physics 0** (S, nil; a
-    look change on the looks that set Iridescence over 0.25). Found writing 38h-6's
-    check: the plate's own bubbles at Iridescence 1 against 0 read 51 levels brighter at
-    Film Physics 0 (`cp * (0.45 + 1.25 * filmC)` above Iridescence 0.25, plate.ts's bubble
-    block), 0 at Film Physics 1. A pocket between the glasses throws only the light
-    through its film, so at Film Physics 0 the rainbow wants a transmitted form too (the
-    pale complement, 1 − k·R, never over 1), or Film Physics 0 is kept as the deliberate
-    look it was written as and named so. Owner's call on the looks. *Measure:* `npm run
-    nolight` line 15 prints the projector's number beside the camera's; ask it under
-    line 15's bar when this ships.
+  - ~~**38h-14**~~ *shipped 2026-11-08.* The projector's bubble film at Film Physics 0 is
+    the light through it, cp·(1 − 0.55·k·filmC) (`projectorFilm`, bubbleFilm.ts), a
+    transmittance in 0.67..1 per channel, never over the lamp: 54 levels over to 0.
+    `npm run nolight` line 16. Story in `docs/plan-shipped.md` §38.
   - **38h-16. The plate still reads the grid's hole round a bubble** (S–M, nil). Found doing
     38h-15. The solver cuts the dye out under a bubble on its grid, so the dye the plate
     decodes is thinned over a texel and a half inside each rim and, through the bicubic
@@ -657,6 +697,10 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   plus a uniform −8dt (`thinGap.ts:348-353`, `forces.ts:224-228`). A draught has no free
   surface to shear between two glasses; a fan acts on an open dish's surface or by cooling
   the glass (38f). Either an open-dish surface shear or a cooling, not a noise.
+  *Read again 2026-11-27 (#614):* the air's Blasius stress τ(x) ∝ x^-½ laid whole into the
+  open-rim solve is the through-flow 18a-16 removed (Air 0.35 left 0% of the dye). Only its
+  closed part may drive the liquid: most of the stress is met by the dish's own pressure
+  and an edge curl is left. That is a design to work out on the lab, with `draught`.
 
 Also found, left with their owners: the ferrofluid's dye is moved by two exchanges that
 tell it where the black went (`phaseDisplace`, `wgsl/fluid/phase.ts:330-370`) rather than

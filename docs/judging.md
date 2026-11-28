@@ -3174,6 +3174,11 @@ crosses the solubility curve, the oil is conserved); how it looks in a show is t
    like paint, white gathering into thick opaque ribbons along an edge, the whole plate a
    grey veil inside a few minutes. Judged from the Mac's film (the thread's page), not by
    loading the app.
+7. Louche with music (PLAN 48s-8, Kick Bloom 0.3). Good: the plate breathes with the song,
+   a push and fold of the cloud through the passages where the kick hits hard, then a
+   quieter spell where little moves; each kick still drops a few small specks of colour.
+   Bad: a steady churn of bright specks on every beat with no rest between, or a dish that
+   has gone dark and empty. Judged from the before/after film on the thread's page.
 
 ## 151. Oil threads pinch into beads (PLAN 38w-27)
 
@@ -3189,3 +3194,16 @@ enough to bead, by design).
    of big bodies look as they did.
 To put it back: THREAD in `src/gpu/wgsl/fluid/capillary.ts` returns 0 from threadCurve
 (`npm run beads` then reads one body, as main did).
+
+## 152. The Magnet's domes in the closeup (PLAN 29a-13)
+
+The domes a magnet stands were black blobs in the macro view. Their sides now mirror the lit
+liquid round them as a camera records a dark gloss under water, with the light's glint on
+each top.
+
+1. Magnet Garden (or Ferro Paint) with the domes standing, zoom in to 4x-6x on them: each dome
+   should read as a raised, glossy black cone: a coloured sheen down its sides, brighter toward
+   its foot, and a bright point on its top.
+2. Relief / 3D at 0: the old flat drawing, black domes.
+3. Bad: domes that read as holes or bowls rather than raised, a sheen that looks painted on, or
+   any change to the plate at 1x.

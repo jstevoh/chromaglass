@@ -27,7 +27,7 @@ export class FluidCover extends FluidReads {
    * The cover's gap over the 2 mm the solver's constants were worked out at,
    * squared: what a Darcy speed in the gap (the colour's fall down a tipped
    * plate, ROCK_FALL; the oil's rise, OIL_LIFT; the oil's tension pull,
-   * OIL_TENSION_GAP) is multiplied by on a live cover, since each is
+   * oilMobility) is multiplied by on a live cover, since each is
    * Δρ g h²/12μ or σ-driven flow with the same h² mobility. 1 at the default.
    */
   protected get coverH2(): number {
