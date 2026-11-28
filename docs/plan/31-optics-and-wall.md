@@ -270,16 +270,23 @@ lens-shaped drop, no shadow beside it.*
   `oplPupilLoss` turns rest gaps per texel into plate widths by `DISH_REST_GAP * logicalGrid`,
   which is a rest gap of 0.03 plate widths (6 mm); since 38r the gap is 2 mm
   (`DISH_GAP_METRES`), as the trace uses. Fold into 31s-2b, or fix alone with the in-focus films.
-- **31s-2f. `npm run caustics` line 7 (ripple) on Metal** (S, found building 31s-2; the owner
-  chose to merge 31s-2 with it open, 2026-11-28). On the owner's Mac the ripple reads 6.1%
-  against its 6% bar, where SwiftShader reads 4.8%; the other nine lines pass on both. The gap
-  is in how each rasteriser covers the slivers of the ripple's folds at periods of two to three
-  texels, so it shows red in main's Mac report until the trace stops depending on which texel
-  centres a sliver happens to cover. Tried and dropped: 4x MSAA (11.5%, light kept 0.99937),
-  splats fully from gain 1.5, the lamp disc's least blur at 0.7 texels (the lens line broke).
-  The bar stays at 6%. Next to try: splat a triangle once any side is under a texel, not only
-  when its gain says it gathered. Also seen in the second round of films: one black frame at
-  Focus 0.8 (3.17 s into branch2-f08); look for it while measuring 31s-2d.
+- **31s-2g. The ripple's last points are the path's half floats** (S, found building 31s-2f).
+  The derive pass holds `.w` in rgba16float, and the light is the path's second difference: a CPU
+  copy of the trace reads line 7 at -2.3% with the path in f64, -4.7% with it truncated to halves
+  as the lab writes it, and -7.2% rounded to nearest as a GPU writes a half. So the line passes on
+  the lab's truncation, and the app's real light carries a few percent of texel-scale grain where
+  rays gather. Fix: the derive pass writes the trace an r32float path beside `.w` (textureLoad
+  needs no float32-filterable), and the lab hands it f32.
+- **31s-2h. `npm run nolight` line 13 reads the pour 1.38 of the oil's predicted strength on the
+  Mac** (S, found building 31s-2f; bar 1.33). Red on the owner's Mac on main (1.38) and with
+  31s-2f (1.39); the cloud read 1.30 only because SwiftShader's sixteenth-texel grid snapped the
+  oil's barely moved corners back to rest, where every texel centre sits on its cell's diagonal and
+  one rule picked the same triangle each time. With 31s-2f the cloud reads as the Mac (1.37): the
+  oil's summed |ln T| at Focus 0.56 is 291 there, 289 on the Mac, against 304 snapped. At rest the
+  texel centre is on the diagonal of its two triangles, so the drawn light point-samples whichever
+  one a hair's displacement picks; look first at whether a texel should take its two triangles'
+  light by area (what the wall truly receives) rather than one centre's, and at whether the
+  prediction (each lens as strong as its index step) holds for a pancake of oil against a dome.
 - **31s-3. The other sparse stencils.** Still reading the plate at a stride: the camera's
   camLap (an 8-tap max, plateTransmit.ts), lacing() (a 4-tap cross at 3 cells, 33c), the
   lamp's lampBendAt and defocusShadow's reads of the derived layer, and blurAlpha (3x3). (The
