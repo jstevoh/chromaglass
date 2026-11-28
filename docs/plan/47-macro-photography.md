@@ -644,8 +644,10 @@ order; the README is `docs/watch.md`, the plugin's layout `docs/watch-plugin-pla
 - **47p-3c** footage that is continuous, coloured, on a dark ground and moving by itself reads
   liquid though it is not (a night street with neon on a tripod, a VJ loop, a fish tank).
   A fourth cue (rigid motion: the flow's blocks moving as solid pieces) would tell them apart.
-- **47p-4** an HTML report and the best moment: one self-contained page per run (sheets,
-  timeline, numbers, the words), and the strongest moment saved as a still and a 10-15 s clip.
+- **47p-4b** the best moment judged on real footage: chosen and checked on made clips only.
+  Watch three or four of the library's films (a real show, an edited film, an app take) and
+  look at whether `best.mp4` is the moment a person would pick; a liquid take may want the
+  swell's peak (shape()'s swells) weighted over colour.
 - **47p-5** a shot list and batch runs: cut and dissolve times, each shot's length, the average
   shot length, a palette per shot and the share of cuts on a beat (CSV and in the summary);
   `--batch <folder|playlist>` with a table across the videos.
@@ -672,7 +674,7 @@ in it". The reference library stays private and ships empty (watch-plugin-plan.m
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q; 47d-1 shipped), 47a, 47e (its glitter half shipped; 47e-1, 47e-2), 47f, 47k; 47b-2 and 47b-3 after 47b-1; 47g,
-47h, 47i and 47n when wanted; 47p-4 and 47p-5 in that order (the owner's pick, 2026-11-28), 47p-3b and 47p-3c when the watch tool is next touched; 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
+47h, 47i and 47n when wanted; 47p-5 next (the owner's pick, 2026-11-28; 47p-4 shipped), 47p-4b when the watch tool next watches real films, 47p-3b and 47p-3c when the watch tool is next touched; 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
 as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4 in that order (the owner asked
 for the drops' physics and their colour, 2026-11-12; ~~47z-5~~ shipped early, 2026-11-13, as Foam
 Cells), then 47z-7 after 47z-3, 47z-8 and 47z-6 after 28k-2 (a). Each its own thread

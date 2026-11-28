@@ -26,6 +26,13 @@ From one clip, in its out folder:
   symmetry, composition); a physics read (flow speed, turning, spreading, lifetime, detail);
   how motion follows the sound; and a plain-language account.
 - `design.json`, `palette.png`: the reads as data, for comparing two films.
+- `report.html`: all of it on one page for a person, best moment first, then the timeline,
+  the read, the words, the numbers and every sheet. Self-contained (pictures inside it), so it
+  can be mailed or opened on a phone; it names no folder of the machine that made it.
+- `best.mp4` and `best.png`: the clip's strongest 12 s (10 to 15) and its strongest frame. The
+  moment is the stretch with most motion, colour, lit area and (with sound) loudness, each
+  ranked within the clip, never a title card, and one shot when it can be
+  (`scripts/watchreport.mjs`). `--no-report` skips these three.
 
 ```
 node scripts/watch.mjs <file or URL> [--out DIR] [--from S] [--to S] [--crop x,y,w,h]
@@ -33,6 +40,7 @@ node scripts/watch.mjs <file> --vs <reference>          # the gaps against a ref
 node scripts/watch.mjs --before A --after B             # what changed between two films
 node scripts/watch.mjs <file> --keep NAME               # keep it in the reference library
 node scripts/watch.mjs <file> --liquid | --general      # the liquid or the general read, whatever the footage shows
+node scripts/watch.mjs <file> --no-report               # no report.html, best.mp4 or best.png
 node scripts/watch.mjs --refs | --selftest
 ```
 

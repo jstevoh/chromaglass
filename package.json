@@ -427,6 +427,7 @@
     "linearlight": "node scripts/linearlight.mjs",
     "watchconfig": "node scripts/watchconfigtest.mjs",
     "watchmode": "node scripts/watchmodetest.mjs",
+    "watchreport": "node scripts/watchreporttest.mjs",
     "reelset": "node scripts/reelsettest.mjs"
   },
   "dependencies": {

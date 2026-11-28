@@ -591,6 +591,24 @@
       ]
     },
     {
+      "name": "The watch tool's page for a person, and its best moment",
+      "shard": "sound",
+      "run": "npm run watchreport",
+      "why": [
+        "Packaged for anyone (reelreader, PLAN 47p-4), a run must give a person one",
+        "page to read and send, and the clip's strongest moment to show. Every run",
+        "writes report.html (self-contained), best.mp4 (10-15 s) and best.png",
+        "(scripts/watchreport.mjs). This holds the choice on rows made to have one",
+        "answer (a burst of colour and motion wins and moves with it, a loud passage",
+        "breaks a tie, a title card never wins, a cut inside costs, 10-15 s), and end",
+        "to end on a film made here: the window lands on its bright 12 s, the clip",
+        "begins on the source's frame at that time and has its sound, the still is",
+        "the source's frame, and the page holds every picture inside it, reads on a",
+        "phone, names no folder of the machine and escapes the video page's words.",
+        "In the sound shard for its ffmpeg. About half a minute."
+      ]
+    },
+    {
       "name": "The public judging skill is whole and its test set's answers hold",
       "shard": "sound",
       "run": "npm run reelset",

@@ -97,6 +97,12 @@ reference library, where to fetch a refused link, a settings map) is its config 
 5. `stats.tsv` (every sample: brightness, near black, blown, saturation, motion, loudness) and
    `design.json` when a number needs checking against a moment.
 
+For the person, not for you: `report.html` is all of it on one self-contained page (best
+moment first, then the timeline, the read, the words, the numbers and every sheet) that opens
+on a phone and can be sent as it is, and `best.mp4` / `best.png` are the clip's strongest 12 s
+and frame (most motion, colour, lit area and loudness, never a title card). Hand the person
+the page; read the files above yourself. `--no-report` skips the three.
+
 ## What is in it: the content read
 
 The tool cannot see content; you can. From the sheets and stills, write:

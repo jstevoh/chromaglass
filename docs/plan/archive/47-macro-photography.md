@@ -179,6 +179,14 @@ blur.
   words (low-key, linear, clustered, colour field). Measured: Big Buck Bunny graded Arc
   9.0/10 against the real shows before, now reads general with no card; the Joshua Light
   Show, glow ink and four app takes read liquid. `npm run watchmode` 21/21.
+- ~~**47p-4** an HTML report and the best moment~~ (shipped, this PR): every run writes
+  `report.html` (one self-contained page: the best moment, the timeline, the read, the words,
+  the numbers and palette, every sheet, the detail; pictures inside it as JPEG, the clip too
+  under 8 MB; no folder of the machine, the video page's words escaped; reads on a phone),
+  `best.mp4` (the strongest 12 s, H.264 with sound) and `best.png` (its strongest frame), from
+  `scripts/watchreport.mjs`; `--no-report` turns them off. The moment is the window with most
+  motion, colour, lit area and loudness by rank, with no title card and a cost per hard cut.
+  `npm run watchreport` 41/41; each choice rule and both seeks shown to catch a mutant.
 - ~~**47p-5b**~~ the public judging skill (shipped, 2026-11-28): `reelreader/skill/`, a
   self-contained skill folder the release copies: honesty rules first, the reading order, a
   content read from the sheets, lenses for anyone, an editor, a colourist and a VJ or liquid
