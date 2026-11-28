@@ -26,9 +26,11 @@ import type { EngineStatus } from '../../lib/platform';
 export interface SettingsPanelProps {
   settings: VisualizerSettings;
   /**
-   * Song detection, the master switch: whether the app listens for which song
-   * is playing at all. Off, nothing is identified, so no set item, song show,
-   * sequence or saved look made for a song goes up on its own.
+   * Song detection, the master switch: whether the app follows the song
+   * playing at all, once it is named (by hand since automatic song
+   * identification was retired, 2026-11-27). Off, nothing is followed, so no
+   * set item, song show, sequence or saved look made for a song goes up on
+   * its own.
    */
   songDetection?: boolean;
   onSongDetection?: (on: boolean) => void;

@@ -6,9 +6,8 @@ import { type OutputConfig, loadOutput, saveOutput } from './outputConfig';
 import { loadCustomLiquids, saveCustomLiquids } from './liquidFile';
 import { type LiquidType } from '../types';
 import {
-  type SongMap, type TrackEvolutionState, type SavedPerformance
+  type SongMap, type TrackEvolutionState, type SavedPerformance, type TrackFingerprint
 } from './musicTypes';
-import { type TrackFingerprint } from './localFingerprint';
 import {
   getAllSongMaps, putSongMap,
   getAllTrackStates, putTrackState,
