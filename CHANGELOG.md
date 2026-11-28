@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Press the Whole Glass, and Lava Pop's hand (PLAN 38w-28)
+
+- **Press the Whole Glass** (`kickGlass`, Settings → Look → Show under Beat Squeeze, on the
+  phone's settings sheet too): Beat Squeeze's kick bears on the whole cover glass, pressed
+  down and let back up as one rigid piece, instead of a fingertip on the rhythm sheet.
+  A switch, so not MIDI-learnable, as LED Platform.
+- Lava Pop presses the whole glass on the kick, with Plate Rock at a real hand's lean.
+
+### Fixed — the glass kick pumped the oil to the rim (PLAN 38w-28)
+
+- A kick that pressed the glass across the dish (Bass Drop's) closed the gap one way and let
+  it open another, and every kick carried the oil a little further out. The glass now goes
+  down and comes back up along one path, and the liquid comes back with it.
 ### Changed — the dye bends light at its real strength (PLAN 38u-10)
 
 - The dye's refractive index is its measured one (tartrazine's dn/dc over its absorbance),

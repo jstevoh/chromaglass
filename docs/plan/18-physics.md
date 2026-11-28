@@ -296,22 +296,23 @@ its frame rate live. "Free" means no new passes or texture reads.
     bowl's curvature 0.70–0.73 on main, 0.01–0.05 now; at gpu=mid (an even 2×, where the
     relaxation rounds most of it) 0.04–0.10 against 0.01–0.05. Open: 18a-15.
   - **18a-15, the rest of the thin gap's laying at solver cells: shipped** (2026-11-28). The
-    bass's hand (`BassPress`), a kick's hold and release (`KickRelease`) and the lift's
-    spokes (`layLift`) laid the gap on the 192² grid, and the rhythm sheet's change came up
-    by the bilinear. The bowls are now the solver's (`BowlLay`, pressBowl's records, at the
-    kick's unrounded radii, so a release gives back the bowl the press laid); the spokes
-    are a record of their own (`liftSpokes`, `spokeLift` in wgsl/splat.ts: squish.ts's
-    `liftShare`, a function of a point, in WGSL, every edge of a spoke eased so the glass
-    has no crease); the sheet comes up by Catmull–Rom (`upsampleCubic`). Two seams in the
-    lift's spokes went too (`onSpoke`: each spoke's props changed at its crest, and an odd
-    count's wobble jumped at the −x axis; a drop's splash keeps its old spokes). `npm run
-    gridlay` (lab, 512² over 192²): the share of curvature between the CPU's samples, 0 for
-    facets and 1 for smooth glass, main → now: bass down 0.13 → 1.00, deeper 0.37 → 1.00,
-    let go 0.23 → 0.99, kick release 0.00 → 1.00, kick hold 0.15 → 1.00, lift 0.00 → 1.14,
-    sheet 0.00 → 0.73; each no more curvature than main's or, for the release and the
-    lift, its formula at every solver cell (0.00% rms); the same volume (within 3%) and
-    pattern (0.98 to 1.00 at the 192² scale). `npm run lift`'s centre-against-rim line now
-    reads the mean over 16 presses (one press's spokes are a small sample). Then 18a-15b.
+    bass's hand (`BassPress`) and the lift's spokes (`layLift`) laid the gap on the 192²
+    grid, and the sheet's channel (the rhythm sheet's change, and since 38w-28 a kick's
+    clock glass pressed whole) came up by the bilinear. The bass's bowl is now the solver's
+    (`BowlLay`, pressBowl's records); the spokes are a record of their own (`liftSpokes`,
+    `spokeLift` in wgsl/splat.ts: squish.ts's `liftShare`, a function of a point, in WGSL,
+    every edge of a spoke eased so the glass has no crease); the sheet's channel comes up by
+    Catmull–Rom (`upsampleCubic`). Two seams in the lift's spokes went too (`onSpoke`: each
+    spoke's props changed at its crest, and an odd count's wobble jumped at the −x axis; a
+    drop's splash keeps its old spokes). A kick's hold and release on a thin gap were in
+    this PR too, until 38w-28 moved that kick to GlassPress, which the cubic now carries.
+    `npm run gridlay` (lab, 512² over 192²): the share of curvature between the CPU's
+    samples, 0 for facets and 1 for smooth glass, main → now: bass down 0.13 → 1.00,
+    deeper 0.37 → 1.00, let go 0.23 → 0.99, lift 0.00 → 1.14, sheet 0.00 → 0.73, clock
+    glass 0.00 → 0.99; each no more curvature than main's or, for the lift, its formula at
+    every solver cell (0.00% rms); the same volume (within 3%) and pattern (0.98 to 1.00 at
+    the 192² scale). `npm run lift`'s centre-against-rim line now reads the mean over 16
+    presses (one press's spokes are a small sample). Then 18a-15b.
   - **18a-15b, the sheet solved at the solver's grid.** The rhythm sheet still solves at
     192² and is only interpolated smoothly; its dent's edge is the 192² solve's. Solve it on
     the GPU at N (it is a plate equation, the same stencil the thin gap's pressure uses) if
@@ -421,6 +422,21 @@ its frame rate live. "Free" means no new passes or texture reads.
     keeps it (tried here: a mixed ring of the meniscus's volume, π h / 4R of the dish) is the
     model if it ever matters; Oil Bodies' own share past the rim (oilDye, never cleared there)
     would have to be cleared with it, or bodyUnspread raises the dye to it.
+  - **18a-25, the comet's pull and the Turbulence noise are through-flows at the open rim.**
+    Found re-tuning the looks the real dye mixing left bare (28i-8, 2026-11-27). On Classical
+    Vibe's thin gap, each stir alone on its own pours (lab, Metal, the dish's mean dye): with
+    nothing stirring the dish held 0.59; the comet's pull (`cometSpeed`) at 0.75 took it to
+    0.05 in 10 s; Turbulence 0.25 to 0.17 in 30 s; the music's stir cord on Turbulence alone
+    to 0.08; Air changed nothing. Lacing Run read the same (a mean of 0.08 at 30 s at Turbulence 0.1,
+    0.02–0.04 at 0.2, and 0.06 at 60 s at 0 with the music's stir cord still on it). The comet is a uniform drift and the curl noise in forcesB
+    (`src/gpu/wgsl/fluid/forces.ts`) has a lowest octave the size of the dish, and neither is
+    held closed at the rim, so both carry liquid, and its dye, out over it; the regulator
+    cannot put back what has left. The looks were re-tuned around it (less of both); the fix
+    is the physics: lay both as stream functions held at zero near the rim, the way 18a-16
+    did the draught and 18a-17 the tilt, so they turn the liquid inside the dish and send
+    none out. Then the looks 28i-8 calmed can have their stir back. Measure with the dish's
+    own mean over 60 s at Turbulence 0.5 and the comet at 1.5 on Classical Vibe's saved
+    settings (a mean under 0.4 at 60 s means it still leaks).
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.

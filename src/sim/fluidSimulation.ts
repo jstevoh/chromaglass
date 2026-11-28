@@ -39,6 +39,8 @@ import { DeltaRows, packRows, restRows } from '../lib/deltaRows';
 import { LiquidPhase } from '../lib/liquidPhase';
 import { pourShare, speciesOf } from '../lib/liquidProps';
 import { RhythmSheet } from '../lib/sheet';
+import { GlassPress } from '../lib/glassPress';
+import { layKick } from './kickLay';
 import { glassSpring, PressLifts, KickRelease, KICK_HOLD, KICK_RELEASE, BassPress, type BowlLay, type Presser, type Stroke } from '../lib/squish';
 import { type Phrase } from '../lib/phrasing';
 import { stream, type Rng } from '../lib/rng';
@@ -188,7 +190,7 @@ export class FluidSimulation {
     plate units, how deep each of its three discs went, and how long ago.
   */
   private sloshClock = new SloshClock();
-  private dishKicks: { x: number; y: number; amount: number; radii: number[]; t: number }[] = [];
+  dishKicks: { x: number; y: number; amount: number; radii: number[]; t: number }[] = [];
   // Kept for scripts/plateboil.mjs --part=zero (unreachable from step()).
   private readonly CM = GRID_SIZE / 2;
   private cvx = new Float32Array((GRID_SIZE / 2) * (GRID_SIZE / 2));
@@ -260,6 +262,8 @@ export class FluidSimulation {
    * each step (`sheetGap`, through its own channel). Public for `npm run sheet`.
    */
   readonly sheet = new RhythmSheet();
+  /** The clock glass pressed whole on a kick, on a thin gap (lib/glassPress.ts, sim/kickLay.ts). */
+  readonly glassPress = new GlassPress();
   /** The sheet's change this step on the plate's grid, and whether anything is in it. */
   private sheetGap: Float32Array | null = null;
   private sheetLaid = false;
@@ -270,7 +274,7 @@ export class FluidSimulation {
   /** The last lift this plate laid: where, and how many cells it touched. */
   lastLift: { x: number; y: number; cells: number } | null = null;
   /** Forget the last press, as a fresh plate has none: a song render starts here, on its own clock. */
-  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.kickRelease.forget(); this.sheet.forget(); this.bassPress.forget(); this.boilHolds = []; this.lastLift = null; }
+  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.kickRelease.forget(); this.sheet.forget(); this.glassPress.forget(); this.bassPress.forget(); this.boilHolds = []; this.lastLift = null; }
   /**
    * Forget everything this plate carries from one frame to the next that is
    * not the liquid itself: a song render starts here (VisualizerRender.begin),
@@ -1233,7 +1237,7 @@ export class FluidSimulation {
     if (this.breathLaid) { this.breath!.fill(0); this.breathLaid = false; }
     // A lift still running would go on laying the old plate's spokes into
     // the cleared one for up to a second, at the old look's Fingering.
-    this.pressLift.forget(); this.kickRelease.forget(); this.sheet.forget(); this.bassPress.forget(); this.lastLift = null;
+    this.pressLift.forget(); this.kickRelease.forget(); this.sheet.forget(); this.glassPress.forget(); this.bassPress.forget(); this.lastLift = null;
     if (this.sheetLaid) { this.sheetGap!.fill(0); this.sheetLaid = false; }
     this.rbDensity.fill(0); this.rbVx.fill(0); this.rbVy.fill(0);
     this.dirty = false;
@@ -2033,8 +2037,14 @@ export class FluidSimulation {
     const fine = this.thinGap && !!this.gpu!.liftSpokes;
     for (const lift of this.pressLift.step(showNow(), this.dtSeconds))
       this.lastLift = { x: lift.x, y: lift.y, cells: layLift(this.size, lift, this.thinGap, this.squishCell, fine ? this.spokesLay : undefined) };
-    // The kicks' presses, held against the spring, let go (`pressKick`): only the gap given back, never past rest.
-    this.kickRelease.step(this.size, this.dtSeconds, this.squishCell, this.lastStep?.gapSpring, this.thinGap && this.gpu!.pressBowl ? this.bowlLay : undefined);
+    // The kicks' presses, held against the spring, let go (`pressKick`): only the gap
+    // given back, never past rest.
+    this.kickRelease.step(this.size, this.dtSeconds, this.squishCell, this.lastStep?.gapSpring);
+    // The clock glass (pressKick): its dent's change, through the sheet's channel (lib/glassPress.ts).
+    if (this.glassPress.live) {
+      if (!this.gpu || !this.thinGap) this.glassPress.forget();
+      else if (this.glassPress.step(this.size, this.dtSeconds, this.lastStep?.gapSpring ?? 0, this.sheetGap ??= new Float32Array(this.size * this.size), this.lastStep?.plateCurve ?? 0) > 0) this.sheetLaid = this.dirty = true;
+    }
     // The rhythm sheet (pressKick): solved a step, laid as the gap's change, with the spring (lib/sheet.ts).
     if (this.sheet.live) {
       if (!this.gpu || !this.thinGap) { this.sheet.forget(); return; }
@@ -2050,41 +2060,9 @@ export class FluidSimulation {
     }
   }
 
-  /**
-   * Beat Squeeze's kick (lib/squish.ts `kickPress`): the rhythm sheet's one
-   * dent, as wide as the sheet bends over this liquid in the time the kick
-   * holds it, or on a look that may move the frame the glass over three
-   * nested discs across most of the dish. `radii` in cells of a 128 plate,
-   * `amount` each disc's press. Remembered for the lift like a hand's press,
-   * and let go a moment later (`kickRelease`).
-   */
+  /** Beat Squeeze's kick: the rhythm sheet's dent, or the clock glass pressed whole (sim/kickLay.ts). */
   pressKick(x: number, y: number, amount: number, fingering: number, radii: readonly number[], nu = NU_REF, curve = 0): void {
-    x = Math.round(x);
-    y = Math.round(y);
-    if (radii.length === 1 && this.gpu && this.thinGap) {
-      /*
-        The rhythm sheet, solved (lib/sheet.ts, PLAN 27f-4): a fingertip on
-        it here, held KICK_HOLD and lifted, pushing out from under it as much
-        liquid as the stamped bowl closed over the same reach (stampedVolume),
-        and from then on the sheet's own equation lays the gap, step by step
-        (liftStep). The lift's memory still hears the kick as a press, so
-        Fingering's fingers follow it as they followed the bowl.
-      */
-      const radius = Math.round(radii[0] * GRID_SCALE);
-      this.pressLift.press('kick', x, y, radius, amount, fingering, showNow());
-      pressSheetKick(this.sheet, this.size, x, y, amount, radii[0], nu, curve, this.gpu.coverMetres);
-    } else {
-      radii.forEach((r, i) => this.applySquish(x, y, r, amount, fingering, i === 0, 'press', 'kick'));
-      this.kickRelease.kick(x, y, radii.map((r) => r * GRID_SCALE), amount, this.thinGap, !!this.gpu?.pressBowl);
-    }
-    // And the same glass on the slosh dish (stepSlosh), over the same radii the
-    // gap was pressed with: off the frame-moving looks that is the sheet's one
-    // dent (kickPress), so the dish is pushed down where the plate is and no
-    // wider, and the liquid it moves runs out as a ring and back off the rim.
-    if (this.thinGap && amount > 0) {
-      this.dishKicks.push({ x: (x + 0.5) / this.size, y: (y + 0.5) / this.size, amount, radii: [...radii], t: 0 });
-      if (this.dishKicks.length > 2) this.dishKicks.shift();
-    }
+    layKick(this, x, y, amount, fingering, radii, nu, curve);
   }
 
   /**

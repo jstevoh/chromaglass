@@ -517,12 +517,14 @@ export function dentRadius(nu: number, hold = KICK_HOLD, gapMetres = DISH_GAP_ME
  * The discs a kick presses, in cells of a 128-cell plate, and each one's
  * share of the press: the glass's three across the dish where the look may
  * move the frame (Frame Sway above 0, the cover loose; lib/plateRock.ts
- * FRAME_MOVING_LOOKS), and otherwise the sheet's one dent, as deep in the
+ * FRAME_MOVING_LOOKS) or where the look presses the whole glass (`glass`,
+ * Press the Whole Glass), and otherwise the sheet's one dent, as deep in the
  * middle as the glass's three stacked (each bowl's middle is three times its
  * amount, so the one dent carries all three's).
  */
-export function kickPress(nu: number, sway: number, gapMetres?: number): { radii: number[]; share: number } {
-  if (Number.isFinite(sway) && sway > 0) return { radii: KICK_RADII, share: 1 };
+export function kickPress(nu: number, sway: number, gapMetres?: number, glass?: boolean): { radii: number[]; share: number } {
+  // And the glass wherever the look asks the kick to press it whole (Press the Whole Glass, PLAN 38w-28).
+  if (glass || (Number.isFinite(sway) && sway > 0)) return { radii: KICK_RADII, share: 1 };
   const h = Number.isFinite(gapMetres) ? gapMetres! : DISH_GAP_METRES;
   return { radii: [Math.max(4, Math.round(dentRadius(nu, KICK_HOLD, h) * 128))], share: KICK_RADII.length };
 }
@@ -585,7 +587,7 @@ export const KICK_RELEASE = 1 / 3;
  * `npm run lift` drives this on that plate (`npm run squeeze` in the app).
  */
 export class KickRelease {
-  private list: { x: number; y: number; radii: number[]; fine: number[] | null; amount: number; age: number; given: number; thin: boolean }[] = [];
+  private list: { x: number; y: number; radii: number[]; amount: number; age: number; given: number; thin: boolean }[] = [];
   /** Release steps laid, over every kick: for a check to see the release run. */
   steps = 0;
   /** Kicks pressed, each owed a release: for the same check. */
@@ -593,14 +595,10 @@ export class KickRelease {
   /** The gap given back, summed over every cell written: the plate's check sets it against the depth its kicks pressed. */
   given = 0;
 
-  /**
-   * A kick pressed `amount` into each disc of `radii` (cells) about (x, y), on a thin gap (`thin`, a bowl: squishDisc) or not.
-   * `fine`: the press was the solver's own bowl at these radii unrounded (applySquish's pressBowl), so the
-   * hold and the release are laid the same way when `step` is handed a `BowlLay` (PLAN 18a-15).
-   */
-  kick(x: number, y: number, radii: number[], amount: number, thin = false, fine = false): void {
+  /** A kick pressed `amount` into each disc of `radii` (cells) about (x, y), on a thin gap (`thin`, a bowl: squishDisc) or not. */
+  kick(x: number, y: number, radii: number[], amount: number, thin = false): void {
     if (!(amount > 0) || radii.length === 0) return;
-    this.list.push({ x: Math.round(x), y: Math.round(y), radii: radii.map(Math.round), fine: thin && fine ? radii.slice() : null, amount, age: 0, given: 0, thin });
+    this.list.push({ x: Math.round(x), y: Math.round(y), radii: radii.slice(), amount, age: 0, given: 0, thin });
     this.kicks++;
   }
 
@@ -608,26 +606,14 @@ export class KickRelease {
    * One step of `dtSeconds`: each kick still held holds the glass against
    * the gap's spring `spring` this step (squeezeUpdate's gapSpring), and each
    * past its hold gives back its share of the gap, through `cell`.
-   *
-   * With `bowl`, a kick whose press was the solver's bowl (`fine`) is held and
-   * given back as that bowl, at the same unrounded radii (PLAN 18a-15). Laid
-   * through `cell` it came back on the 192² grid at rounded radii, as facets,
-   * round a press laid smooth: what was given back was not what went, and
-   * the difference stayed in the glass as creases until the spring took it.
-   * `cell` still hears every cell then, at gap 0, so the count holds.
    */
-  step(S: number, dtSeconds: number, cell: SquishCell, spring = 0, bowl?: BowlLay): void {
+  step(S: number, dtSeconds: number, cell: SquishCell, spring = 0): void {
     const dt = Number.isFinite(dtSeconds) && dtSeconds > 0 ? dtSeconds : 1 / 60;
     const hold = Number.isFinite(spring) && spring > 0 ? spring / STEFAN_FILM ** 3 : 0;
-    // The solver's bowls (a kick pressed fine), and the 192² discs through `onto`, which lays or only counts them.
-    const lay = (k: KickRelease['list'][number], amount: number, onto: SquishCell | null) => k.radii.forEach((r, i) => {
-      if (k.fine && bowl) bowl(k.x + 0.5, k.y + 0.5, k.fine[i], amount);
-      if (onto) squishDisc(S, k.x, k.y, r, amount, 0, 'press', 0, onto, k.thin);
-    });
     for (const k of this.list) {
       k.age += dt;
       if (k.age <= KICK_HOLD + 1e-9) {
-        if (k.thin && hold > 0 && k.age > dt + 1e-9) lay(k, k.amount * hold, k.fine && bowl ? null : cell);
+        if (k.thin && hold > 0 && k.age > dt + 1e-9) for (const r of k.radii) squishDisc(S, k.x, k.y, r, k.amount * hold, 0, 'press', 0, cell, true);
         continue;
       }
       // Smooth cosine ease: zero initial velocity, gentle swell and recoil.
@@ -637,8 +623,7 @@ export class KickRelease {
       if (!(owed > 0)) continue;
       k.given += owed;
       // In the shape it was pressed in, so what comes back is what went.
-      const fine = !!(k.fine && bowl);
-      lay(k, -owed, (idx, g, vx, vy, m) => { this.given += g; if (!fine) cell(idx, g, vx, vy, m); });
+      for (const r of k.radii) squishDisc(S, k.x, k.y, r, -owed, 0, 'press', 0, (idx, g, vx, vy, m) => { this.given += g; cell(idx, g, vx, vy, m); }, k.thin);
       this.steps++;
     }
     this.list = this.list.filter((k) => k.given < k.amount * (1 - 1e-9));

@@ -9,12 +9,13 @@
  * The press laid its bowl on the CPU's 192² grid, and the bilinear upsample
  * carried it to the solver as flat facets with creases between them, which
  * the film's closing (Stefan's law, squeezeUpdate) turned into a polygon in
- * the flow. 18a-14 laid the press's bowl at the solver's own cells. Four
- * more writers of the glass still went through the 192² grid: the bass's
- * hand (BassPress), a kick's hold and release (KickRelease), the lift's
- * spokes (layLift) and the rhythm sheet (lib/sheet.ts, its change upsampled
- * as sheetT). None was reported; each has the same facets at a low enough
- * amount.
+ * the flow. 18a-14 laid the press's bowl at the solver's own cells. More
+ * writers of the glass still went through the 192² grid: the bass's hand
+ * (BassPress), the lift's spokes (layLift), and the sheet's channel (its
+ * change upsampled as sheetT), which carries the rhythm sheet (lib/sheet.ts)
+ * and, since 38w-28, a kick's clock glass pressed whole (lib/glassPress.ts),
+ * which took over a thin gap's kick from KickRelease's discs. None was
+ * reported; each has the same facets at a low enough amount.
  *
  * What this measures, in the lab at 512² over a 192² plate (an upsample of
  * 8/3, where pressfacets found main's creases plainest): the gap read at the
@@ -37,21 +38,21 @@
  * found it at 1.15, better than the fix), so the lay must also carry no more
  * curvature than main's, rms d² within 1.5× (a staircase reads 30 to 36×),
  * or, where the writer has a formula, be that formula at every solver cell:
- * a release's bowl and a lift's spokes (squish.ts `liftShare`), within 1% rms of its peak
- * (both read 0.00% now; a staircase reads 1.9% on the bowl, 13% on the spokes).
+ * a lift's spokes (squish.ts `liftShare`), within 1% rms of its peak (0.00%
+ * now; a staircase reads 13%).
  *
  * Each writer is laid twice, on two fresh plates: as main lays it (through
  * the lab's 192² deltas, and the sheet by the bilinear, `sheetBilinear`: the
  * control, which must score as facets, so the check can see them) and as the
  * plate lays it now. The two must be the same glass: the volume within 10%
- * (3% for the sheet, and its depth), and the pattern correlated over 0.95 at
+ * (3% for the sheet's channel, and its depth), and the pattern correlated over 0.95 at
  * the 192² grid's own scale, both blurred by one of its cells, since what a
  * facet changes is finer than that (unblurred, the spokes read 0.85, a spoke
  * being two or three CPU cells wide; a spoke's phase off by a radian reads
- * 0.66). An opening under rest is laid as the 192² grid was told, within 3%,
- * on both plates. The bass is one hand pressed, pressed deeper and let go,
- * so a let-go that gave back another shape fails; the kick is read in its
- * hold as well as its release.
+ * 0.66). A lift, an opening under rest, is laid as the 192² grid was told,
+ * within 3%, on both plates. The bass is one hand pressed, pressed deeper
+ * and let go, so a let-go that gave back another shape fails. The clock
+ * glass is read over its first six steps down, laid in one flush.
  */
 import { openLab } from './lab.mjs';
 import { build } from 'esbuild';
@@ -64,6 +65,7 @@ await build({ stdin: { contents: "export { thicknessViscosity } from './src/lib/
 const { thicknessViscosity, kickDepth, kickPress, liftShare, spokesAt } = await import(`../${out}`);
 const NU = thicknessViscosity(0.45);
 const SHEET_AMOUNT = kickDepth(0.5, 0.7, 1) * kickPress(NU, 0).share;
+const GLASS_AMOUNT = kickDepth(0.5, 0.7, 1);   // each of the glass's discs, as the old stamp took it
 
 const N = +(process.env.GRIDLAY_RES || 512), L = 192;
 // The glass's spring and memory off, so a flush's δ is what it laid (the control reads it).
@@ -131,18 +133,16 @@ function correlation(a, b, keep, n) {
 }
 
 // The writers, each on glass of its own, inside the open rim (radius 96).
-const SPOTS = { bass: [56, 56], kick: [136, 56], lift: [56, 136], quiet: [136, 136] };
-const BASE = { r: 30, amount: 0.003 };          // the pressed glass a release or a lift opens
+const SPOTS = { bass: [56, 56], lift: [56, 136], quiet: [136, 136] };
+const BASE = { r: 30, amount: 0.003 };          // the pressed glass a lift opens
 const FINGERING = 0.8;
 // In the order they are laid; `at` is the spot. The bass is one hand: down, deeper, let go.
 const TRIALS = [
   { name: 'bass down', what: 'bass', at: 'bass', r: 18, amount: 0.0012 },
   { name: 'bass deeper', what: 'bass', at: 'bass', r: 18, amount: 0.0024 },
   { name: 'bass let go', what: 'bass', at: 'bass', r: 18, amount: 0 },
-  { name: 'kick release', what: 'kick', at: 'kick', r: 16, amount: 0.002, base: true },
   { name: 'lift', what: 'lift', at: 'lift', r: 14, amount: 0.004, base: true },
   { name: 'quiet', what: null, at: 'quiet' },
-  { name: 'kick hold', what: 'hold', at: 'quiet', r: 16, amount: 0.002 },
 ];
 
 const { page, close } = await openLab();
@@ -150,7 +150,7 @@ let failed = false;
 try {
   const plates = {};
   for (const fine of [false, true]) {
-    const got = await page.evaluate(async ({ N, L, P, SPOTS, BASE, TRIALS, fine, NU, SHEET_AMOUNT, FINGERING }) => {
+    const got = await page.evaluate(async ({ N, L, P, SPOTS, BASE, TRIALS, fine, NU, SHEET_AMOUNT, GLASS_AMOUNT, FINGERING }) => {
       await lab.create(N, L);
       lab.gridLayReset(!fine);
       await lab.step(2, P);
@@ -171,8 +171,11 @@ try {
       // The rhythm sheet in the plate's middle: its first step's change, by the cubic or (main's, gridLayReset) the bilinear.
       lab.sheetPress(0.5, 0.5, SHEET_AMOUNT, NU);
       await lay('sheet', () => { lab.sheetStep(1 / 60, 0); return 0; });
+      // A kick's clock glass, pressed whole over the dish (the sheet laid its change once and is not stepped again): six steps down, one flush.
+      lab.glassPress(0.5, 0.5, GLASS_AMOUNT);
+      await lay('clock glass', () => { for (let i = 0; i < 6; i++) lab.glassStep(1 / 60, 0); return 0; });
       return { n: (await lab.squeeze()).n, res };
-    }, { N, L, P, SPOTS, BASE, TRIALS, fine, NU, SHEET_AMOUNT, FINGERING });
+    }, { N, L, P, SPOTS, BASE, TRIALS, fine, NU, SHEET_AMOUNT, GLASS_AMOUNT, FINGERING });
     plates[fine ? 'fine' : 'main'] = got;
   }
   const n = plates.fine.n;
@@ -186,21 +189,17 @@ try {
   /*
     What each should be, where the gap stays under rest and off the floor
     (the base press is deeper than any opening here): a release opens as a
-    bowl, 3·owed·(1 − d²/r²)², half the kick given back; a lift opens by
-    squish.ts's liftShare at every point, which is what the solver's
-    spokeLift must be.
+    a lift opens by squish.ts's liftShare at every point, which is what the
+    solver's spokeLift must be.
   */
   const sp = spokesAt(SPOTS.lift[0], SPOTS.lift[1], FINGERING);
-  const lift = TRIALS.find((t) => t.name === 'lift'), kick = TRIALS.find((t) => t.name === 'kick release');
+  const lift = TRIALS.find((t) => t.name === 'lift');
   const oracle = {
-    'kick release': (x, y) => {
-      const d = Math.hypot((x + 0.5) / s - SPOTS.kick[0] - 0.5, (y + 0.5) / s - SPOTS.kick[1] - 0.5), q = Math.max(0, 1 - (d * d) / (kick.r * kick.r));
-      return 3 * 0.5 * kick.amount * q * q;
-    },
     lift: (x, y) => lift.amount * 0.5 * FINGERING * liftShare((x + 0.5) / s - SPOTS.lift[0] - 0.5, (y + 0.5) / s - SPOTS.lift[1] - 0.5, lift.r, Math.round(lift.r * 1.15), sp),
   };
-  for (const t of [...TRIALS.filter((t) => t.what), { name: 'sheet', what: 'sheet' }]) {
-    const R = t.what === 'sheet' ? 60 : t.what === 'lift' ? t.r * 1.3 : t.r * 1.1;
+  // The sheet's channel: the rhythm sheet's dent, and the clock glass over most of the dish.
+  for (const t of [...TRIALS.filter((t) => t.what), { name: 'sheet', what: 'sheet', R: 60 }, { name: 'clock glass', what: 'sheet', R: 80 }]) {
+    const R = t.R ?? (t.what === 'lift' ? t.r * 1.3 : t.r * 1.1);
     const keep = near(t.what === 'sheet' ? [95.5, 95.5] : SPOTS[t.at], R);
     const M = plates.main.res[t.name], F = plates.fine.res[t.name];
     const m = measure(M.d, n, keep), f = measure(F.d, n, keep);
@@ -224,9 +223,9 @@ try {
     check(`${t.name}: the same glass, where main laid it`, corr > 0.95, `correlation ${corr.toFixed(3)}`);
     const tol = t.what === 'sheet' ? 0.03 : 0.1;
     check(`${t.name}: the same volume as main's`, Math.abs(f.vol - m.vol) <= tol * Math.abs(m.vol), `${f.vol.toExponential(3)} against ${m.vol.toExponential(3)}`);
-    if (t.what === 'sheet') check(`sheet: as deep as main's`, Math.abs(f.peak - m.peak) <= 0.03 * m.peak, `${f.peak.toExponential(3)} against ${m.peak.toExponential(3)}`);
-    // An opening under rest is laid as told (a press closes by Stefan's law, so the bass and the hold are held to main's instead).
-    if (t.what === 'kick' || t.what === 'lift') for (const [who, X] of [['main', m], ['now', f]])
+    if (t.what === 'sheet') check(`${t.name}: as deep as main's`, Math.abs(f.peak - m.peak) <= 0.03 * m.peak, `${f.peak.toExponential(3)} against ${m.peak.toExponential(3)}`);
+    // An opening under rest is laid as told (a press closes by Stefan's law, so the bass is held to main's instead).
+    if (t.what === 'lift') for (const [who, X] of [['main', m], ['now', f]])
       check(`${t.name}: ${who} lays the volume the 192² grid was told`, Math.abs(X.vol - F.told) <= 0.03 * Math.abs(F.told), `${X.vol.toExponential(3)} against ${F.told.toExponential(3)}`);
     if (oracle[t.name]) {
       let e2 = 0, k = 0, peak = 0;

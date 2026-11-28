@@ -3747,6 +3747,20 @@
       ]
     },
     {
+      "name": "Lava Pop's hand presses the whole glass and keeps the oil",
+      "shard": "plate",
+      "run": "npm run classichand",
+      "timeout": 25,
+      "why": [
+        "PLAN 38w-28, 38w-35: Lava Pop's water slid where a real dish shears. Lava",
+        "Pop's own dish under 120 bpm kicks on the rigid clock glass and a real",
+        "rock, read as npm run watch reads a film: twice main's own motion, the",
+        "slide under a third, the oil kept in the middle third and the gap back",
+        "at rest, against the old disc kick, which must pump the oil out. Two",
+        "labs side by side, about nineteen minutes on software WebGPU at 256²."
+      ]
+    },
+    {
       "name": "The oil's colour rides the oil past a bubble",
       "shard": "plate",
       "run": "npm run oilride -- --plate=air",
