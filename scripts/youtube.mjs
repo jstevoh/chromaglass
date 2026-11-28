@@ -818,8 +818,11 @@ const MUTANTS = [
   { rule: 'limitFloor', find: 'return Math.max(now + 2 * 3600_000, afterLast);', replace: 'return afterLast || now + 2 * 3600_000;' },
   // The check's old video has no manifest entry yet when its replacement finishes, so
   // the server takes the push branch (the entry made on the spot), and that is the one cut.
-  { rule: 'manifestReplace', find: "status: 'replaced', replacedBy: video.id, updatedAt: finishedAt });", replace: "status: 'replaced', updatedAt: finishedAt });" },
-  { rule: 'leakFiles', find: 'writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos }, null, 2));', replace: 'writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos, t: loadToken()?.refresh_token }, null, 2));' },
+  { rule: 'manifestReplace', in: 'youtube/manifest.js', find: "status: 'replaced', replacedBy: video.id, updatedAt: finishedAt });", replace: "status: 'replaced', updatedAt: finishedAt });" },
+  // The manifest moved to youtube/manifest.js (44i-2c-2), where the server's loadToken is out of
+  // reach, so this leak reads the refresh key from token.json beside the manifest: the same secret
+  // written into the same file, which is what leakFiles must catch.
+  { rule: 'leakFiles', in: 'youtube/manifest.js', find: 'writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos }, null, 2));', replace: "writePrivate(MANIFEST_FILE, JSON.stringify({ syncedAt: m.syncedAt ?? null, videos: m.videos, t: JSON.parse(readFileSync(MANIFEST_FILE.replace(/manifest\\.json$/, 'token.json'), 'utf8')).refresh_token }, null, 2));" },
   { rule: 'progress', find: 'if (moved) { onProgress?.(job.sent, job.size); fails = 0; continue; }', replace: 'if (moved) { fails = 0; continue; }' },
   { rule: 'replaceVideo', find: 'const playlists = Array.isArray(oldEntry?.playlists) ? oldEntry.playlists : await findVideoPlaylists(oldId);', replace: 'const playlists = [];' },
   { rule: 'sidecar', find: 'if (unknown.length) {', replace: 'if (false) {' },
@@ -830,7 +833,7 @@ const MUTANTS = [
   { rule: 'agentLinux', find: "const dryScheduler = () => env('NO_SCHEDULER') === '1' || env('NO_LAUNCHCTL') === '1';", replace: 'const dryScheduler = () => false;' },
   { rule: 'setup', find: 'process.exit(r.ok ? 0 : 1);', replace: 'process.exit(0);' },
   { rule: 'settingsKeys', find: 'try { SETTINGS = readSettings(DIR); } catch (e) { log(e.message); process.exit(2); }', replace: "try { SETTINGS = readSettings(DIR); } catch (e) { SETTINGS = { timeZone: 'UTC', categoryId: '22' }; }" },
-  { rule: 'manifestViews', find: '...(v?.statistics ? { views: Number(v.statistics.viewCount ?? 0), likes: Number(v.statistics.likeCount ?? 0) } : {}),', replace: '' },
+  { rule: 'manifestViews', in: 'youtube/manifest.js', find: '...(v?.statistics ? { views: Number(v.statistics.viewCount ?? 0), likes: Number(v.statistics.likeCount ?? 0) } : {}),', replace: '' },
   // The words around a video (44i-2b): the server's wiring, then the rules in youtube/describe.js and youtube/captions.js.
   { rule: 'credits', find: 'const credits = creditsLine(SETTINGS.credits, a.credits, a.music, a.description);', replace: "const credits = '';" },
   { rule: 'updateChapters', in: 'youtube/describe.js', find: 'if (credits) text = text.split(credits).join', replace: 'if (false) text = text.split(credits).join', as: 'creditsOnce' },
@@ -908,7 +911,7 @@ const MUTANTS = [
   { rule: 'folderFilms', in: 'youtube/folder.js', find: 'try { if (!statSync(p).isFile()) continue; } catch { continue; }', replace: '', as: 'folderIsFile' },
   { rule: 'folderHidden', in: 'youtube/folder.js', find: 'if (/[\\/\\\\]\\.[^\\/\\\\]/.test(under)) throw', replace: 'if (false) throw' },
   { rule: 'folderMax', in: 'youtube/folder.js', find: 'if (films.length > FOLDER_MAX) throw', replace: 'if (false) throw' },
-  { rule: 'releasePlan', find: 'const slotMs = every % 24 === 0\n      ? zoneWall(y, mo, d + i * (every / 24), h, min, 0)\n      : slot0Ms + i * every * 3600_000;', replace: 'const slotMs = slot0Ms + i * every * 3600_000;' },
+  { rule: 'releasePlan', in: 'youtube/release.js', find: 'const slotMs = every % 24 === 0\n      ? zoneWall(y, mo, d + i * (every / 24), h, min, 0)\n      : slot0Ms + i * every * 3600_000;', replace: 'const slotMs = slot0Ms + i * every * 3600_000;' },
 ];
 
 function mutant(m) {

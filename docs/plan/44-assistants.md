@@ -216,7 +216,9 @@ through cords and preset patches, and the plate shader is untouched.
     films), so the Shorts check refuses it; reelreader's side is to cut a 9:16 copy of its
     best moment (with a `best.youtube.json` card carrying `short: true`), which is also what
     37c needs. Its own thread, in reelreader's files, after 47p-5.
-  - **44i-2c-2.** `mcp/youtube-mcp.js` is about 96 KB of the 100 KB ceiling. 44i-2d's analytics
+  - **44i-2c-2.** **Done 2026-11-28** (a pure move: the server 97,833 bytes before, 85,243
+    after; `mcp/youtube/manifest.js` 8,510 and `release.js` 7,081; `npm run youtube` unchanged).
+    `mcp/youtube-mcp.js` was about 96 KB of the 100 KB ceiling. 44i-2d's analytics
     cannot land in it: first a pure move (the manifest, or the release plan, into
     `youtube/`), then 2d beside it.
   - **44i-2c-3.** AVI and other kinds are not read, so a Short in one is refused ("export it
