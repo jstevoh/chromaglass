@@ -52,7 +52,7 @@ import { SIM_STEP, stepCurrentCpu, pressSheetKick } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
 import { layDrop, stepPlateDrops } from './dropSplash';
 import { layLift, layPress, type SpokesLay } from './pressLay';
-import { SolverSeeds, takeBack, addShare, scaleSince, OwedLay, dishMean } from './solverLay';
+import { SolverSeeds, captureWithOil, shareWithOil, scaledWithOil, clearCarriedArrays, OwedLay, dishMean } from './solverLay';
 import { makeDropQueue, dropsLive } from '../lib/dropImpact';
 import { besideStep } from '../gpu/besidePlate';
 import { mixWait } from './mixWait';
@@ -421,17 +421,9 @@ export class FluidSimulation {
   */
   private gpuLanded = false;
   private seed: Float32Array[] | null = null;
-  /*
-    The liquids that never cross to the CPU (the ferrofluid, the mix, the
-    reactions), handed from the last solver to this one (PLAN 9w; handOver
-    in gpu/fluid.ts says why a copy on the GPU). Kept until this solver's
-    first readback lands, for the same reason as the seed above: a solver
-    swapped out before it has spoken (out of memory straight after a climb,
-    or a second move inside a frame or two) hands the next one this, not
-    whatever it managed in a frame: on a solver that ran out of memory that
-    would be a copy of textures that were never made.
-  */
-  private carry: SolverCarry | null = null;
+  private seedOil: Float32Array | null = null;
+    // Kept until first readback for S3 fallback if the solver is swapped before speaking.
+    private carry: SolverCarry | null = null;
   private carried = false;
   /**
    * Whether the attached solver opened on what the one before it handed
@@ -631,6 +623,8 @@ export class FluidSimulation {
     this.rbDensity.set(this.density);
     this.rbVx.set(this.vx);
     this.rbVy.set(this.vy);
+    const carriedDye = this.carried && !!(this.carry as { dye?: unknown } | null)?.dye;
+    if (carriedDye) clearCarriedArrays(this.dye(), [this.vx, this.vy, this.temp]);
   }
 
   /** Bring the field back to the CPU arrays and release the GPU solver. */
@@ -691,12 +685,13 @@ export class FluidSimulation {
   /** The state a new solver opens on, kept for `restoreSeed`. */
   private keepSeed() {
     this.seed = copySeedArrays([this.densityR, this.densityG, this.densityB, this.density, this.vx, this.vy, this.temp], this.seed);
+    this.seedOil = this.oilAdd?.slice() ?? null;
   }
 
   /** Put the attached solver's opening state back; for a solver that never handed anything back. */
   private restoreSeed(): boolean {
     return applySeedArrays([this.densityR, this.densityG, this.densityB, this.density, this.vx, this.vy, this.temp], this.seed, () => {
-      this.wait.putBack(); this.restAfterRestore();
+      this.oilAdd = this.seedOil?.slice() ?? null; this.wait.putBack(); this.restAfterRestore();
     });
   }
 
@@ -1312,31 +1307,20 @@ export class FluidSimulation {
    * seeding is random) and the change flashed through several pictures.
    */
   captureSeed(lay: () => void): Float32Array[] {
-    const arrays = this.dye();
-    const before = arrays.map(a => a.slice()), onSolver = this.seeds.capture(lay), delta = takeBack(arrays, before);
-    this.seeds.keep(delta, onSolver);
-    this.dirty = true;
-    return delta;
+    const { seed, oilNext } = captureWithOil(this.seeds, this.dye(), () => this.oilAdd, lay);
+    this.oilAdd = oilNext; this.dirty = true;
+    return seed;
   }
 
   /** Add `k` of a captured seed (see `captureSeed`) to the plate. */
   addSeedShare(seed: Float32Array[], k: number): void {
     if (!(k > 0)) return;
-    this.seeds.share(seed, this.gpu, k);
-    addShare(this.dye(), seed, k);
+    this.oilAdd = shareWithOil(this.seeds, seed, this.gpu, this.dye(), this.oilAdd, k);
     this.dirty = true;
   }
 
-  /**
-   * A look's own seed laid at `w` of its strength (0..1), on top of what is
-   * there. A seed only adds to the four dye arrays (the state on the CPU
-   * path, the deltas pending on the GPU), so what it added scales either way.
-   */
   seedPresetScaled(presetId: string, noise2D: Noise2D, w: number): number[] {
-    const k = c01(w);
-    const before = this.dye().map(a => a.slice());
-    const harmony = this.seeds.scaled(k, () => this.seedPreset(presetId, noise2D));
-    scaleSince(this.dye(), before, k);
+    const harmony = scaledWithOil(this.seeds, this.dye(), () => this.oilAdd, c01(w), () => this.seedPreset(presetId, noise2D));
     this.dirty = true;
     return harmony;
   }
@@ -1906,8 +1890,9 @@ export class FluidSimulation {
       }
 
       case 'foam-cells':
-        // Pressed cells across the dish, rust water in the films (layFoamCells, src/lib/oilLay.ts, says why).
-        layFoamCells(this.rng.float, harmony.length, this.gpu?.N ?? S, S, (f) => this.gpu?.layOil?.(f), (x, y, d, k) => { const c = col(k); this.addDensity(x, y, d, c.r, c.g, c.b); });
+        layFoamCells(this.rng.float, harmony.length, this.gpu?.N ?? S, S, (f) => this.gpu?.layOil?.(f), (x, y, d, k) => {
+          const c = col(k); (k > 0 ? this.addOilDensity : this.addDensity).call(this, x, y, d, c.r, c.g, c.b);
+        });
         break;
 
       case 'turing-print': {
@@ -1970,7 +1955,7 @@ export class FluidSimulation {
       case 'lava-lamp': {
         // The wax as a liquid of its own, a pool and three bodies (PLAN 27f-9c; src/lib/oilLay.ts says why).
         const c = col(0);
-        layLavaLamp(S, this.wait.oil, (x, y, d) => this.addDensity(x, y, d, c.r, c.g, c.b));
+        layLavaLamp(S, this.wait.oil, (x, y, d) => this.addOilDensity(x, y, d, c.r, c.g, c.b));
         break;
       }
 

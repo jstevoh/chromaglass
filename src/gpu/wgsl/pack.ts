@@ -142,6 +142,36 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /**
+   * Packs each active layer's oil dye (`rgba8unorm` per texel) and oil share
+   * (`unorm16` mix.r) into the shared `oilDyeBuf` storage buffer for display
+   * (PLAN 47z-1b): header words `[off0, n0, off1, n1]` at `[0..3]`, then two
+   * `u32` words per texel starting at `A.off`.
+   */
+  packOil: /* wgsl */ `
+struct OilPackArgs {
+  n: u32,
+  off: u32,
+  pad0: u32,
+  pad1: u32,
+};
+@group(0) @binding(0) var<uniform> A: OilPackArgs;
+@group(0) @binding(1) var dye: texture_2d<f32>;
+@group(0) @binding(2) var oilDye: texture_2d<f32>;
+@group(0) @binding(3) var mixT: texture_2d<f32>;
+@group(0) @binding(4) var<storage, read_write> outBuf: array<u32>;
+const DENSITY_SCALE = 8.0;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (id.x >= A.n || id.y >= A.n) { return; }
+  let p = vec2i(id.xy);
+  let t = max(textureLoad(dye, p, 0), vec4f(0.0));
+  let o = clamp(textureLoad(oilDye, p, 0), vec4f(0.0), t);
+  let c = clamp(textureLoad(mixT, p, 0).r, 0.0, 1.0);
+  let k = A.off + 2u * (id.y * A.n + id.x);
+  outBuf[k] = pack4x8unorm(sqrt(clamp(o / DENSITY_SCALE, vec4f(0.0), vec4f(1.0))));
+  outBuf[k + 1u] = pack2x16unorm(vec2f(c, 0.0));
+}`,
+
+  /**
    * Packs dye (rgba8unorm, square-rooted over DENSITY_SCALE) and velocity +
    * species scatter (PACKED_VEL_FORMAT) into the composite layers in one pass.
    * The flow is in the solver's own units, signed, in half float; `u_flowRate`

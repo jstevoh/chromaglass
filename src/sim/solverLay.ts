@@ -75,6 +75,7 @@ export class SolverSeeds {
   /** The dish mean the solver's lays added since `took` last asked (dishSum cannot see them). */
   private mean = 0;
   private readonly held = new WeakSet<Float32Array[]>();
+  private readonly oilHeld = new WeakMap<Float32Array[], Float32Array>();
 
   /** Run `f` with a lay's share at once `k` (none stays none, inside a capture). */
   scaled<T>(k: number, f: () => T): T {
@@ -97,12 +98,16 @@ export class SolverSeeds {
     return laid;
   }
 
-  /** Mark a captured seed as holding a lay on the solver. */
-  keep(seed: Float32Array[], onSolver: boolean): void { if (onSolver) this.held.add(seed); }
+  /** Mark a captured seed as holding a lay on the solver, and any captured `oilAdd` delta. */
+  keep(seed: Float32Array[], onSolver: boolean, oilDelta?: Float32Array | null): void {
+    if (onSolver) this.held.add(seed);
+    if (oilDelta) this.oilHeld.set(seed, oilDelta);
+  }
 
-  /** A share of a captured seed: the solver's part of it, if it holds one. */
-  share(seed: Float32Array[], gpu: PlateSolver | null, k: number): void {
+  /** A share of a captured seed: the solver's part of it, and any oil-colour share. */
+  share(seed: Float32Array[], gpu: PlateSolver | null, k: number): Float32Array | null {
     if (this.held.has(seed)) gpu?.layShare?.(k);
+    return this.oilHeld.get(seed) ?? null;
   }
 
   /**
@@ -244,6 +249,69 @@ export class OwedLay {
     }
     lay(o.look, o.noise, o.dyes);
   }
+}
+
+/** Sum `k` of a captured oil-dye delta into `oilAdd`, allocating on first pour. */
+export function addOilShare(oilAdd: Float32Array | null, delta: Float32Array | null, k: number): Float32Array | null {
+  if (!delta || !(k > 0)) return oilAdd;
+  const out = oilAdd ?? new Float32Array(delta.length);
+  for (let i = 0; i < delta.length; i++) out[i] += delta[i] * k;
+  return out;
+}
+
+/** Take back any oil-dye added since `before`, leaving `oilAdd` as `before` and returning the delta. */
+export function takeBackOil(oilAdd: Float32Array | null, before: Float32Array | null): { next: Float32Array | null; delta: Float32Array | null } {
+  if (!oilAdd) return { next: before, delta: null };
+  if (!before) return { next: null, delta: oilAdd };
+  const d = new Float32Array(oilAdd.length);
+  for (let i = 0; i < oilAdd.length; i++) { d[i] = oilAdd[i] - before[i]; oilAdd[i] = before[i]; }
+  return { next: oilAdd, delta: d };
+}
+
+/** Scale any oil-dye added since `before` by `k`. */
+export function scaleOilSince(oilAdd: Float32Array | null, before: Float32Array | null, k: number): void {
+  if (!oilAdd) return;
+  for (let i = 0; i < oilAdd.length; i++) {
+    const b = before ? before[i] : 0;
+    oilAdd[i] = b + (oilAdd[i] - b) * k;
+  }
+}
+
+/** Capture `lay` into a delta across dye arrays and `oilAdd`, leaving the plate untouched until `shareWithOil`. */
+export function captureWithOil(
+  seeds: SolverSeeds, dye: Float32Array[], getOil: () => Float32Array | null, lay: () => void,
+): { seed: Float32Array[]; oilNext: Float32Array | null } {
+  const before = dye.map(a => a.slice()), prevOil = getOil(), beforeOil = prevOil ? prevOil.slice() : null;
+  const onSolver = seeds.capture(lay), delta = takeBack(dye, before);
+  const oil = takeBackOil(getOil(), beforeOil);
+  seeds.keep(delta, onSolver, oil.delta);
+  return { seed: delta, oilNext: oil.next };
+}
+
+/** Add `k` of a captured seed (dye, solver lay, and `oilAdd`). */
+export function shareWithOil(
+  seeds: SolverSeeds, seed: Float32Array[], gpu: PlateSolver | null, dye: Float32Array[], oilAdd: Float32Array | null, k: number,
+): Float32Array | null {
+  const next = addOilShare(oilAdd, seeds.share(seed, gpu, k), k);
+  addShare(dye, seed, k);
+  return next;
+}
+
+/** Scale any dye and `oilAdd` laid during `lay` by `k`. */
+export function scaledWithOil<T>(
+  seeds: SolverSeeds, dye: Float32Array[], getOil: () => Float32Array | null, k: number, lay: () => T,
+): T {
+  const before = dye.map(a => a.slice()), prevOil = getOil(), beforeOil = prevOil ? prevOil.slice() : null;
+  const out = seeds.scaled(k, lay);
+  scaleSince(dye, before, k);
+  scaleOilSince(getOil(), beforeOil, k);
+  return out;
+}
+
+/** Zero CPU dye and flow arrays when a fresh GPU solver took them at its own resolution (`9z`). */
+export function clearCarriedArrays(dye: Float32Array[], flow: Float32Array[]): void {
+  for (const a of dye) a.fill(0);
+  for (const a of flow) a.fill(0);
 }
 
 /** The dish's mean dye inside the open rim, each cell capped at 6 (seedPreset's measure of what a look laid). */

@@ -53,10 +53,8 @@ import { AIR_RIM_WGSL } from './air';
 
 export const BUBBLE_SHAPE_WGSL = /* wgsl */ `
 ${AIR_RIM_WGSL}
-/** The bubbles as the air field was last stamped from them (WebGPUAir.geo): x, y, r (fluid uv), opacity. */
-@group(0) @binding(20) var<storage, read> airDiscs: array<vec4f>;
-/** And their rims: fingering, how many, phase, film. */
-@group(0) @binding(21) var<storage, read> airRims: array<vec4f>;
+/** The bubbles as the air field was last stamped from them (WebGPUAir.geo): interleaved disc and rim pairs. */
+@group(0) @binding(20) var<storage, read> airGeo: array<vec4f>;
 
 /** A bubble at a point: where its centre is taken to be, its radius, its film, its number, and how opaque this pixel of it is. */
 struct AirHere {
@@ -87,9 +85,9 @@ fn airIndex(v: f32) -> i32 {
   clip space's y-up, as the stamp reads it.
 */
 fn airDisc(fuv: vec2f, i: i32) -> vec4f {
-  let d = airDiscs[i];
+  let d = airGeo[2 * i];
   let off = fuv - d.xy;
-  let edge = rimAt(atan2(-off.y, off.x), airRims[i]) * d.z;
+  let edge = rimAt(atan2(-off.y, off.x), airGeo[2 * i + 1]) * d.z;
   return vec4f(off / max(edge, 1e-6), d.z, edge - length(off));
 }
 
@@ -105,7 +103,7 @@ fn airHere(fuv: vec2f, looks: vec4f, airC: vec4f, spx: f32, dropCam: f32) -> Air
   var best = -1;
   var bestIn = -1e9;
   var bestD = vec4f(0.0);
-  let n = i32(arrayLength(&airDiscs));
+  let n = i32(arrayLength(&airGeo)) / 2;
   for (var j = 0; j < 4; j++) {
     let i = airIndex(looks[j]);
     if (i >= 0 && i < n) {
@@ -114,14 +112,15 @@ fn airHere(fuv: vec2f, looks: vec4f, airC: vec4f, spx: f32, dropCam: f32) -> Air
     }
   }
   if (best >= 0) {
-    let rim = airRims[best];
+    let d = airGeo[2 * best];
+    let rim = airGeo[2 * best + 1];
     o.geo = vec3f(fuv - bestD.xy * bestD.z, bestD.z);
-    o.centre = airDiscs[best].xy;
+    o.centre = d.xy;
     o.rim = bestIn + length(fuv - o.centre);
     o.film = clamp(rim.w, 0.0, 1.0);
     o.id = (floor(fract(rim.z / 6.2831853) * 7.99) + 0.5) / 8.0;
     // An edge one screen pixel wide, on the rim, in both views.
-    o.opac = clamp(airDiscs[best].w, 0.0, 1.0) * clamp(0.5 + bestIn / spx, 0.0, 1.0);
+    o.opac = clamp(d.w, 0.0, 1.0) * clamp(0.5 + bestIn / spx, 0.0, 1.0);
     return o;
   }
   // Air the list did not lay: drawn from the field, as every bubble was.

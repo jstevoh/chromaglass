@@ -26,8 +26,11 @@ export type GroupNode = { kids: Map<unknown, GroupNode>; group?: GPUBindGroup };
 
 export interface FieldCarry extends SolverCarry {
   readonly device: GPUDevice;
+  readonly dye: GPUTexture | null;
+  readonly vel: GPUTexture | null;
   readonly phase: GPUTexture | null;
   readonly mix: GPUTexture | null;
+  readonly oilDye: GPUTexture | null;
   readonly rxn: GPUTexture | null;
   readonly lies: GPUTexture | null;
   readonly surfaceHeight: GPUTexture | null;

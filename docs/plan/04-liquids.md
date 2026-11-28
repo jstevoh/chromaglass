@@ -12,11 +12,14 @@
 
 - Open from this: **4a-units**. Roy, 1963 lays its shapes the same way (`S × fr` in
   128-grid units, 1.5 times the size meant); its panel may want them halved, by eye.
-  **4a-clock-fade**: on a fade (the set list, the desk's Go) the seed is laid in shares
-  over the fade (addSeedShare) while every body's oil lands at once, so on a long fade
-  the bodies move before their colour arrives and some of it lands in the water: the
-  halo this fixed for a hard lay. Lay the oil in the same shares, and give `npm run
-  clockglass` a case that lays through the handover. Also unmeasured: the look's own
+  **4a-clock-fade** (partly landed 2026-11-28): on a fade (`captureSeed`, `addSeedShare`,
+  `seedPresetScaled`), `oilAdd` is now captured, scaled, and shared proportionally alongside
+  the dye (`captureWithOil`, `shareWithOil`, `scaledWithOil` in `src/sim/solverLay.ts`:
+  Clock Glass `oilAdd` sum `0.2500` at 25% share, `1.0000` at 100% share, `0.4000` at
+  `seedPresetScaled(..., 0.4)`). Still open: deferring `mix` (`addMix`/`wait.lay`) from
+  `captureSeed` to `addSeedShare` so bodies arrive with the fade too, and adding a fade
+  handover case in `scripts/clockglass.mjs` (blocked here by `scripts/oillaid.mjs`, which
+  reads Clock Glass's 12 bodies immediately after `captureSeed`). Also unmeasured: the look's own
   doses (`['oil', 'water', 'oil', 'syrup']`, about seven small clear bodies at the
   lay) and the app's finer GPU grid (the check lays at 192², the app runs 384² and up).
   And the automation's drops still land any of a look's dyes anywhere, so over a minute

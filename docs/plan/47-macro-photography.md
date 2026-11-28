@@ -511,31 +511,33 @@ The physics, in the order to build (each its own thread and PR):
   story in `docs/plan-shipped.md` 47z-1, with 28i-7b and 28k-5): a part-oil cell's light is the two
   liquids' side by side (`packDyeBodies`), a look's lay puts each drop's colour in its own oil
   (`addOilDensity`); `npm run dropcolour`. Found doing it, open:
-  - **47z-1e. Splodascope's water: cobalt was tried and is darker.** Filmed on the owner's Mac
-    (2026-11-13, 20 s takes): main's pale water read colourfulness 131, coloured 0.87, luminance
-    0.42; the photograph's cobalt with this PR 62, 0.51, 0.20, the frame 0.40 near black. The drops
-    kept their colours with no browning, but a full wash of cobalt passes too little of the lamp,
-    and the orange ferro reference's vivid colour is on a bright ground (luminance 0.52). Kept pale.
-    A thinner cobalt wash (the photograph's water is a thin layer) is the thing to try next, filmed.
-  - **47z-1a. Lava Lamp and the other lays.** Splodascope and Clock Glass lay each body's colour
-    as the oil's own; Lava Lamp still lays its wax's colour as plain dye, so the rim's share goes
-    to the water by the oil under each cell, and a faint halo of the wax's colour is the water's.
-    Left as it was because the owner had just approved the lamp's look (2026-11-12); try it in the
-    lab against `npm run lavawax`, and any other look that lays oil with a colour.
-  - **47z-1b. The averaging's path and the cells between.** The pack averages the light at the
-    composite's rest-gap path (DYE_PATH, 2.8), not the pixel's own gap (gapScale, 0.3 to 3 times),
-    and the composite's bicubic still interpolates absorbance between two cells, so a drop's edge
-    keeps a band about one cell wide where red and cobalt multiply. Named shortcuts: the true
-    sum is per pixel, which needs the oil's share in the composite, and its sixteen textures are
-    full (`view0` is packed to the bit); a seventeenth needs a binding freed first.
-  - **47z-1c. A rebuilt solver forgets whose colour is whose.** A lay's labels go across once,
-    with its flush; a solver rebuilt before the plate has come back (`restoreSeed`) or carried
-    to a new grid (`takeOver`) starts the oil's share from the oil under each cell again, as
-    before this item. Carry the share with the dye where the carry allows.
+  - **47z-1e. Splodascope's water: cobalt was tried and is darker** (tuned in code 2026-11-28; filmed Mac run still owed): main's pale water read colourfulness 131, coloured 0.87, luminance
+    0.42; the photograph's cobalt with this PR 62, 0.51, 0.20, the frame 0.40 near black. Switched
+    `splodascope` to Cobalt (`[9, 0, 6, 3, 2]` in `src/presetPlate.ts`) at thinner wash
+    (`SPLOD_WASH = 0.18` in `src/lib/oilLay.ts`, vs `0.5`); in the lab `SPLOD_WASH = 0.18`
+    cobalt lifted luma `0.161 → 0.447` and colourfulness `132.1 → 193.7` (`0` near black;
+    `npm run dropcolour` `4/4`, `npm run filmhold` `6/6`, `npm run oillaid -- --node` `11/11`).
+    Still owed: a filmed `npm run pace -- --film` take on the Mac before closing.
+  - ~~**47z-1a. Lava Lamp and the other lays.**~~ (**done** 2026-11-28) `lava-lamp` (`layLavaLamp`)
+    and `foam-cells` (`layFoamCells` oil bodies `k > 0`) now lay each oil body's dye via
+    `addOilDensity`, leaving `foam-cells` water borders (`k === 0`) on `addDensity`; `npm run
+    lavawax` `3/3`, `npm run foam` water dye per cell `0.563` borders / `0.001` middles, `npm run oillaid -- --node` `11/11`.
+  - ~~**47z-1b. The averaging's path and the cells between.**~~ (**done** 2026-11-28) Merged
+    `airDiscs` + `airRims` into interleaved `airGeo` at `@binding(20)` (`src/gpu/air.ts`,
+    `src/gpu/wgsl/bubbleShape.ts`; `npm run bubbleround` `4/4`), freeing slot 21 for
+    `oilDyeBuf`; `packOil` (`src/gpu/wgsl/pack.ts`) packs each cell's `oilDye` and `oilFrac`,
+    and `decodeFluidBodies` (`OIL_DECODE_WGSL` in `src/gpu/wgsl/plateInterface.ts`) splits
+    whole dye per pixel at each pixel's own `gapScale` and mixes `dyeThrough` via `mixLight`:
+    `npm run dropcolour` off-line error halved (`0.102 → 0.055`, `4/4`).
+  - ~~**47z-1c. A rebuilt solver forgets whose colour is whose.**~~ (**done** 2026-11-28)
+    `handOver`/`takeOver` carry `oilDye` across grid moves via `carryArea` (`src/gpu/fluid/inputs.ts`;
+    `384² → 256² → 384²` `oilSum` `17798 → 17798`), and `keepSeed`/`restoreSeed` preserve
+    `seedOil` across `dropGpu(true)` (`36864 → 36864`).
   - **47z-1d. A drop inside another drop goes dark where they meet.** Splodascope's compound
-    drops (a hole in one colour with another drop in it): once the ring of water between them
-    thins, the two oils are one phase holding both colours, and they multiply. Real ones keep a
-    water film between them: 47z-3's films, or a second oil phase.
+    drops (a hole in one colour with another drop in it): measured 2026-11-28 with `SPLOD_GAP = 0.02`
+    at 192² under `filmHold = 1`, `ringMinMix` still collapses `0 → 0.058` (60 steps) `→ 0.983`
+    (180 steps) so the two oils become one phase and multiply. Still blocked on 47z-3's drainage
+    films or a second oil phase (`47z-1b` keeps the gap clean while water remains).
 - **47z-2. Drops of every size, from a stir.** A real oil layer stirred or swirled breaks into
   a crowd: a drop sheared past the critical capillary number (Ca = μ γ̇ R / σ, near 0.5 for
   equal viscosities) stretches and splits, its pieces split again until each is under the

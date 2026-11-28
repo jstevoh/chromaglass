@@ -256,7 +256,7 @@ Open follow-ups:
 
 Left from 18h, each its own item:
 
-- **18h-1. Flux-form dye transport and removal of MacCormack clamp.** The dye advection stage currently uses MacCormack backtracing with neighbor bounding clamps, which causes minor mass drift (~0.4% over 60 steps) under shear flow. Moving dye advection to a conservative flux form across faces will allow removing the clamp and guaranteeing exact mass conservation during both advection and dispersion.
+- **18h-1. Flux-form dye transport and removal of MacCormack clamp.** The dye advection stage on the open plate (`!thinGap && !bodiesOn` in `src/gpu/fluid.ts`) still uses MacCormack backtracing with neighbor bounding clamps (`npm run dispersion` check 4: `+0.435%` delta across 60 steps; `thinGap` plates already use flux-form `bodyAdvect` and `npm run grating` stays within `+1.21 ppm/s`). Switching the open-plate branch off `macCormack` is blocked here because `scripts/encode-owed.mjs` (`46g` / `H2c-5`, run by CI `npm run encode -- --owed=h2c1,h2c3,h2c2`) explicitly asserts `1` MacCormack correction + `3` carries without liquids (`3` and `7` with liquids); needs `encode-owed.mjs` updated in a check-authorized change alongside the open-plate switch.
 - **18h-2. Dye spreads along the flow (visible streaking).** On show timescales ($t \ll 25\text{ hours}$ across 6 mm gap), shear dispersion is in the unsteady pre-asymptotic regime ($\sigma^2 \approx 0.2 v^2$). This draws the dye out into visible streaks along the flow. It requires a multi-layer or sub-stepped flux scheme to model the flow's shear without capping the dispersion at the explicit face flux limit.
 
 ## 18k. Smaller ones
