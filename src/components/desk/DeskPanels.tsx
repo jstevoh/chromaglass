@@ -636,14 +636,14 @@ function RecipeBody({ p }: { p: DeskProps }) {
 
 function BottlesBody({ p }: { p: DeskProps }) {
   return (
-    <div className="grid grid-cols-3 gap-1" data-testid="bench-left">
+    <div className="grid grid-cols-4 gap-0.5" data-testid="bench-left">
       {[...p.dyeBottles, ...p.behaviourBottles].map(l => (
         <button
           aria-pressed={p.bottleId === l.id}
           key={l.id}
           onClick={() => p.onBottle(l.id)}
           title={l.behaviour ? `${l.name}: changes the plate where it lands` : l.name}
-          className={`flex min-h-[28px] min-w-0 items-center gap-1 rounded-md border px-1 py-0.5 text-left transition-colors ${
+          className={`flex min-h-[26px] min-w-0 items-center gap-1 rounded-md border px-1 py-0.5 text-left transition-colors ${
             p.bottleId === l.id ? LIT : 'border-transparent text-muted hover:bg-hover hover:text-text'
           }`}
           data-testid={`bottle-${l.id}`}
@@ -657,7 +657,7 @@ function BottlesBody({ p }: { p: DeskProps }) {
           {p.bottleId === l.id
             ? <LiveBottle colour={bottleSwatch(l).backgroundColor} read={p.dyeRoom} testId="bottle-in-hand" />
             : <Bottle colour={bottleSwatch(l).backgroundColor} level={1} />}
-          <span className="min-w-0 flex-1 text-[12px] font-medium leading-[1.15] line-clamp-2">{l.name}</span>
+          <span className="min-w-0 flex-1 text-[11px] font-medium leading-[1.15] line-clamp-2">{l.name}</span>
         </button>
       ))}
     </div>

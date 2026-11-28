@@ -71,6 +71,8 @@ export interface LiquidDeposit {
   /** The bottle's ethanol and anise oil (PLAN 48s): into the GPU's solvent field with the species; nothing here reads them. */
   ethanol?: number;
   anise?: number;
+  /** Bioluminescent plankton (PLAN 48c-1): into GlowPlate's plankton concentration field via `onDeposit`. */
+  plankton?: number;
 }
 
 /**

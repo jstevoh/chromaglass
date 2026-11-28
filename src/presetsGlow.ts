@@ -79,6 +79,7 @@ export const NIGHT_SEA: Preset = {
     glassSmear: 0,
     rainDrip: 0,
     viscosity: 'thin',
+    gapThickness: 0,
     evaporationRate: 0.002,
     airVelocity: 0.02,
     vibrationFrequency: 0.05,

@@ -776,7 +776,7 @@ export class FluidInputs extends FluidPasses {
    * for a check that needs a pool in place (`npm run thick`). Only on a thin
    * gap; in plate units.
    */
-  pour(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number; weight?: number; ethanol?: number; anise?: number } | null, volume = true, what?: { tension?: number; density?: number; weight?: number }, plateSigma = LIQUID_SIGMA): void {
+  pour(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number; weight?: number; ethanol?: number; anise?: number } | null, volume = true, what?: { tension?: number; density?: number; weight?: number; plankton?: number }, plateSigma = LIQUID_SIGMA): void {
     if (!(radius > 0) || !(take > 0)) return;
     const enc = this.device.createCommandEncoder({ label: 'pour' });
     const pass = enc.beginComputePass({ label: 'pour' });
@@ -815,6 +815,13 @@ export class FluidInputs extends FluidPasses {
         this.solventLive = true;
       }
       if (this.solventLive && this.cloudFresh) this.writeCloudView(pass);
+    }
+    const plankton = (what as { plankton?: number } | undefined)?.plankton ?? 0;
+    if (plankton > 0 || (this.glowPlate && !push)) {
+      if (this.glowPlate) this.glowPlate.pour(x, y, radius, take, plankton, push, this.squeeze.read);
+      else if (plankton > 0) {
+        if (this.pendingPlankton.length < 32) this.pendingPlankton.push({ x, y, r: radius, take, plankton, push });
+      }
     }
     if (push) {
       this.hsRun(pass, 'pourVolume', 'pourVolume', this.arg('pour volume', [x, y, radius, take]), [this.hsPour!]);
@@ -1089,6 +1096,8 @@ export class FluidInputs extends FluidPasses {
     this.speciesClears++;
     this.speciesPoured = null;
     this.speciesSnap = null;
+    this.pendingPlankton.length = 0;
+    this.glowPlate?.reset();
     // With the oil gone its colour is the water's: the share is emptied, the dye kept.
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;

@@ -40,6 +40,14 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
   // The carrier, and therefore the zero of both scales.
   { id: 'water',   name: 'Water',   color: '#4488ff', own: '#ffffff', description: 'Flows freely, spreads evenly',         injectRadius: 3, injectAmount: 0.6, heatAmount: 0.05,
     behaviour: { weight: 0, polarity: 0 } },
+  /*
+    Bioluminescent dinoflagellates in seawater (PLAN 48c-1): clear in daylight
+    or under a lamp, and glowing blue where sheared when Glow is up. Poured
+    into a plate it adds a drifting patch of bloom; pouring clear water
+    beside it flushes and thins the patch.
+  */
+  { id: 'plankton', name: 'Plankton', color: '#ffffff', own: '#ffffff', description: 'Seawater full of bioluminescent plankton: glows blue where sheared, carried and thinned by the flow', injectRadius: 4, injectAmount: 0.4, heatAmount: 0.0,
+    behaviour: { plankton: 1 } },
   // Lighter than water and about as unlike it as a kitchen gets: it rides up
   // over water and will not mix with it.
   { id: 'oil',     name: 'Oil',     color: '#faf6cc', own: '#faf6cc', description: 'Lighter than water and will not mix with it — rides up and beads',  injectRadius: 2, injectAmount: 1.4, heatAmount: 0.0,

@@ -101,7 +101,7 @@ const UNITS: Record<string, (v: number) => string> = {
   soapFilmRate: v => `${v.toFixed(2)}×`,
   soapFilmAngle: v => `${Math.round(v)}°`,
   soapFilmTilt: v => `${Math.round(v)}°`,
-  glowShear:  v => `${Math.round(v)}/s`,
+  glowShear:  v => `${Math.round(v)} mPa`,
   glowRecharge: v => `${v.toFixed(1)} s`,
   lensStop:   v => `f/${v.toFixed(1)}`,
   sideLightHue: v => `${Math.round(v)}°`,

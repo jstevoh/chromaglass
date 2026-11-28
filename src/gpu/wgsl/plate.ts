@@ -218,24 +218,6 @@ fn groundOf(bg: vec3f) -> vec3f {
 }
 
 /*
-  More or less of the dye than the decode read, as a power of what it lets
-  through. Between the decode and the composite a few things scale how much
-  dye is at a point, and do it to the opacity: the dish's edge, the
-  pigment's grain, the back plate's level in the mixer. On a lamp ground
-  each is the amount of dye, so it is the exponent: half the dye, T^0.5.
-
-  The gooey edge's contrast is left out on purpose. It is an opacity curve
-  (thin dye thinner, thick dye thicker, so a blob's edge reads crisp on
-  black), and as an amount it bent Beer and Lambert itself: with it in, a
-  plate of dye twice as deep let through 0.16 of the green where the law
-  says 0.09 (npm run lamp). Its blur, which merges blobs, is in the amount
-  already, through the density the decode reads.
-*/
-fn throughScaled(through: vec3f, k: f32) -> vec3f {
-  return pow(max(through, vec3f(1e-6)), vec3f(clamp(k, 0.0, 4.0)));
-}
-
-/*
   The look's saturation grade, which keeps the hue (PLAN 18l).
 
   It was mix(luma, c, s) and then a clamp of each channel to 0..1. Most
@@ -396,7 +378,7 @@ fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) ->
   */
   let body = clamp(U.colourBody, 0.0, 1.0);
   let amount = mix(mix(totalDensity * 2.8, exposed, U.exposure), exposed, m) * gapScale * (1.0 + 3.0 * body);
-  if (U.lampGround > 0.001) { dyeThrough = lampThrough(unit, amount); }
+  if (U.lampGround > 0.001 || U.glow > 0.001) { dyeThrough = lampThrough(unit, amount); }
   // Written out as it always was, not as amount × the fudge: the same
   // product in another order can round a byte apart, and at Lamp Ground 0
   // the picture is today's to the byte (npm run lamp).
@@ -971,7 +953,7 @@ fn decodeFluidRaw(raw: vec4f) -> vec4f {
   let c = lightThrough(unit, totalDensity);
   let darkness = 1.0 - max(c.r, max(c.g, c.b));
   let amount = mix(totalDensity * 2.8, max(0.0, totalDensity - U.filmLevel) * U.filmGain, clamp(U.macroOn, 0.0, 1.0));
-  if (U.lampGround > 0.001) { dyeThrough = lampThrough(unit, amount * gapScale); }
+  if (U.lampGround > 0.001 || U.glow > 0.001) { dyeThrough = lampThrough(unit, amount * gapScale); }
   let thickness = amount * (1.0 + darkness * 1.7) * filmWater;
   return vec4f(c, min(mix(0.95, 0.995, clamp(U.macroOn, 0.0, 1.0)), 1.0 - exp(-thickness)));
 }
@@ -2379,7 +2361,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   let lampScreen = projectorLamps();
 
   var outColor = bgColor;
+  var glowFilter = vec3f(1.0);
   if (U.photo > 0.5) {
+    glowFilter = throughScaled(through0, more0) * ft0;
     let a = fluid0.a;
     var tr = pow(fluid0.rgb, vec3f(1.0 + 0.9 * a));
     let trl = dot(tr, vec3f(0.299, 0.587, 0.114));
@@ -2402,8 +2386,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     let t0 = milkTransmission(through0, vel0, fuv0, layerGap0);
     milkScatter = sc0;
     milkGap = layerGap0;
+    let glowT0 = select(more0, dish0.x * select(1.0, fluid0.a / max(film0, 1e-4) * lampGrain0, film0 > 0.004), U.lampGround > 0.001);
+    glowFilter = throughScaled(through0, glowT0) * ft0 * exp(-vec3f(0.85, 0.95, 1.20) * (sc0 * 0.90) * layerGap0);
     outColor = onGround(filmDyePaint(outColor, ft0, 1.0), vec4f(filmDyePaint(fluid0.rgb, ft0, 0.0), fluid0.a),
-      throughScaled(t0, select(more0, dish0.x * select(1.0, fluid0.a / max(film0, 1e-4) * lampGrain0, film0 > 0.004), U.lampGround > 0.001)) * reliefOf(fluid0.rgb, tint0, alpha0) * ft0);
+      throughScaled(t0, glowT0) * reliefOf(fluid0.rgb, tint0, alpha0) * ft0);
     milkScatter = 0.0;
 
     /*
@@ -2695,6 +2681,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         }
         let lit = outColor * exp(-film * vec3f(0.45, 0.7, 1.0)) * (1.0 + 0.6 * lens * amt);
         phaseCover = cover;
+        glowFilter *= mix(vec3f(1.0), exp(-depth * vec3f(0.45, 0.7, 1.0)), cover);
         outColor = mix(lit, pc, cover);
       }
     }
@@ -2753,6 +2740,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let depth = max(own.r, max(own.g, own.b));
       let w = U.phIndicator * clamp(abs(a) * 10.0, 0.0, 1.0);
       let tint = exp((own - depth * k) * w);
+      glowFilter *= tint;
       outColor = chemOnGround(outColor, min(outColor * tint, vec3f(1.0)), tint, 1.0);
     }
     // The BZ reaction in ferroin: red where the catalyst is reduced, blue
@@ -2777,7 +2765,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   if (U.thinFilm > 0.001 && film0 > 0.004 && film0 < 0.4) {
     outColor = thinFilmOver(outColor, film0, bare0, layer0, fuv0, blurFluid, useBlur, dof);
   }
-  outColor = coversOver(outColor, fuv0);
+  if (U.dishSpread > 0.001) { glowFilter *= dish0.x; }
+  outColor = coversOver(outColor, fuv0, glowFilter);
 
   // ── The mixer: the front plate's grade and level ─────────────────
   // Its level fades the plate back to the bare lamp under it.
