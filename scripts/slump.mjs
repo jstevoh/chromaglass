@@ -71,7 +71,10 @@
  *  13. and the same on a 1024² plate
  *  14. the grid's checkerboard filter (dampGrid) makes no dye at a drop's
  *      rim and does not move its front: the glycerine drop of 7, run once
- *      with the filter on (as every look has it) and once with it off, has
+ *      with the filter forced on at GRID_DAMP (0.05, the old plate's; since
+ *      18a-8b, #1024, the thin gap runs none, so a run at the look's own
+ *      setting read 0 cells changed and failed the guard below) and once
+ *      with it off, has
  *      the bare run's total to within 0.01% at 2 s and 20 s, and its front
  *      (the radius at 2% of the peak) within 0.05 mm of the bare run's (a
  *      cell here is 0.78 mm, and one cell more over the contour moves the
@@ -117,8 +120,9 @@
  * Not covered here: the oil's share (a cell of oil holds no current) and a
  * step other than 1/60 s.
  *
- * The grid's checkerboard filter (dampGrid, GRID_DAMP a step on every look
- * with no Diffusion Rate) is on in 1 to 11, as the app has it (PLAN 18m-5a).
+ * The grid's checkerboard filter (dampGrid, GRID_DAMP a step on the old
+ * plate with no Diffusion Rate) runs as the app has it in 1 to 11, which
+ * since 18a-8b (#1024) is not at all on the thin gap (PLAN 18m-5a had it on).
  * Until 18m-5 it was off here: it clamped its high-pass to the 3×3
  * neighbourhood's range, a drop's rim is where that clamp bites, and it
  * moved the glycerine drop's front 0.72 mm in 20 s and added 3.2% to its dye
@@ -280,7 +284,8 @@ const g0 = 9.81 * 0.02, g1 = 9.81 * 0.15;
 
 const water = await drop([0, 5, 20, 30], { gapThickness: 0, solutalBuoyancy: 0 });
 const heavy = await drop([0, 20], { gapThickness: 0, solutalBuoyancy: 1 });
-const syrup = await drop([0, 2, 20], { gapThickness: 1, solutalBuoyancy: 0 }, false, 256, true);
+// The grid filter forced on (GRID_DAMP, 0.05): the thin gap has run none since 18a-8b (#1024), and 14 is about the filter where it runs.
+const syrup = await drop([0, 2, 20], { gapThickness: 1, solutalBuoyancy: 0, gridDamp: 0.05 }, false, 256, true);
 const syrupBare = await drop([0, 2, 20], { gapThickness: 1, solutalBuoyancy: 0, gridDamp: 0 }, false, 256, true);
 const clear = await drop([0, 10], { gapThickness: 0, solutalBuoyancy: 0 }, true);
 // 18h calibrated diff: 0.0002 to physical molecular diffusion (Dm ≈ 4e-10 m²/s),

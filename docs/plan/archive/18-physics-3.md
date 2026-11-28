@@ -11,7 +11,7 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
 - ~~**18m-5b. The grid filter's three passes each work out the stencil again.**~~ **Shipped**: `dampGridCurv` stores c, `dampGrid` writes only near a clamp and reads β once per workgroup; the dye is the same to the bit, and the stage's Metal time fell by a third to a half; story in [`docs/plan-shipped.md`](docs/plan-shipped.md).
 - ~~**18m-5c. The grid filter still reshapes a slumping drop's edge.**~~ **Shipped**: `[lo, hi]` is held to `here` unless the cross-curvature `m = δx²δy²f` oscillates along both grid axes (`ax & ay` in `dampGridCurv`, `dampGridLimit`, `dampGrid`), `npm run slump` 14b holds the 2% front to +0.000 mm of the bare run's at 2 s and 20 s, and `--owed=front` is removed from `scripts/checks.json`; story and numbers in [`docs/plan-shipped.md`](docs/plan-shipped.md).
 - ~~**18m-1a. Implicit backward-Euler slump step and grid-independent inertial flux.**~~
-  **Shipped** (this PR, thread "Build the implicit slump"). The explicit substeps (`SLUMP_SUBSTEPS =
+  **Shipped** (#1038). The explicit substeps (`SLUMP_SUBSTEPS =
   20` against `SLUMP_FACE = 0.24`) and the per-face `min(a, 0.24)` guard are gone: the slump is a
   backward-Euler step `(I − Δt∇·K∇)A = Aⁿ` with lagged K, red-black sweeps from Aⁿ (`slumpSmooth`)
   and the fluxes taken from what they reach (`slumpApply`), so the dye is kept exactly whether the
