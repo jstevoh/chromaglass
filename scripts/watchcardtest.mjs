@@ -511,6 +511,17 @@ async function runSuite(mods, dir, clips, only = null) {
       parserOk && unknownKeys.length === 0 && physicsBeforeGrade && vsSum.includes('## Settings to try')
         && vsSum.includes('## Report card (side by side') && raiseMatch,
       `parserOk=${parserOk}, unknown=[${unknownKeys.join(',')}], physicsFirst=${physicsBeforeGrade}, colLine="${colLine.slice(0, 90)}"`);
+
+    // (h2) the same --vs watch with a config that names no settings map (a
+    // packaged copy watching some other app's film, PLAN 47p-1) leaves the
+    // section out and keeps the rest: the comparison still ran.
+    const bare = path.join(dir, 'bare.config.json');
+    fs.writeFileSync(bare, '{}');
+    const rBare = await rw(clips.grey, { out: path.join(dir, 'out-vs-bare'), vs: rPlain.out, settings: settingsFile, rate: 4, quiet: true, config: bare });
+    const bareSum = fs.readFileSync(path.join(rBare.out, 'summary.md'), 'utf8');
+    rec('h2', 'settings: with no settingsMap in the config, --vs leaves "Settings to try" out and still compares',
+      !bareSum.includes('## Settings to try') && bareSum.includes('## Report card (side by side') && vsSum.includes('## Settings to try'),
+      `bare has section=${bareSum.includes('## Settings to try')}, bare compared=${bareSum.includes('## Report card (side by side')}`);
   }
 
   return out;
@@ -527,7 +538,8 @@ async function runMutant(m, clips, tmpRoot) {
   const mDir = fs.mkdtempSync(path.join(tmpRoot, `mut-${m.id}-`));
   try {
     for (const f of fs.readdirSync(HERE)) {
-      if (/^watch.*\.mjs$/.test(f) && f !== 'watchcardtest.mjs') {
+      // reelreader.config.json too: without it the copy would watch with no settings map (47p-1).
+      if ((/^watch.*\.mjs$/.test(f) && f !== 'watchcardtest.mjs') || f === 'reelreader.config.json') {
         fs.copyFileSync(path.join(HERE, f), path.join(mDir, f));
       }
     }

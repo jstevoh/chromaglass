@@ -15,11 +15,13 @@
  *                                  span watched, when, and a line on why it
  *                                  was kept
  *
- * The library is private to the owner (the repository is public; a film's
- * frames and the owner's notes are not for it), so it lives outside the repo:
- * $CHROMAGLASS_REFERENCES if set, else the project's shared folder
- * (/mnt/project-files/references, which every cloud thread sees), else
- * ~/chromaglass-films/references on the owner's Mac.
+ * The library is private to whoever keeps it (this repository is public; a
+ * film's frames and the owner's notes are not for it), so it lives outside
+ * the repo, in the folders the watch config lists (`references` in
+ * `reelreader.config.json`, `watchconfig.mjs`): this project's lists its shared
+ * folder, which every cloud thread sees, then a folder on the owner's Mac.
+ * `$REELREADER_REFERENCES` always comes first; a copy with no config uses
+ * `~/reelreader-references` (PLAN 47p-1).
  *
  *   npm run watch -- <film> --out … --keep jls-liquid-loops --note "the 1969 look"
  *   npm run watch -- our-take.webm --out … --vs jls-liquid-loops
@@ -27,23 +29,28 @@
  */
 
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { loadConfig, referenceTries, expandPath } from './watchconfig.mjs';
 
 const KEEP = ['design.json', 'summary.md', 'timeline.png', 'sheet-1.png', 'palette.png'];
 
 /** The library folders that exist, first the one `--keep` writes to. */
-export function libraryDirs(env = process.env) {
-  const tries = [env.CHROMAGLASS_REFERENCES, '/mnt/project-files/references', path.join(os.homedir(), 'chromaglass-films', 'references')];
-  return [...new Set(tries.filter(Boolean))].filter(d => fs.existsSync(d));
+export function libraryDirs(env = process.env, cfg = loadConfig({ env })) {
+  return referenceTries(env, cfg).filter(d => fs.existsSync(d));
 }
 
 /** Where `--keep` writes: the first library that exists, or the first that can be made. */
-export function libraryForKeep(env = process.env) {
-  const have = libraryDirs(env);
+export function libraryForKeep(env = process.env, cfg = loadConfig({ env })) {
+  const have = libraryDirs(env, cfg);
   if (have.length) return have[0];
-  if (env.CHROMAGLASS_REFERENCES) return env.CHROMAGLASS_REFERENCES;
-  return fs.existsSync('/mnt/project-files') ? '/mnt/project-files/references' : path.join(os.homedir(), 'chromaglass-films', 'references');
+  // None exists yet. A folder named by an environment variable is taken as
+  // asked (it was set for this run); otherwise the first whose parent exists
+  // (a shared folder mounted here, a home folder), so a cloud thread does not
+  // make the Mac's folder inside its own container; the last as the fallback.
+  const fromEnv = ['$REELREADER_REFERENCES', ...cfg.references].map(p => (/^\$/.test(p) ? expandPath(p, env) : null)).find(Boolean);
+  if (fromEnv) return fromEnv;
+  const tries = referenceTries(env, cfg);
+  return tries.find(d => fs.existsSync(path.dirname(d))) ?? tries[tries.length - 1];
 }
 
 /** A reference's name as a folder: lower case, words joined by dashes. */
@@ -88,7 +95,7 @@ const f = (x, d = 1) => (x == null || !Number.isFinite(x) ? '–' : x.toFixed(d)
 /** The library as lines: each reference, why it was kept, and its headline numbers. */
 export function listRefs(env = process.env) {
   const libs = libraryDirs(env);
-  if (!libs.length) return [`No reference library yet (looked in ${[env.CHROMAGLASS_REFERENCES, '/mnt/project-files/references', '~/chromaglass-films/references'].filter(Boolean).join(', ')}). Keep one with --keep <name>.`];
+  if (!libs.length) return [`No reference library yet (looked in ${referenceTries(env).join(', ')}). Keep one with --keep <name>.`];
   const lines = [];
   for (const lib of libs) {
     const names = fs.readdirSync(lib).filter(d => fs.existsSync(path.join(lib, d, 'design.json'))).sort();

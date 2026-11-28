@@ -296,6 +296,32 @@ is in the project's files).
   (17% in the reference). Liquids only interact where the water shears; ours barely does, so
   cells never stretch or meet. The period hand drives it: a pressed second glass (radial
   squeeze-out) and a deep rock. Give Classic that hand once 38w-27 keeps the edges.
+  *Part shipped 2026-11-28 (`npm run classichand`, the owner chose the whole glass):* Lava Pop's
+  kick presses the whole clock glass (Press the Whole Glass, lib/glassPress.ts) at Beat Squeeze
+  1, and Plate Rock is a real hand's 0.3 (it was 0.8, 4.5x past real, sliding every cell
+  together). In the lab at 256², 6 s at 120 bpm, read as `npm run watch` reads a film: own
+  motion 0.42 → 0.79 %/s, turnover 7.78 → 4.22 s, the whole picture's slide 0.77 → 0.22 of what
+  moves; the oil in the middle third 65.6 → 63.9%, colourfulness 137 → 134. The rest of the
+  way to the real shows is 38w-36. *Failed:* a quicker press (down in 0.05 s): 0.97 %/s and
+  3.5 s but twice the oil's drift outward (−3.6 points in 5 s); less rock (0.15) changed
+  nothing (0.95, 3.56 s); thinner water and the rhythm sheet at full (the handoff's).
+- **38w-36. Lava Pop at the real shows' pace** (M; High, after 38w-28). The rigid glass and a
+  real rock reach 0.79 %/s own and 4.2 s turnover against the real shows' 1.96–8.0 and 1.5–2.4
+  (`npm run classichand`, whose bars are this PR's). A reciprocal press brings the liquid back,
+  so its shear is the breathing and little stays; the 1969 hand also slid and turned the second
+  glass, not only pressed it. Find what the period hand did besides (the films), model that,
+  and raise the check's bars to the real shows'.
+- **38w-37. The oil still drifts outward under the rigid glass** (S; High). With the gap back
+  at rest to five places after every kick, Lava Pop's oil in the middle third still loses about
+  0.3 points a second at full Beat Squeeze (none under the rock alone), an eighth of the old
+  discs' pump, and it had not settled in 20 s (65.6 → 59.7%, `node scripts/classichand.mjs
+  --hand=look --oil` with SECS=20). Stokes flow round a reciprocal stroke should return it: find
+  whether it is mixing toward an even dish (the lay starts two thirds of its oil in the middle
+  third), the solver's inertia (the drag time h²/12ν is 0.3 s in 2 mm of water, as long as a
+  kick), the advection's diffusion or Cahn–Hilliard.
+- **38w-38. oilride's hand is 60x the app's** (S; Low, a note from 38w-28's probe). oilride.mjs
+  passes Beat Squeeze's dial (0.6) as lab.sheetPress's amount; the app passes kickDepth × share
+  (about 0.01). Hand it the app's amount and re-read its numbers.
 - **38w-29. The oil's colour rides the oil's own flux** (M; High, the owner's round five: "the
   colors seem to get washed out"). A shortcut named in PR #946: the dye and the oil's dye are
   carried on their own (minmod) and the Cahn–Hilliard step moves the oil fraction `c` but not

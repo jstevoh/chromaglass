@@ -13,6 +13,47 @@ import { DISH_GAP_RANGE, DISH_GAP_FIELD_METRES, DISH_REST_GAP } from '../../../l
 import { BOIL_PROPERTIES_WGSL } from '../lampBoil';
 import { STIR_PSI } from './stir';
 
+/*
+  What drives the lasting current, as one function the two plates share (PLAN
+  18a-4). The current is three body forces on the liquid, written as the speed
+  each holds it to: the lamp's heat lifting a standing plate's warm liquid
+  (Buoyancy), the dye's weight against the plate's mean down a rocked plate
+  (the old plate's rock; a thin gap's is hsBody's), and the same weight drawn
+  toward the dish's middle (Center Gravity), plus the boil's lift from water's
+  real density (Kell 1975, PLAN 36e-2), which is added past the cap.
+
+  On the old plate these are relaxed into the current's own field on the M
+  grid by Damping, projected there by ten Jacobi sweeps, and laid over the
+  flow (currentForces, then curDivergence, curPressure, curGradient). A thin
+  gap takes them straight into forcesB, at its own cells, as the speed they
+  drive at the rest gap: that is what the thin solve takes a push to be, and
+  its own solve makes it conserve liquid with everything else, at the gap's
+  drag. Between two glasses a body force is answered in the drag time 12ν/h²
+  (milliseconds for water, under a second for the thickest oil), so the
+  current's relaxation of seconds was a lag of its own on top of the real one,
+  and its half-resolution grid came up into the flow through the bilinear as
+  2×2 facets. Its steady state is what is kept: a relaxed c = c·d + f·(1 − d)
+  settles on f, capped, and with the boil's lift b (1 − d) added a step it
+  settles on f + b while under the cap and holds at the cap past it, which is
+  cap(f + b).
+*/
+const CURRENT_DRIVE_WGSL = /* wgsl */ `
+fn currentDrive(temp: f32, density: f32, uv: vec2f) -> vec2f {
+  var f = S.up * (S.curBuoy * temp);
+  let dd = tanh(clamp(density - S.meanD, -10.0, 10.0));
+  f += S.rock * dd;
+  let toC = vec2f(0.5) - uv;
+  let r = length(toC);
+  if (r > 1e-4) { f += (toC / r) * (S.curGrav * dd); }
+  return f;
+}
+fn boilLift(rawTemp: f32) -> vec2f {
+  if (S.curBuoy <= 0.0 || rawTemp <= 0.0) { return vec2f(0.0); }
+  let dRho = max(0.0, waterDensity(T_AMBIENT) - waterDensity(T_AMBIENT + rawTemp));
+  return S.up * (S.curBuoy * (dRho * BOIL_BUOY_PER_KG_M3));
+}
+`;
+
 export const FORCE_KERNELS: Record<string, string> = {
   /*
     A poured soap thins the dye it lies on, once a step (stepLiquids,
@@ -271,7 +312,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   // Everything the CPU applies after the projection, fused with addCurrent.
-  forcesB: `${HEAD}${NOISE_WGSL}${STIR_PSI}${BILERP_N}
+  forcesB: `${HEAD}${NOISE_WGSL}${STIR_PSI}${BILERP_N}${BOIL_PROPERTIES_WGSL}${CURRENT_DRIVE_WGSL}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var dye: texture_2d<f32>;
 @group(0) @binding(4) var cur: texture_2d<f32>;
@@ -461,7 +502,23 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
 
   let v0 = safeVel(v);
-  let c = bilerpN(cur, uv, A.a.y).xy;   // the current is on the M grid
+  /*
+    The current: on the old plate its own field on the M grid; on a thin gap
+    what drives it, here at this cell (CURRENT_DRIVE_WGSL says why). A.a.x is
+    2 on a thin gap while the boil runs, whose lift is then water's own.
+  */
+  var c = vec2f(0.0);
+  if (thin) {
+    let rawTemp = textureLoad(vel, q, 0).z;
+    let boiling = A.a.x > 1.5;
+    c = currentDrive(select(clamp(rawTemp, 0.0, 50.0), 0.0, boiling), d, uv);
+    if (boiling) { c += boilLift(rawTemp); }
+    let s = length(c);
+    if (s > S.maxCur) { c *= S.maxCur / s; }
+    c = select(vec2f(0.0), c, finite2(c));
+  } else {
+    c = bilerpN(cur, uv, A.a.y).xy;     // the current is on the M grid
+  }
   var flow = v0.xy + c;
   if (A.a.z > 0.0) {
     let h = max(textureLoad(sq, q, 0).r, 0.0005);
@@ -482,7 +539,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   // The lasting current, at half resolution: A.a.x is 1/M for its own grid.
-  currentForces: `${HEAD}${BILERP_N}${BOIL_PROPERTIES_WGSL}
+  currentForces: `${HEAD}${BILERP_N}${BOIL_PROPERTIES_WGSL}${CURRENT_DRIVE_WGSL}
 @group(0) @binding(2) var cur: texture_2d<f32>;
 @group(0) @binding(3) var vel: texture_2d<f32>;
 @group(0) @binding(4) var dye: texture_2d<f32>;
@@ -496,12 +553,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let rawTemp = bilerpN(vel, uv, S.n).z;
   let boiling = A.a.z > 0.0;
   let temp = select(clamp(rawTemp, 0.0, 50.0), 0.0, boiling);
-  var f = S.up * (S.curBuoy * temp);
-  let dd = tanh(clamp(bilerpN(dye, uv, S.n).a - S.meanD, -10.0, 10.0));
-  f += S.rock * dd;
-  let toC = vec2f(0.5) - uv;
-  let r = length(toC);
-  if (r > 1e-4) { f += (toC / r) * (S.curGrav * dd); }
+  let f = currentDrive(temp, bilerpN(dye, uv, S.n).a, uv);
   c = c * S.curDamp + f * (1.0 - S.curDamp);
   let s = length(c);
   if (s > S.maxCur) { c *= S.maxCur / s; }
@@ -513,10 +565,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     after the non-thermal current is capped. At Heat = 0, today's exact lines
     above run byte for byte.
   */
-  if (boiling && S.curBuoy > 0.0 && rawTemp > 0.0) {
-    let dRho = max(0.0, waterDensity(T_AMBIENT) - waterDensity(T_AMBIENT + rawTemp));
-    c += S.up * (S.curBuoy * (dRho * BOIL_BUOY_PER_KG_M3) * (1.0 - S.curDamp));
-  }
+  if (boiling) { c += boilLift(rawTemp) * (1.0 - S.curDamp); }
   textureStore(dst, q, select(vec4f(0.0), vec4f(c, 0.0, 0.0), finite2(c)));
 }`,
 

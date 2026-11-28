@@ -71,7 +71,7 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
 - **27d. The rest of the sweep (open, its own PR).** From the run above and a read of
   the code (handoff `meaningful-controls.md` in the project's files):
   - Dead on a thin gap (every look since #248): Depth Drag (18a's open item), Vibration
-    (18a-2's), Damping (only the lasting current now), Plate Pressure (only the clock
+    (18a-2's), Damping (nothing in the thin step since 18a-4: the current's lag was all it did there), Plate Pressure (only the clock
     and the dish's bed drag).
   - Two dials that are one number: Gooey × Post Blur (`U.gooey * U.postBlur`), Blob
     Surface Tension × Polarity (`immiscibility`); Rain Drip against Dye Weight with
