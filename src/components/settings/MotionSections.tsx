@@ -271,9 +271,9 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
               key={l}
               onClick={() => onFlickPlate?.(l)}
               disabled={!onFlickPlate || (settings.layerCount ?? 1) <= l}
-              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-white/80
+              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-text-2
                          hover:bg-white/10 hover:border-white/30 active:bg-white/20 transition-all
-                         disabled:opacity-35 disabled:hover:bg-white/5 disabled:cursor-not-allowed"
+                         disabled:opacity-65 disabled:hover:bg-white/5 disabled:cursor-not-allowed"
               data-testid={`flick-plate-${l}`}
               title={(settings.layerCount ?? 1) <= l
                 ? 'This look has one plate'
@@ -334,7 +334,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
         <div className="flex gap-2 mt-1 mb-2">
           <button
             onClick={() => onUpdate({ spinRpm: -(settings.spinRpm ?? 6) })}
-            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-white/80
+            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-text-2
                        hover:bg-white/10 hover:border-white/30 active:bg-white/20 transition-all"
             data-testid="spin-reverse"
             title="Turn Auto Spin the other way round"

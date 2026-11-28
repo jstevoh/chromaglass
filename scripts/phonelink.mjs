@@ -492,8 +492,13 @@ try {
   // is the webpage, and the phone that scans this should open the show.
   check('and shows the page\'s own show address, with no key and no remote flag after it', p.url === `${origin}${SHOW_PATH}`, p.url ?? 'no address');
   check('drawn as a QR code, module for module the encoder\'s own for that address', !!p.d && p.d === codeOf(`${origin}${SHOW_PATH}`), p.d ? `${p.d.length} chars of path` : 'no code drawn');
-  check('and its words say the code opens the show on the phone itself, and how to get a show server',
-    /on the phone itself/.test(p.words) && /show server/.test(p.words) && /npm run remote/.test(p.words), p.words.replace(/\s+/g, ' ').slice(0, 120));
+  // How to get a show server is the Mac app now, not `npm run remote`: a
+  // performer has no terminal, and 49j (#973, H2-01) took the developer's
+  // command out of the panel. The words still have to say where the remote
+  // comes from, and still must not hand the performer a command line.
+  check('and its words say the code opens the show on the phone itself, and that the Mac app pairs a phone remote, with no developer command',
+    /on the phone itself/.test(p.words) && /show server/.test(p.words) && /Mac app/.test(p.words) && /phone remote/.test(p.words) && !/npm run/.test(p.words),
+    p.words.replace(/\s+/g, ' ').slice(0, 200));
   check('with no relay there is no Link another button', p.more === null, p.more ?? 'none');
 } finally {
   stop(relay);
