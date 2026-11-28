@@ -375,9 +375,20 @@ cells (18f-2, 48h); salt fingers (48l); Kelvin–Helmholtz (48o).
   dish Ouzo three times, Alcohol twice, water once (half Ouzo still, two thirds of 48s-6's oil
   a minute, two Alcohol for three Ouzo where it was one for two: nothing but Alcohol takes the
   droplets out of a dish, `npm run ouzo` line 3). Lines 10 and 11 of `npm run ouzo` hold the
-  seed's bracket and the spirit's share. The film is on the judging page in the PR.
-  Open: why the late cloud gathers at the bottom of the frame (Plate Rock's default 0.45 or the
-  rim's carry; not measured), still 27f-9o.
+  seed's bracket and the spirit's share. Filmed on the Mac (seed 1, 60 s, against 48s-6's take):
+  near black 72–80% → 59–63%, dye 15/8/8% → 38/28/24% of the frame at 0:10/0:30/0:55, three
+  hues not two; the late white 14.8% → 9.2% of the frame, its densest part (luma over 190) 7.5%
+  → 2.4%, a thinner ribbon broken by dark holes. Swells did not come back (1.0 a minute both,
+  calm 11% → 10%): 48s-8.
+- **48s-8. What took Louche's swells** (S–M). The first Louche filmed 4.9 swells a minute;
+  48s-6 and 48s-7 film 1.0, at Evolve 0.36 and 0.24 alike, and calm 10–11% against the
+  reference shows' 20–42%. So the rate is not it. Candidates, none measured: the first version's
+  wide dye pools were what a drop or a kick visibly moved (a swell is luma change standing above
+  its median, and a mostly dark dish changes little); the kick's press (platePressure 0.2 with a
+  0.3 cord) moving everything a little all the time, which raises the median; the white's own
+  slow drift. Film Louche with the kick cord off, and with the 48s-6 dish at Evolve 0.12, and
+  read swells and calm. Also open: why the late cloud gathers at the bottom of the frame (Plate
+  Rock's default 0.45 or the rim's carry; not measured), and 27f-9o.
 - **48t. Chemical gardens in the gap** (M–L; builds on the Liesegang precipitate,
   `LIES_GRID`, and the pours). A metal salt pushed into silicate between two glasses grows a
   membrane of precipitate at the front, and the front's speed against its reaction sets the
