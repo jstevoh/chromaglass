@@ -41,3 +41,32 @@ story in `docs/plan-shipped.md` §31p-3; `npm run polar`).
 ## 31s. The surface is drawn from the dye, not traced from the liquid (2026-11-22)
 
 - **31s-14. ~~Every film refused: the flower gate's control and its path measure went blind with 38u-10~~** shipped 2026-11-28. Found filming 51c-2 on main c9cfd74: `npm run flower` read the path (.z) at exactly 0 on the owner's Mac and the point-read control no worse than the build, so `flowergate` refused every film. Two faults, both from 38u-10 (#1037). The projector's derive pass reads cells through `cellDye` (wgsl/dyeIndex.ts), which kept its own copy of the cell's footprint, so the control's one cut in `cellDensity` reached only the camera's reader (control slope 0.058, the build's, against 0.3 needed); and the dye's index is real at Dye Index Boost 1, a path slope near 1e-6 that a half float flushes to 0 on the Mac and keeps as dust in the cloud lab (band sums 0.0 to 0.1). Now one `cellSide` (plateSlope.ts) serves both readers, the path is measured at x3370 (holeline's INDEX_LIT, the old stand-in), and the "sees the rim" line needs band sums over 1, not over 0. `npm run flower` 2 FAIL (cloud) -> 9/9: control slope 0.348 ring, 0.339 bubble; build path comb 0.058 ring, 0.050 disc and bubble.
+- ~~**31s-1a. The height field is paid for before anything draws it**~~ **Shipped** with 31s-2
+  (2026-11-28): the whole-grid pack into the display's binding 27 is gone (that binding is the
+  traced light now), and the derive pass reads the height for the traced path's oil every frame
+  (`SURFACE_PATH_WGSL`), so the step has its reader.
+- ~~**31s-2. Light traced through the surface, gathered on the wall.**~~ **Shipped** (2026-11-28,
+  `npm run caustics` 9/9; with 48b and 47j's projected half). The derive pass's whole-column path
+  (`.w`), its oil now from 31s-1's height (dn h, bilinear) and not the view's share, is turned into
+  a mesh of landed rays, x + dz grad(OPL), one vertex a cell; each triangle carries its plate area
+  over its wall area, gathered ones splatted with a tent so a focus or a fold keeps its light;
+  spread by the lamp's disc (half angle 0.02 rad, so a caustic past dz is no sharper than
+  dz * 0.02); read by the display as `wallLight0/1` in place of the first-order `defocusShadow`,
+  which stays as the fallback while the pipelines build and for a projector source with its own
+  Focus. Focus's middle traces nothing (no look changes there); the dial's throw keeps the old
+  law's strength where the map does not fold (`PROJECTOR_DEFOCUS_METRES` 0.183). Measured: a flat
+  path even to 0.000%; light kept to 0.003%; a plano-convex lens of Rc 6.85 mm, dn 0.137 peaks at
+  47.5 mm against Rc/dn 50 mm, its light all kept at focus; a ridge's folds at 0.38 s against
+  0.40 s; three domes of 1, 2 and 4 cells light three peaks; a ripple follows 1/|1 - c sin kx|
+  to 5.3% and folds between c 0.9 and 2, its fold pair 9 texels apart as the law drawn through
+  the lamp's disc has it; the back plate traces in its own half; the derive pass writes a 0.4 mm
+  oil cap as 0.0274 rest gaps (dn h / gap exactly); and the display drawn with the trace differs
+  from the first-order fallback on 9.1% of a dyed plate. The old law fails 5 of the 9 as a
+  control. `npm run nolight`'s turnover (lines 7 and 13) is now asked either side of the middle
+  (Focus 0.56 against 0.44), where the traced map is linear: at 0.8 against 0.2 the oil turned
+  over at 75% (3761 of 5010), the trace moving light rather than flipping it pixel for pixel; at
+  0.56/0.44 4057 of 4074. A glycerine pour's sharp edge throws its rays wider than its ramp even
+  there, so its pixels at the edge are dark both sides (714 of 1464 at 0.8 to 1.1 R), as a real
+  shadowgraph of a sharp interface draws: line 13 asks the turnover inside 0.8 R (975 of 1018)
+  and that no pixel anywhere is brighter both sides (0). Not yet replaced (each an item below):
+  the in-focus pupil loss (31s-2b) and the dense slope stencil (31s-3).

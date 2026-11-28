@@ -53,7 +53,7 @@ export const CONTROL_HELP: Record<string, string> = {
   edgeRelief: 'The curved rim where a blob of liquid meets the glass: a dark edge and a bright refracted highlight.',
   dyeIndexBoost: 'How much the dye bends light. ×1 is real dye, too faint to see; turn it up for bright and dark lines at every dye edge out of focus.',
   crispEdges: 'Draws the line where oil meets water as sharp as a real dish shows it, instead of a soft band a few pixels wide.',
-  projectorFocus: 'Moves the projector lens\'s focus through the liquid, turning edges into bright and dark Becke lines.',
+  projectorFocus: 'Moves the projector lens\'s focus off the liquid, so each drop focuses the lamp\'s light: a bright rim inside a dark edge, or a bright core.',
   lacing: 'Pale threads along the line where two colours meet, finer where the flow pulls them apart.',
   benDay: 'Prints the picture as a comic: flat inks with the tones laid down as even dots.',
   sharpness: 'How crisp the edge of a colour stays. Low lets the solver smear it soft, high holds it hard.',

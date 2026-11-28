@@ -97,7 +97,7 @@ liquid-physics theme on one board (about 230 items in 25 themes) and said "Queue
 Let's group things in testing so we can move quickly." Each batch below is one PR whose items
 the same checks prove, so a batch is built and tested once. **Next**, in this order: land the
 built PRs (#838, #662, #935, #882, #735, #664; #624 and #614 checked against main); caustics
-(31s-2, 48b, 47j); a clean grid with less jitter (18a-8 and the grid-size items); the music's
+(~~31s-2, 48b~~ shipped, 47j's closeup half); a clean grid with less jitter (18a-8 and the grid-size items); the music's
 physics (48f, 48c, 48r, the cord-only honesty items); real dye colour (18l, 38p); oil that breaks
 up (38w-27 and the bead and foam items); the ferrofluid (9aa, 9t, 38j); the new phenomena
 (48s–48z); heat (18f-2, 18e-3); tools that move liquid (18a-3, 15b, 15e); drops and pours (18c,
@@ -597,7 +597,7 @@ Each file holds only open work; its closed items are in [`docs/plan/archive/`](d
 |  | (continued) | [`28-preset-palettes-2.md`](docs/plan/28-preset-palettes-2.md) | 28i–28l | 21 |
 | 29 | The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11) | [`29-ferro-drop.md`](docs/plan/29-ferro-drop.md) |  | 15 |
 | 30 | Shaping the sound and the MIDI: what Imaginando's VS rig showed (2026-10-11) | [`30-sound-and-midi.md`](docs/plan/30-sound-and-midi.md) |  | 12 |
-| 31 | Optics and the wall: what Boris FX Continuum showed (2026-10-11); polarised light (31p); the surface traced, not drawn from the dye (31s); ~~31s-8~~ the flower's second life (each tap its cell's mean, films refuse a flower build) shipped (`npm run flower`), ~~31s-14~~ the gate's blind control after 38u-10 shipped, 31s-9, 31s-10, 31s-11 (the gate calls a vite server old), 31s-12 (the gate times out in a busy film queue) and 31s-15 (.z below a half float at the real index) open | [`31-optics-and-wall.md`](docs/plan/31-optics-and-wall.md) |  | 17 |
+| 31 | Optics and the wall: what Boris FX Continuum showed (2026-10-11); polarised light (31p); the surface traced, not drawn from the dye (31s); ~~31s-2~~ light traced through the surface to the wall shipped (`npm run caustics`, with ~~31s-1a~~), 31s-2b to 31s-2e open; ~~31s-8~~ the flower's second life (each tap its cell's mean, films refuse a flower build) shipped (`npm run flower`), ~~31s-14~~ the gate's blind control after 38u-10 shipped, 31s-9, 31s-10, 31s-11 (the gate calls a vite server old), 31s-12 (the gate times out in a busy film queue) and 31s-15 (.z below a half float at the real index) open | [`31-optics-and-wall.md`](docs/plan/31-optics-and-wall.md) |  | 17 |
 | 32 | The soap film: a draining film seen in reflection (asked 2026-10-18) | [`32-soap-film.md`](docs/plan/32-soap-film.md) |  | 15 |
 | 33 | Bubbles and the closeup, per liquid (asked 2026-10-19) | [`33-bubbles-closeup.md`](docs/plan/33-bubbles-closeup.md) | 33f motion **shipped** (`npm run bubbleliquid` 9/9); 33b-5 (the air held at a hole's whole drained rim) **shipped** (`npm run holeline`); 33q-1 (the Beads dial is oil) **shipped**; 33q-4 (air only in looks made for it) **shipped** (`npm run lookair` 7/7); 33c, 33d, 33f-2..4, 33q-2, 33q-3, 33q-5 open | 12 |
 | 34 | What Photism showed: the page and the app (asked 2026-10-22) | [`34-photism.md`](docs/plan/34-photism.md) |  | 19 |
