@@ -223,3 +223,18 @@ written first. Line numbers are as read on main at d07ac31.
   the light through it, cp·(1 − 0.55·k·filmC) (`projectorFilm`, bubbleFilm.ts), a
   transmittance in 0.67..1 per channel, never over the lamp: 54 levels over to 0.
   `npm run nolight` line 16. Story in `docs/plan-shipped.md` §38.
+- ~~**38d-1. The period from the Bond number, for the coil**~~ — **Shipped** (`npm run
+  bondmaze`; story in `docs/plan-shipped.md`). Labyrinth is the coil's field (7.5 mT at 1)
+  and the maze's period is λ/h = 1.906·e^{4π/N} − 0.5 from the stripe energy, read from the
+  field's mean square over 4 s; the frame loop swings the coil about the setting (0.75 +
+  music, was 0.55 +). The physics shipped; the first cut's look retune did not: it moved
+  Ferro Paint and Magnet Garden toward the onset (0.65 and 0.58, periods 0.15 and 0.27),
+  and the owner, seeing it (2026-11-13): "The reference images have much thinner and more
+  complex fingers." Both looks ship at Labyrinth 1 (N 14, period 0.042, Ferro Paint over
+  √3 by Maze Detail 0.5) with their magnets as before: no wider than on main.
+
+## Smaller, each worth doing when its area is open
+
+- **38k-7. The plate on the real onset (shipped, #662, with 9t-2).** `SPIKE_ONSET`
+  is the liquid's 4.0 mT; the owner's films of Magnet Garden, Ferro Paint and a dragged
+  Magnet are `docs/judging.md` §154. Story in `docs/plan-shipped.md` §9t-2 + 38k-7.

@@ -737,16 +737,6 @@ order; the README is `docs/watch.md`, the plugin's layout `docs/watch-plugin-pla
   gets four "still overlays" masked (one the left quarter of the frame) and three 0.4 s
   "title spans" dropped, with no overlay or title on the sheets.
 
-- ~~**47p-6**~~ the release build (shipped, this PR). reelreader's public repository is a build
-  of this one, never edited by hand: `scripts/reelreaderpack.mjs --out DIR [--demo] [--zip]
-  [--test]` copies every watch module but the settings map (and every file they import, so
-  watchreadtest.mjs goes too), the tests that need only node and ffmpeg, the skill as
-  `skills/reelreader/` with its helper again as `agents/`, and `reelreader/release/` (README,
-  package.json, MIT licence, `.claude-plugin/` plugin + marketplace, the `/reelreader` command, CI
-  and a tag-driven release workflow that puts the skill zip on the GitHub release and the
-  package on npm). `npm run reelpack` (14 checks, each shown failing on a wrong build) holds that
-  every import resolves, npm packs no test, clip or demo, one version everywhere, no home
-  folder, address or model name, and the command runs through a bin link as npx runs it.
 - **47p-6b** publish: the public repository jstevoh/reelreader (the owner creates it empty and
   adds it to the project; a cloud session cannot create one), the `NPM_TOKEN` secret there (the
   owner's npm account), then push the build and the tag `v0.1.0`; deploy the omnibrains.org card
@@ -767,13 +757,41 @@ order; the README is `docs/watch.md`, the plugin's layout `docs/watch-plugin-pla
 Later, not now: photosensitivity (flash) screening, real units (mm/s), dance and pose, "what is
 in it". The reference library stays private and ships empty (watch-plugin-plan.md, point 3).
 
+## 47q. The structure and light read: what a frame is made of (the owner's ask, 2026-11-28) (M)
+
+Sent three macro films of soap foam (dark-field light, pink cores, blue walls, glints and
+satellite bubbles), the watch tool gave whole-frame statistics, and the owner asked what our
+reel tool was missing: "you don't seem to see a lot of the things in the images that make them
+different from our own generated ones, or things that would help us build simulated physics
+versions". Our takes beside them were "sad illustrated versions".
+
+- **47q-2** a round dish in a dark frame: the app's takes hold the dish inside black corners,
+  which read as border and as smooth blocks. Find the lit disc (the footage read's autocrop
+  sees rectangles only) and read inside it; until then crop to the picture.
+- **47q-3** focus layers under a sharp layer: a block holding a sharp reflection over a soft
+  foam reads sharp, so the owner's foam film reads one focus layer where the eye sees two.
+  Split each block's gradients into two populations, or read layers per pixel at edges.
+- **47q-4** dish or camera: a steady turn reads alike from either. A second layer that does not
+  turn (a background off the dish) or one that turns at another rate tells them apart.
+- **47q-5** the illustrated index's bands were set on four films and three takes (2026-11-28);
+  refit them on the owner's ratings when there are some (47p-5f).
+- **47q-6** the structure read in report.html and the report card, and `--vs` against a
+  reference's structure in the watch itself (watch.mjs is at 99.5 KB: a pure split first).
+- **47q-7** per-cell motion: follow cells between stills for coarsening (von Neumann's law, a
+  cell's area changes at a rate set by its sides minus six) and neighbour swaps (T1 events).
+- **47q-8** the fringe on our takes reads 2.7 to 6.6 px though the plate has no lens: the
+  recordings are 4:2:0 and scaled, and the plate's own dispersion may shift colours. Read it on
+  an uncompressed still from the plate before trusting the app side of the fringe.
+- **47q-9** a lens-character fringe on the plate (lateral chromatic aberration), which the
+  owner's films show at about 1.1 px outward.
+
 ## Order
 
 47a-1 first (the cheapest fix for the photograph's serrated, soft closeup), then 47b (one
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q; 47d-1 shipped), 47a, 47e (its glitter half shipped; 47e-1, 47e-2), 47f, 47k; 47b-2 and 47b-3 after 47b-1; 47g,
-47h, 47i and 47n when wanted; the release build shipped (47p-6), publishing next (47p-6b, waiting on the owner's empty repository and npm token), 47p-6c with the owner's OK, 47p-5f with the owner's ratings, 47p-4b when the watch tool next watches real films, 47p-3b and 47p-3c when the watch tool is next touched; 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
+47h, 47i and 47n when wanted; the structure and light read shipped (47q-1), then 47q-2 and 47q-3 before the next foam look is judged; the release build shipped (47p-6), publishing next (47p-6b, waiting on the owner's empty repository and npm token), 47p-6c with the owner's OK, 47p-5f with the owner's ratings, 47p-4b when the watch tool next watches real films, 47p-3b and 47p-3c when the watch tool is next touched; 47w-3, 47v-4, 47v-7 and 47v-8 whenever the watch tool is next touched; 47y
 as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4 in that order (the owner asked
 for the drops' physics and their colour, 2026-11-12; ~~47z-5~~ shipped early, 2026-11-13, as Foam
 Cells), then 47z-7 after 47z-3, 47z-8 and 47z-6 after 28k-2 (a). Each its own thread

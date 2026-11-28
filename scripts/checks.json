@@ -626,6 +626,27 @@
       ]
     },
     {
+      "name": "The watch tool's structure and light read: cells, edges, light, layers, specks",
+      "shard": "sound",
+      "run": "npm run watchstructure",
+      "why": [
+        "The owner, 2026-11-28: the watch tool read macro foam films as whole-frame",
+        "statistics and missed what made them look real, and read our takes as",
+        "nothing worse when they looked like illustrations of them. The structure",
+        "read (scripts/watchstructure.mjs, watchdepth.mjs) segments cells and",
+        "borders, classes edge profiles, says where the light and colour sit, counts",
+        "specks by size and finds focus and motion layers. This holds each to a",
+        "picture drawn with its answer: a honeycomb against a random tiling (same six",
+        "sides, μ2 0 against 1.6, junctions at 120° or not), dark against bright",
+        "field, pink cores and blue flanks, planted highlights and a planted lateral",
+        "fringe, profiles of known kind and width, specks of three sizes, dots on a",
+        "ring against dots at random, two focus layers against one, a glide with a",
+        "near layer 2.5x the far, a glide over a tilted scene not read as a turn, a",
+        "turn of known period and centre, and end to end through watchVideo. In the",
+        "sound shard for its ffmpeg. About a minute and a half."
+      ]
+    },
+    {
       "name": "The watch tool's batch runs, rating page, refit and notes",
       "shard": "sound",
       "run": "npm run watchbatch",

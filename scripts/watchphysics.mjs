@@ -758,7 +758,11 @@ export function physicsLines(p) {
   const curl = p.curl.med;
   // Rotation period of a solid turn: curl = 2Ω.
   const period = curl && Math.abs(curl) > 0.01 ? (4 * Math.PI) / Math.abs(curl) : null;
-  const turn = period != null && period < 120 ? `turning ${curl < 0 ? 'anticlockwise' : 'clockwise'} on screen, about one turn in ${f(period, 0)} s` : 'no steady turn';
+  // The structure read's motion layers (watchdepth.mjs) say when the curl is
+  // a camera glide's parallax: near and far moving at two speeds leave a
+  // shear in this one affine fit, half of which is rotation by arithmetic.
+  const glide = /^glide/.test(p.motionKind ?? '');
+  const turn = glide ? 'no turn: the curl is a camera glide\'s parallax (see motion layers)' : period != null && period < 120 ? `turning ${curl < 0 ? 'anticlockwise' : 'clockwise'} on screen, about one turn in ${f(period, 0)} s` : 'no steady turn';
   const dv = p.div.med;
   const spread = band(dv, [[-0.02, 'drawing in (converging)'], [0.02, 'neither spreading nor drawing in'], [Infinity, 'spreading out (diverging), as from a pour or a press']]);
   const car = p.carried.med;

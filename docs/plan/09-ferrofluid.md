@@ -108,15 +108,6 @@ Open, from building 9i:
     hundreds), so the domes grow at a scale the grid draws; at the lab's G 4.3 they set
     as bars along the grid. A finer film grid under the magnet (the patch at twice the
     plate's cells) would let it rise.
-  - **9t-2. No pull under the film (shipped, #662, with 38k-7).** The plate's pull
-    acts under the standing film's window on each cell's own share. Story in
-    `docs/plan-shipped.md` §9t-2 + 38k-7. Landed 2026-11-28 (thread "Re-measure the
-    ferrofluid pair") with three checks re-read at the real 2 mm gap on the owner's Mac:
-    `standing`'s spacing bar now from the film's own fastest-growing wavelength (0.49 of
-    the pitch at the Magnet's G 3.0) and asked to widen as the domes merge; `ferrohold`'s
-    compression differential reads the body, as its absolute bar does, since a cone's
-    core is past three quarters with or without the pass; `ferropour`'s ring arm is a
-    plate by its pour and its mass, not by how much stays black once its drops stand up.
   - **9t-2b. Domes merge slower at 2 mm than at 6 mm.** Under the Magnet they stand 0.67
     then 0.74 of 2π l_c apart (Mac, e60a5262), against about 0.8 at 6 mm: the glass
     holds the layer to the oil. Whether a real EFH1 layer in a 2 mm cell coarsens at

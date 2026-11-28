@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- A structure and light read: what each frame is made of and where its light sits. Cells and
+  borders (size, sides, junction angles against Plateau's 120°, border thickness), edge
+  profiles (step, line, double line, halo), light against structure (dark-field index, colour
+  of interiors, borders and nodes, specular highlights, lateral colour fringe), a speck census,
+  focus layers and motion layers (own motion, camera glide with parallax, turn with its centre),
+  and an illustrated index with its parts. In every summary, and on its own for stills:
+  `node scripts/watchstructure.mjs <video or image>`. Held by `watchstructuretest.mjs`.
+
 ## 0.1.0 (2026-11-28)
 
 First public release.
