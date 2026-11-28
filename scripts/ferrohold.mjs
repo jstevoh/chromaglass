@@ -45,7 +45,7 @@
  *     phaseCompress off, and the pass must be worth something: the lead with
  *     phaseMomentum off exceeds the lead as given by at least DLAG_BAR, and the
  *     half-full count as given exceeds the count with phaseCompress off by at
- *     least DHALF_BAR. The absolute bars alone are one-sided (the review of
+ *     least DBODY_BAR (since 38k-7 of the body, not the count). The absolute bars alone are one-sided (the review of
  *     this check ran the scene with the pull 10% stronger and phaseMomentum
  *     off, and the lead read 2.01R, green: anything that speeds the drop up
  *     stands in for the pass); the differential says the pass itself is on.
@@ -181,6 +181,18 @@
  * their differential stay main's 2 mm bars: a cone's core is that and more.
  * The body, the skirt and the cells past full are printed for every run.
  *
+ * At the real onset and the 2 mm gap together the cells over three quarters
+ * stopped reading the compression pass too, for the half-full count's
+ * reason one level up: the cone stands 2.2 times full on its axis, so its
+ * middle is past three quarters whether or not the pass keeps its edge,
+ * and the slumped cone of the off-run still has a core. On the owner's Mac
+ * (e60a5262, the slow drag's means): 51.7 cells over three quarters on and
+ * 43.8 off, a gap of 7.9 against a differential of 13; the body 84.0 on
+ * and 63.5 off, a gap of 20.5. So the pass's differential reads what the
+ * pass keeps, the body, as line 3's absolute bar already does, and keeps
+ * its 13 (a full cell's worth is a cell's), under the 20.5 measured and
+ * above half of it. CORE_BAR stays an absolute bar on the run as given.
+ *
  * Lab only (software WebGPU in headless Chrome, or Metal on the Mac).
  */
 import { openLab } from './lab.mjs';
@@ -210,9 +222,10 @@ const BODY_BAR = 71;
 // phaseCompress off in the slow drag (software WebGPU, 2 mm).
 const CORE_BAR = 33;
 // The differentials kept from #495: 0.16R (the quick drag's gap is 0.47R)
-// and 13 cells (the slow drag's core gap is 18.2).
+// and 13, since 38k-7 of the body (full cells' worth) where it was of the
+// cells over three quarters: see the header's last paragraph.
 const DLAG_BAR = 0.16;
-const DHALF_BAR = 13;
+const DBODY_BAR = 13;
 
 const { page, close } = await openLab();
 try {
@@ -272,9 +285,9 @@ try {
   check(`and it is the momentum pass: with phaseMomentum off in the quick drag (${QUICK.DIST} of the plate in ${QUICK.DRAG} steps) the lead is at least ${DLAG_BAR} drop radii longer`,
     noM.lag - qOn.lag >= DLAG_BAR,
     `lead ${qOn.lag.toFixed(2)}R on, ${noM.lag.toFixed(2)}R with phaseMomentum off over steps ${qw.FROM} to ${qw.TO} (difference ${(noM.lag - qOn.lag).toFixed(2)}R, bar >= ${DLAG_BAR}R)`);
-  check(`and it is the compression pass: with phaseCompress off in the same slow drag the body's core is at least ${DHALF_BAR} cells over three quarters fewer`,
-    on.core - noC.core >= DHALF_BAR,
-    `${on.core.toFixed(1)} cells over three quarters on, ${noC.core.toFixed(1)} with phaseCompress off (difference ${(on.core - noC.core).toFixed(1)}, bar >= ${DHALF_BAR}); half-full ${on.half.toFixed(1)} and ${noC.half.toFixed(1)}, body ${on.body.toFixed(1)} and ${noC.body.toFixed(1)}, printed`);
+  check(`and it is the compression pass: with phaseCompress off in the same slow drag the body holds at least ${DBODY_BAR} full cells' worth less ferrofluid`,
+    on.body - noC.body >= DBODY_BAR,
+    `body ${on.body.toFixed(1)} on, ${noC.body.toFixed(1)} with phaseCompress off (difference ${(on.body - noC.body).toFixed(1)}, bar >= ${DBODY_BAR}); over three quarters ${on.core.toFixed(1)} and ${noC.core.toFixed(1)}, half-full ${on.half.toFixed(1)} and ${noC.half.toFixed(1)}, printed`);
 } finally {
   await close();
 }

@@ -187,14 +187,27 @@ try {
   console.log(`  poured 'ring' (${old.drops} drops): at the pour ${line(old[0])}; after ${EARLY} ${line(old[EARLY])}`);
   console.log(`  the same ferrofluid as one pool: ${line(pooled[0])}\n`);
 
-  // The old arm has to be a plate before it can be a comparison: nothing
-  // poured reads worked 0 and fingers Infinity, and would pass both.
-  const ringReal = old.drops === 18 && old[EARLY].cover > 0.1 && Number.isFinite(old[EARLY].width);
+  /*
+    The old arm has to be a plate before it can be a comparison: nothing
+    poured reads worked 0 and fingers Infinity, and would pass both. So its
+    18 drops, poured over a tenth of the plate or more, all of it still
+    there after the steps, and something black left to measure. Until the
+    real 2 mm gap this asked for a tenth of the plate black after the
+    steps, which read whether the drops had stood up, not whether they were
+    poured: at the liquid's own onset each big drop stands up into a
+    cluster of domes, the same ferrofluid on fewer cells (ferrohold's
+    cone), 12% of the plate at 6 mm and 10% on the owner's Mac at 2 mm
+    (e60a5262), so the arm read "not a plate" and took lines 3 and 5 red
+    with it while the scatter passed both by wide margins. The pour and the
+    mass are what make it a plate; what it covers after is the physics.
+  */
+  const ringReal = old.drops === 18 && old[0].cover > 0.1 && Math.abs(old[EARLY].mass / old[0].mass - 1) < 0.001
+    && old[EARLY].cover > 0.02 && Number.isFinite(old[EARLY].width);
   check('Ferro Paint pours its own shape, not the ring', look === 'scatter', `phasePourShape gives '${look}'`);
   check('its ferrofluid is worked through nearly the whole plate, and still is three times later',
     ringReal && now[EARLY].worked >= 0.9 && now[LATE].worked >= 0.9 && old[EARLY].worked < 0.7,
     `black and colour side by side in ${pct(now[EARLY].worked)} then ${pct(now[LATE].worked)} of an 8 × 8 grid's tiles, against ${pct(old[EARLY].worked)} poured the old way`
-    + (ringReal ? '' : ` (the ring arm poured ${old.drops} drops, black ${pct(old[EARLY].cover)}: not a plate to compare with)`));
+    + (ringReal ? '' : ` (the ring arm poured ${old.drops} drops, black ${pct(old[0].cover)} at the pour and ${pct(old[EARLY].cover)} after ${EARLY} steps: not a plate to compare with)`));
   check('and the playing drew it: the black has moved off the drops it was poured as',
     now[LATE].moved > 0.15,
     `${pct(now[LATE].moved)} of the plate changed between black and colour since the pour`);

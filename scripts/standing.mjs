@@ -18,15 +18,28 @@
  *      the film running every step of it (the plate's own cap at full
  *      would hold it flat without the film)
  *   2. past it, domes stand up: tops twice the pool's depth or more, at
- *      least eight within 0.08 of the magnet, and about a capillary
- *      wavelength apart (spikes.ts's SPIKE_PITCH, 2π l_c): the median
- *      distance from each top to its nearest between 0.7 and 1.15 of it, read
- *      once the domes have risen and again as long after.
- *      Not nearer to it than that: the wavelength is the onset's, and past
- *      the onset the pattern's is shorter (in this model the fastest to grow
- *      under the Magnet is 0.55 of it, and what stands after the domes
- *      have merged a while is 0.8). Grid-scale bumps would be a quarter of
- *      it; a pool gathered whole, one top
+ *      least eight within 0.08 of the magnet, spaced as this layer's own
+ *      instability spaces them: the median distance from each top to its
+ *      nearest no nearer than the wavelength that grows fastest under the
+ *      magnet's axis and no wider than 1.15 of the onset's (spikes.ts's
+ *      SPIKE_PITCH, 2π l_c), read once the domes have risen and again as
+ *      long after, and the second no nearer than the first: domes merge as
+ *      they stand, they never split at a steady field.
+ *      Why the fastest-growing wavelength and not the onset's. At the onset
+ *      the pattern is 2π l_c; past it the film's growth rate peaks where
+ *      4k² − 3Gk + 2 = 0 (k in 1/l_c, G the film's lift: wgsl/standing.ts),
+ *      so at G 3.0, the Magnet's on its axis, the domes first stand 0.49 of
+ *      the pitch apart, and off the axis, where the field falls back to the
+ *      onset, up to the pitch itself. What stands is that, coarsening as
+ *      the domes merge. Until PLAN 38k-7 the bar was 0.7 to 1.15 of the
+ *      pitch, read at 6 mm, where the plate's flow under the window merged
+ *      the domes quickly. At the real 2 mm gap the glass holds the layer to
+ *      the oil (the drag time goes as h², 0.07 s), so the domes merge
+ *      slower and stand nearer the linear wavelength: on the owner's Mac
+ *      (e60a5262) a median 0.0266 then 0.0297 apart, 0.67 then 0.74 of the
+ *      pitch, between 0.49 and the 0.8 the header used to name for merged
+ *      domes. Grid-scale bumps would be a quarter of the pitch and red; a
+ *      pool gathered whole, one top, red on the count
  *   3. the gaps open: within 0.08 of the magnet the plate is no longer
  *      covered (under 0.75 of it past half full, where it was all), and less
  *      of it the stronger the field, as the domes grow taller on the same
@@ -163,13 +176,25 @@ try {
   */
   check('under the onset the layer stays flat', u.ran === RISE && u.peak < 1.05 && u.domes === 0 && u.cover > 0.95,
     `peak ${u.peak.toFixed(3)}, ${u.domes} domes, ${u.cover.toFixed(2)} of the plate near the magnet covered, the film running ${u.ran} of ${RISE} steps`);
-  const h = hand[1], h2 = hand[2], pitch = 0.04;
-  // At RISE and at twice it: a spacing read once could be any moment of
-  // the domes merging (the header's 0.55 to 0.8 of the pitch).
-  const spaced = (r) => r.domes >= 8 && r.spacing >= 0.7 * pitch && r.spacing <= 1.15 * pitch;
-  check('past it, domes stand up a capillary wavelength apart',
-    spaced(h) && spaced(h2),
-    `${h.domes} then ${h2.domes} domes twice the pool's depth or more, their nearest neighbours a median ${h.spacing.toFixed(4)} then ${h2.spacing.toFixed(4)} apart against 2π l_c = ${pitch}`);
+  const h = hand[1], h2 = hand[2], pitch = await page.evaluate(() => lab.SPIKE_PITCH);
+  /*
+    The wavelength that grows fastest on the Magnet's axis (the header's 2):
+    the film's lift G there, as wgsl/standing.ts's lift() reads the field
+    (0.8 on the axis, by REL3), and the larger root of 4k² − 3Gk + 2 = 0.
+    Read from the lab, so a change to the lift's scale moves the bar with
+    the physics it describes, and printed.
+  */
+  const lift0 = await page.evaluate(() => lab.LIFT_ONSET);
+  const langevin = (x) => 1 / Math.tanh(Math.min(x, 20)) - 1 / x;
+  const G = 2 * (langevin(0.8 / (ONSET / lift0)) / langevin(lift0)) ** 2;
+  const fastest = 1 / ((3 * G + Math.sqrt(9 * G * G - 32)) / 8);
+  if (!(fastest > 0.3 && fastest < 1)) throw new Error(`the fastest-growing wavelength reads ${fastest} of the pitch (G ${G}): the film's lift changed shape`);
+  // At RISE and at twice it: a spacing read once could be any moment of the
+  // domes merging, so both, and the merging may only widen it.
+  const spaced = (r) => r.domes >= 8 && r.spacing >= fastest * pitch && r.spacing <= 1.15 * pitch;
+  check('past it, domes stand up as far apart as the layer\'s instability sets them, and merge wider',
+    spaced(h) && spaced(h2) && h2.spacing >= h.spacing,
+    `${h.domes} then ${h2.domes} domes twice the pool's depth or more, their nearest neighbours a median ${h.spacing.toFixed(4)} then ${h2.spacing.toFixed(4)} apart (${(h.spacing / pitch).toFixed(2)} then ${(h2.spacing / pitch).toFixed(2)} of 2π l_c = ${pitch}), against the fastest-growing ${(fastest * pitch).toFixed(4)} at G ${G.toFixed(2)} and 1.15 of the pitch`);
   const w = weak[1];
   // Domes at 0.35 as well: a pool thinning with none standing would open
   // the plate too.

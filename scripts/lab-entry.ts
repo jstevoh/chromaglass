@@ -9,6 +9,7 @@ import { DISPLAY_MAIN, plateWgsl } from '../src/gpu/wgsl/plate';
 import { displayGateTests, displayMayMask, leanDisplayWgslCounted } from '../src/gpu/displayLean';
 import type { AirGeo } from '../src/gpu/air';
 import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_PITCH, SPIKE_B_REF, MAGNET_E, MAGNET_BS } from '../src/gpu/wgsl/spikes';
+import { LIFT_ONSET } from '../src/gpu/wgsl/standing';
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
 import { MAGNET_RADIUS } from '../src/gpu/wgsl/magnetDisc';
 import { BeadField, rasterDrops } from '../src/lib/beads';
@@ -689,6 +690,8 @@ const api = {
    * physics.
    */
   SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_PITCH, SPIKE_B_REF, MAGNET_RADIUS, magnetReach, magnetDepth,
+  /** The film's lift scale (wgsl/standing.ts), for `npm run standing` to work out the wavelength that grows fastest. */
+  LIFT_ONSET,
   /**
    * The magnet's pull in the solver's own units, and the gap's, for `npm run
    * magnetgain` to derive what MAGNET_GAIN is in tesla, metres and seconds
