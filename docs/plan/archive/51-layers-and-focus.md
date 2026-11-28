@@ -31,7 +31,10 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   deck Go now leaves what the decks stand on alone (`DECK_RIG`: Two Projectors, the plate
   count, the lamp ground and render style, the back row's blend, both plates' levels), and
   `npm run decks` sends every house look through it (46 of 46 would switch it off by a plain
-  Go, 0 by a deck Go). A Back, a later Go or a Go to the
+  Go, 0 by a deck Go). The second film (51c-2c) found the light under the glass: held at
+  the lamp ground, Solar Flare's own LED (a single dark #2a0700) became both plates' lamp
+  when its switch flipped at the fade's middle, and the wall fell to a third of its light in
+  one frame; the LED platform and its Mixer row are now held too. A Back, a later Go or a Go to the
   back plate stops what of a deck Go is still to come. And B with no light on the wall is no
   longer blurred at all (`gpu/plateUniforms.ts`), so a dark B's melt costs nothing; A's is
   still drawn, because where neither projector has light the Mixer's rows laid over both

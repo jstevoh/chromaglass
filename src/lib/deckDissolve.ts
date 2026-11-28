@@ -115,9 +115,14 @@ export const dishOf = (target: VisualizerSettings, now: VisualizerSettings): Vis
  * projector out halfway through its own dissolve: the wall fell back to one
  * lamp through both plates, the old dish showed under the new one, and the
  * next Go was a plain one that changed the lit plate. In a deck show these
- * are the operator's, as the crossfade is.
+ * are the operator's, as the crossfade is. So is the light under the glass,
+ * the LED platform and its row (the second film, 51c-2c): held at the lamp
+ * ground, Solar Flare's own LED, a single #2a0700, became the lamp of both
+ * plates when its switch flipped at the fade's middle, and the wall fell to
+ * a third of its light in one frame. A deck show's lamps are its projectors'.
  */
-export const DECK_RIG: ReadonlySet<string> = new Set(['twoProjectors', 'layerCount', 'lampGround', 'renderStyle', 'backBlend', 'frontLevel', 'backLevel']);
+export const DECK_RIG: ReadonlySet<string> = new Set(['twoProjectors', 'layerCount', 'lampGround', 'renderStyle', 'backBlend', 'frontLevel', 'backLevel',
+  'ledPlatform', 'ledMode', 'ledColor', 'ledSpeed', 'ledLevel', 'ledBlend', 'ledBright', 'ledContrast', 'ledSat', 'ledHue', 'ledFade']);
 
 /** The rest of the look over the plate's dish as it is: everything but the solver settings and what the decks stand on (`DECK_RIG`), those `now`'s. */
 export const drawingOf = (target: VisualizerSettings, now: VisualizerSettings): VisualizerSettings => split(target, now, k => PER_LAYER.has(k) || DECK_RIG.has(k));
