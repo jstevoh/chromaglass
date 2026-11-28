@@ -158,6 +158,37 @@ through cords and preset patches, and the plate shader is untouched.
   verification of our app for the `youtube` scope (a privacy policy, a review of
   weeks) and us running the sign-in. Decide after the owner has used it for a few
   uploads. Not in the store, and not named on the site while undecided.
+  **Decided 2026-11-28 (the owner): publish it as `sendreel`, MIT**, the reelreader
+  pattern (its own repository, npm, a Claude Desktop extension, a page on the owner's
+  other site, never chromaglass.art), for YouTube, Vimeo and TikTok drafts. Name
+  checked 2026-11-28: no US register mark, free on npm, no repository or product by it.
+  Not in YouTube's API, so left to Studio: copyright and public-domain disputes, end
+  screens, cards, community posts. Instagram and a multi-network scheduler, later.
+  - **44i-2a. Runs on any computer, and says what setup is left.** **Built 2026-11-28**
+    (`npm run youtube`): the hourly drain in each system's own scheduler (LaunchAgent,
+    systemd user timer, Task Scheduler) and notifier (osascript, notify-send,
+    PowerShell), `settings.json` (time zone for release times, default category),
+    `SENDREEL_*` variables beside the old ones, the folder `~/.config/sendreel/youtube`
+    unless the owner's old one exists, and `setup`, which walks the Google steps and
+    prints the fix for the first not done. Modules in `mcp/youtube/`.
+  - **44i-2a-1.** The drain's job keeps the old `art.chromaglass.youtube-drain` label so
+    the owner's Mac keeps one agent; the release renames it and removes the old one.
+  - **44i-2a-2.** The Windows drain's output has nowhere to go (Task Scheduler takes no
+    redirect without a shell); `upload_status` is the record there.
+  - **44i-2b.** Captions (`.srt`/`.vtt`, `captions.insert`), chapters (description
+    timestamps from a list or the sidecar), a credits footer from settings (the owner's:
+    the music's CC BY line), localized titles and descriptions.
+  - **44i-2c.** A Shorts check (three minutes or less, vertical or square, tagged) and a
+    whole folder queued at once; reelreader's side cuts a 9:16 clip from its best moment.
+  - **44i-2d.** Analytics (YouTube Analytics API, its own read-only scope asked only when
+    wanted): watch time, retention, traffic sources per video.
+  - **44i-2e.** Comments: list and reply (its own scope, also asked only when wanted).
+  - **44i-2g.** Vimeo: upload (tus, resumable), edit, privacy, showcases, on a personal
+    access token (no app review).
+  - **44i-2h.** TikTok drafts: the Content Posting API's upload mode, which lands a clip
+    in the TikTok inbox to finish on the phone (public posting waits on TikTok's audit
+    of an app; each user makes their own developer app once).
+  - **44i-2f.** The release: `jstevoh/sendreel`, npm, the Desktop extension, the page.
 - **44i-3. The channel from claude.ai on the web and the phone.** A local server is
   reachable only from the Mac's own assistant apps. Once 44h's Worker exists, the
   same tools can ride it (the Mac's server doing the upload, since the films are on
