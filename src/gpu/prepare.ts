@@ -62,6 +62,7 @@ import { SoapFilmPlate } from './soapFilmPlate';
 import { TankPlate } from './tankPlate';
 import { preparePlateBoil } from './lampBoil';
 import { FaradayPlate } from './faraday';
+import { SurfaceHeight } from './surfaceHeight';
 import { GlowPlate } from './glow';
 import { WebGPUParticles } from './particles';
 import { FineDye } from './fineDye';
@@ -568,6 +569,7 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
     ...SoapFilmPlate.prepare(device, open),
     ...TankPlate.prepare(device),
     ...FaradayPlate.prepare(device, open),
+    ...SurfaceHeight.prepare(device, open),
     ...GlowPlate.prepare(device, open),
     ...WebGPUParticles.prepare(device, open),
     ...FineDye.prepare(device, open),

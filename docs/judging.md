@@ -3189,3 +3189,16 @@ enough to bead, by design).
    of big bodies look as they did.
 To put it back: THREAD in `src/gpu/wgsl/fluid/capillary.ts` returns 0 from threadCurve
 (`npm run beads` then reads one body, as main did).
+
+## 152. The Magnet's domes in the closeup (PLAN 29a-13)
+
+The domes a magnet stands were black blobs in the macro view. Their sides now mirror the lit
+liquid round them as a camera records a dark gloss under water, with the light's glint on
+each top.
+
+1. Magnet Garden (or Ferro Paint) with the domes standing, zoom in to 4x-6x on them: each dome
+   should read as a raised, glossy black cone: a coloured sheen down its sides, brighter toward
+   its foot, and a bright point on its top.
+2. Relief / 3D at 0: the old flat drawing, black domes.
+3. Bad: domes that read as holes or bowls rather than raised, a sheen that looks painted on, or
+   any change to the plate at 1x.
