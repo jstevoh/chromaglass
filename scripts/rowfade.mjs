@@ -566,7 +566,7 @@ const lvSrc = code(src('src/components/LiquidVisualizer.tsx'));
 check('a Go, a Back and Send to wall dip the ring for the handoff, and the unattended changes do not; the handoff swaps at the middle the dip is centred on',
   // Three: a Go's, a Back's, and a deck Go's dish on the front (PLAN 51c-2), which runs the handoff too.
   ringCalls.length === 3 && ringCalls.some(c => /fadeSettingsTo\(target, fade, false, \[\], true\)/.test(c))
-  && ringCalls.some(c => /true, blackoutRef/.test(c)) && ringCalls.some(c => /dishOf\(target, settingsRef\.current\) : target, fade, false, \[\], true\)/.test(c))
+  && ringCalls.some(c => /true, blackoutRef/.test(c)) && ringCalls.some(c => /dishOf\(target, settingsRef\.current\), plan\.dishSeconds, false, \[\], true\)/.test(c))
   && /lookFadeStep\(false, true\)/.test(around('const sendDraftToWall', 3000))
   && /if \(h\.dosed === 1 && p >= 0\.5\) \{/.test(lvSrc),
   `${fadeCalls.length} fadeSettingsTo calls, ${ringCalls.length} with the ring`);

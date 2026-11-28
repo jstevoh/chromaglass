@@ -21,22 +21,28 @@
  * render pass for both, until 16b gives each projector its own source. So a
  * Go to the dark deck takes it the new look's dish (the front's solver
  * settings and dyes, or the back plate's own look), and the rest of the look,
- * which shows on both, changes on the front over the fade's middle half,
+ * which shows on both, changes on the front inside the fade's middle half,
  * where both are melted (Focus Dissolve up) or both half lit: 51c's window.
  *
  * The timing, a fade of T:
  *   - the dish goes in at the Go, over T/4, while its deck is dark; a deck
  *     still lit at the Go (the crossfade in the middle, as it opens) waits
  *     out the first quarter, its rack out, and changes over the second, held
- *     melted;
+ *     melted: either way it has landed before its deck racks in at T/2;
  *   - the crossfade travels over the middle half, T/4 to 3T/4, along
  *     sin²(π q / 2), still at both ends as a hand starts and stops a fader;
  *     linear in light (51a), so the middle is no brighter than the ends;
- *   - the rest of the look fades on the front over the middle half;
+ *   - the rest of the look fades on the front once the dish has landed, to
+ *     3T/4: inside the middle half, and never beside the dish's own fade on
+ *     the front (one fade at a time there: the first build ran a lit front's
+ *     dish over the whole middle half, still changing as it racked in);
  *   - the racks (lib/focusDissolve.ts startDeckRack) run the whole T.
  * A second Go mid-dissolve goes to the deck the crossfade is leaving: the
  * light turns round from where it stands, and each projector's rack carries
  * on from its blur.
+ *
+ * A Back, a later Go to either plate, or a hand on the crossfader stops
+ * what of a deck Go is still to come (app/useLookFades.ts `stopDeck`).
  *
  * Plain numbers; the App's look fades run it (app/useLookFades.ts) and
  * `npm run focus` drives it with a made-up clock.
@@ -77,12 +83,13 @@ export function deckPlan(x: number | undefined, seconds: number): DeckPlan {
   const to = darkDeck(x);
   const t = Math.max(0, seconds);
   const dark = deckLight(x, to) < DARK_SHARE;
+  const dishFrom = dark ? 0 : LOOK_FROM, restFrom = dishFrom + LOOK_FROM;
   return {
     to,
-    dishDelayMs: dark ? 0 : LOOK_FROM * t * 1000,
+    dishDelayMs: dishFrom * t * 1000,
     dishSeconds: LOOK_FROM * t,
-    lookDelayMs: LOOK_FROM * t * 1000,
-    lookSeconds: (LOOK_TO - LOOK_FROM) * t,
+    lookDelayMs: restFrom * t * 1000,
+    lookSeconds: (LOOK_TO - restFrom) * t,
   };
 }
 

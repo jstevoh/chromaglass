@@ -17,7 +17,7 @@
  *
  *   0. the deck a Go goes to is the darker one, B on a tie; the dish goes in
  *      at once on a dark deck over the first quarter, and waits that quarter
- *      on a lit one; the rest of the look runs the middle half;
+ *      on a lit one; the rest of the look follows the dish, to three quarters;
  *   1. the crossfade is still until a quarter of the way, lands at three
  *      quarters, never turns back, and is still at both ends (a hand's start
  *      and stop): its first and last frames' steps are under a tenth of its
@@ -28,8 +28,9 @@
  *      the look's window both are; a deck's rack jumps (a frame's step over
  *      a fifth of its depth) only while its light is under 2%; and both end
  *      at rest, sharp;
- *   3. a Go to a lit deck (the crossfade in the middle) racks it out over
- *      the first quarter and changes its dish only once it is melted;
+ *   3. a Go to a lit deck, either way, racks it out over the first quarter
+ *      and changes its dish only while it is held melted, landed before it
+ *      racks in; the rest of the look never beside the dish on the front;
  *   4. a second Go mid-dissolve, before the middle and past it, goes to the
  *      darker deck then, and neither rack steps by more than a frame's worth
  *      at the second Go; 2 still holds after it;
@@ -38,9 +39,11 @@
  *      are the look;
  *   6. the switch is the rig's: off by default (a Go as before), not
  *      wandered, ridden by a cord or carried by a look, learnable as a
- *      switch; and the wiring reads the source: a Go goes to the decks only
- *      with Decks on, a fade and two projectors, and the Mixer draws Decks
- *      only where there is a B.
+ *      switch; and the wiring reads the source (the App's timers cannot run
+ *      in node): a Go goes to the decks only with Decks on, a fade and two
+ *      projectors; a Back, a later Go and a Go to the back plate stop what of
+ *      a deck Go is still to come; the front takes the dish and then the
+ *      rest at the plan's times; and the Mixer draws Decks only where there is a B.
  *
  * Then of the real plate pass in the lab, two projectors at 256, the racks
  * and the crossfade as the clocks walk them over a dissolve:
@@ -49,9 +52,9 @@
  *      linear light within 1% of the first's, the racks melting both decks
  *      in turn (a blur in display values would darken the middle);
  *   8. a dark deck is not on the wall: at the crossfade's end, A's picture
- *      is the same to the byte with B sharp or melted (so B's dish can change
- *      there unseen), and the positive control: at the middle, B's melt moves
- *      the wall;
+ *      is the same to the byte with B sharp or melted, and with B's dish
+ *      changed (its plate turned another way); the positive controls: at the
+ *      middle, each moves the wall;
  *   9. the dissolve leaves nothing behind: its first frame is the plain A
  *      and its last the plain B, to the byte.
  */
@@ -111,9 +114,10 @@ function softWhileMoving(frames) {
   const plan = deckPlan(0, T), planB = deckPlan(1, T), planTie = deckPlan(0.5, T);
   const routes = darkDeck(0) === 1 && darkDeck(1) === 0 && darkDeck(0.5) === 1 && darkDeck(0.51) === 0 && darkDeck(undefined) === 1;
   const times = plan.to === 1 && plan.dishDelayMs === 0 && Math.abs(plan.dishSeconds - 1) < 1e-9 && Math.abs(plan.lookDelayMs - 1000) < 1e-6 && Math.abs(plan.lookSeconds - 2) < 1e-9
-    && planB.to === 0 && planB.dishDelayMs === 0 && planTie.dishDelayMs > 0;
-  check('the deck a Go goes to is the darker one, B on a tie; a dark deck\'s dish goes in at the Go over the first quarter, a lit one\'s waits it; the rest of the look runs the middle half',
-    routes && times, `dark Go: dish at ${plan.dishDelayMs} ms for ${plan.dishSeconds} s, the rest at ${plan.lookDelayMs} ms for ${plan.lookSeconds} s; lit Go: dish at ${planTie.dishDelayMs} ms`);
+    && planB.to === 0 && planB.dishDelayMs === 0
+    && Math.abs(planTie.dishDelayMs - 1000) < 1e-6 && Math.abs(planTie.lookDelayMs - 2000) < 1e-6 && Math.abs(planTie.lookSeconds - 1) < 1e-9;
+  check('the deck a Go goes to is the darker one, B on a tie; a dark deck\'s dish goes in at the Go over the first quarter, a lit one\'s waits it; the rest of the look follows the dish, to three quarters',
+    routes && times, `dark Go: dish at ${plan.dishDelayMs} ms for ${plan.dishSeconds} s, the rest at ${plan.lookDelayMs} ms for ${plan.lookSeconds} s; lit Go: dish at ${planTie.dishDelayMs} ms, the rest at ${planTie.lookDelayMs} ms for ${planTie.lookSeconds} s`);
 
   const c = rackClock();
   startDeckRack(c, 0, T, 1);
@@ -139,19 +143,25 @@ function softWhileMoving(frames) {
     `B's light in the dish's window ${f3(darkDish)}, least melt while moving ${f3(moving)}, through the look ${f3(lookSoft)}, jumps in view ${jump}`);
 }
 
-// ── 3. A Go to a lit deck ──────────────────────────────────────────────
+// ── 3. A Go to a lit deck, either way ──────────────────────────────────
 {
-  const plan = deckPlan(0.5, T);
-  const c = rackClock();
-  startDeckRack(c, 0, T, plan.to);
-  const fr = walk(c, 0.5, plan.to, 0, MS + 100);
-  const at = (ms) => fr.reduce((b, f) => (Math.abs(f.t - ms) < Math.abs(b.t - ms) ? f : b));
-  const meltedAtDish = at(plan.dishDelayMs).s[1];
-  const heldThrough = Math.min(...fr.filter(f => f.t >= plan.dishDelayMs && f.t <= plan.dishDelayMs + plan.dishSeconds * 1000).map(f => f.s[1]));
-  const { moving, jump } = softWhileMoving(fr);
-  check('a Go to a lit deck (the crossfade in the middle) racks it out over the first quarter and changes its dish only once it is melted, held melted until the dish has landed',
-    plan.to === 1 && plan.dishDelayMs > 0 && meltedAtDish >= 0.999 && heldThrough >= 0.999 && moving >= 0.5 - 1e-6 && jump === 0,
-    `B's melt as its dish goes in ${f3(meltedAtDish)}, least while it lands ${f3(heldThrough)}, least while moving ${f3(moving)}`);
+  const lit = (x0) => {
+    const plan = deckPlan(x0, T);
+    const c = rackClock();
+    startDeckRack(c, 0, T, plan.to);
+    const fr = walk(c, x0, plan.to, 0, MS + 100);
+    const d = plan.to;
+    const lands = plan.dishDelayMs + plan.dishSeconds * 1000;
+    const during = fr.filter(f => f.t >= plan.dishDelayMs && f.t <= lands).map(f => f.s[d]);
+    const restEnd = plan.lookDelayMs + plan.lookSeconds * 1000;
+    const { moving, jump } = softWhileMoving(fr);
+    return { plan, held: Math.min(...during), lands, restOk: plan.lookDelayMs >= lands - 1e-6 && restEnd <= 0.75 * MS + 1e-6 && plan.lookDelayMs >= 0.25 * MS - 1e-6, moving, jump };
+  };
+  const toB = lit(0.5), toA = lit(0.75);
+  const ok = (r, to) => r.plan.to === to && r.plan.dishDelayMs > 0 && r.held >= 0.999 && r.lands <= 0.5 * MS + 1e-6 && r.restOk && r.moving >= 0.5 - 1e-6 && r.jump === 0;
+  check('a Go to a lit deck, to B from the middle or to A from three quarters, waits for it to melt, changes its dish only while it is held melted, landed before it racks in at the half; the rest of the look follows the dish, inside the middle half',
+    ok(toB, 1) && ok(toA, 0),
+    `to B: held ${f3(toB.held)}, landed at ${toB.lands} ms; to A: held ${f3(toA.held)}, landed at ${toA.lands} ms; least melt while moving ${f3(Math.min(toB.moving, toA.moving))}`);
 }
 
 // ── 4. A second Go mid-dissolve ────────────────────────────────────────
@@ -206,9 +216,15 @@ function softWhileMoving(frames) {
   const fades = readFileSync('src/app/useLookFades.ts', 'utf8');
   const bank = readFileSync('src/components/ProjectorBank.tsx', 'utf8');
   const gate = /if \(\(settingsRef\.current\.projDeck \?\? 0\) > 0\.5 && seconds > 0 && twoOnWall\(settingsRef\.current\)\) \{ deckGo\(next, seconds\); return; \}/.test(fades);
+  const body = (from, to) => fades.slice(fades.indexOf(from), fades.indexOf(to, fades.indexOf(from)));
+  const stops = [body('const sendLook =', 'const goLook ='), body('const sendBack =', 'const goBackPlate ='), body('const revertLook =', '}, [fadeSeconds')].every(b => /stopDeck\(\);/.test(b));
+  const deck = body('const deckGo =', 'useEffect(() => () => stopDeck()');
+  const order = /after\(deckBack, plan\.dishDelayMs,/.test(deck) && /after\(frontWait, plan\.lookDelayMs, rest\)/.test(deck)
+    && /after\(frontWait, plan\.dishDelayMs, \(\) => \{[\s\S]*fadeSettingsTo\(dishOf\(target, settingsRef\.current\), plan\.dishSeconds[\s\S]*after\(frontWait, plan\.lookDelayMs - plan\.dishDelayMs, rest\);/.test(deck)
+    && /previousLook\.current = \{ id: pinnedPresetId, settings: s \};/.test(deck);
   const twoBranch = bank.slice(bank.indexOf('{two ? ('), bank.indexOf(') : (', bank.indexOf('{two ? ('))).includes('decks()');
-  check('Decks is the rig\'s: off by default, not wandered, ridden or carried by a look, learnable as a switch; a Go goes to the decks only with it on, a fade and two projectors, and the Mixer draws it only where there is a B',
-    rig && gate && twoBranch, `learnable ${learn ? `${learn.min}–${learn.max} step ${learn.step}` : 'no'}, gate ${gate}, drawn with B ${twoBranch}`);
+  check('Decks is the rig\'s: off by default, not wandered, ridden or carried by a look, learnable as a switch; a Go goes to the decks only with it on, a fade and two projectors; a Back, a later Go or a Go to the back plate stops what of a deck Go is to come; the front takes the dish, then the rest, as planned; and the Mixer draws Decks only where there is a B',
+    rig && gate && twoBranch && stops && order, `learnable ${learn ? `${learn.min}–${learn.max} step ${learn.step}` : 'no'}, gate ${gate}, drawn with B ${twoBranch}, a Back and a later Go stop it ${stops}, dish then rest as planned ${order}`);
 }
 
 // ── 7–9. Through the real pass ─────────────────────────────────────────
@@ -231,13 +247,13 @@ for (let i = 0; i <= SAMPLES; i++) {
 const lab = await openLab();
 let shots;
 try {
-  const shoot = async (over, rack) => {
-    const b64 = await lab.page.evaluate(async ([S, N, BACK, over, rack]) => {
-      const bytes = new Uint8Array(await lab.render(S, { ...N, ...over }, rack ? { ...BACK, rack } : BACK));
+  const shoot = async (over, rack, cam = {}) => {
+    const b64 = await lab.page.evaluate(async ([S, N, BACK, over, rack, cam]) => {
+      const bytes = new Uint8Array(await lab.render(S, { ...N, ...over }, rack ? { ...BACK, ...cam, rack } : { ...BACK, ...cam }));
       let bin = '';
       for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
       return btoa(bin);
-    }, [S, NEUTRAL, BACK, over, rack]);
+    }, [S, NEUTRAL, BACK, over, rack, cam]);
     return Buffer.from(b64, 'base64');
   };
   await lab.page.evaluate(async ([BLUE, TEAL]) => {
@@ -251,6 +267,9 @@ try {
   shots.aBmelt = await shoot({ projCross: 0 }, [0, 1]);
   shots.midBsharp = await shoot({ projCross: 0.5 }, [0, 0]);
   shots.midBmelt = await shoot({ projCross: 0.5 }, [0, 1]);
+  // B's dish changed (its plate turned a quarter instead of a half), at A and at the middle.
+  shots.aBother = await shoot({ projCross: 0 }, [0, 1], { backRotation: Math.PI / 2 });
+  shots.midBother = await shoot({ projCross: 0.5 }, [0, 1], { backRotation: Math.PI / 2 });
 } finally { await lab.close(); }
 
 {
@@ -259,8 +278,9 @@ try {
   check('through the real pass the wall\'s light is kept across a deck dissolve: every frame\'s mean linear light within 1% of the first\'s, both decks melting in turn',
     worst <= 0.01 && l0 > 0.02, `worst ${(100 * worst).toFixed(2)}% off, first frame ${f3(l0)} linear`);
   const dark = maxDiff(shots.aBsharp, shots.aBmelt), mid = maxDiff(shots.midBsharp, shots.midBmelt);
-  check('a dark deck is not on the wall and costs nothing: with the crossfade at A, the wall is the same to the byte with B sharp or melted (the pass sits out for it, and its dish can change there unseen); at the middle B\'s melt moves it (the control)',
-    dark === 0 && mid > 8, `at A ${dark} levels, at the middle ${mid}`);
+  const dish = maxDiff(shots.aBmelt, shots.aBother), dishMid = maxDiff(shots.midBmelt, shots.midBother);
+  check('a dark deck is not on the wall: with the crossfade at A, the wall is the same to the byte with B sharp or melted (the pass sits out for it) and with B\'s dish changed; at the middle each moves it (the controls)',
+    dark === 0 && dish === 0 && mid > 8 && dishMid > 8, `at A: B's melt ${dark}, its dish ${dish} levels; at the middle: ${mid} and ${dishMid}`);
   const startD = maxDiff(shots.frames[0], shots.plainA), endD = maxDiff(shots.frames[SAMPLES], shots.plainB);
   check('the dissolve leaves nothing behind: its first frame is the plain A and its last the plain B, to the byte',
     startD === 0 && endD === 0, `first ${startD}, last ${endD} levels`);
