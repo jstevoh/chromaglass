@@ -115,10 +115,11 @@ export function carrierViscosity(viscosity: string | undefined): number {
  * reads the same dial: 2% at 0, 15% at 1. So does the slump of a pool on a
  * level plate (PLAN 18m, wgsl/slump.ts). The dial runs on to 2 (PLAN 27h-2),
  * 28%: a dye as heavy against its liquid as glycerine (1.26) is against
- * water, still a real pair, just not one a light show pours. At 6 mm and
- * 1024² the slump then asks for 27 substeps against SLUMP_SUBSTEPS' 20, and
- * the face guard (SLUMP_FACE) holds each to its stable share: the front
- * still runs faster than at 1, a little under its Froude speed. The oil a look pours is lighter
+ * water, still a real pair, just not one a light show pours. The slump's
+ * step is backward Euler (PLAN 18m-1a), stable at any weight: at 1024² the
+ * dial's 2 plans four substeps, to keep its faster front under a cell each
+ * (fluid/slump.ts), where the explicit step it replaced ran out of substeps
+ * and slowed the front with a per-face guard. The oil a look pours is lighter
  * than the water, about 12% (mineral oil 0.85–0.88 against 1.0), and the
  * ferrofluid heavier, about 25% (a light-oil ferrofluid is 1.1–1.2 against a
  * 0.88 oil), both fixed properties of the liquids and so constants in the
