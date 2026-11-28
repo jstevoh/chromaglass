@@ -577,9 +577,6 @@
       "name": "Watching in words",
       "shard": "sound",
       "run": "npm run watchwords",
-      "quarantine": [
-        { "line": "drift → drift2 (the same look, another phase): no steady change past a step", "plan": "47x-11", "since": "2026-11-22", "until": "2026-12-06" }
-      ],
       "why": [
         "The watch tool says what it sees in words (docs/watch-words.md: Laban,",
         "Itten, Ching, Greenberg, Arnheim, the wet show) and tells a before film",
@@ -3374,6 +3371,18 @@
       ]
     },
     {
+      "name": "Turbulence and the comet stir the dish without emptying it",
+      "shard": "lab",
+      "run": "npm run rimstir",
+      "timeout": 20,
+      "why": [
+        "Lacing Run and Classical Vibe left dim (PLAN 18a-25): the Turbulence's",
+        "curl noise and the comet's pull were laid into the open-rim solve as",
+        "through-flows and ran the dish out over its rim (7% and 0.04% left in",
+        "the lab); both are now the closed dish's circulation, as strong inside."
+      ]
+    },
+    {
       "name": "Keep Full refills an emptied dish in the app",
       "shard": "plate",
       "run": "npm run keepfullapp",
@@ -3772,6 +3781,21 @@
         "at 512², a thread of oil narrower than the gap breaks into beads",
         "(Rayleigh–Plateau, its curvature across the gap) and a ribbon wider",
         "than the gap holds (confinement); no oil made or lost. About seven",
+        "minutes on software WebGPU."
+      ]
+    },
+    {
+      "name": "Oil threads bead at the Rayleigh–Plateau wavelength",
+      "shard": "plate",
+      "run": "npm run pinch",
+      "timeout": 15,
+      "why": [
+        "PLAN 47k: the per-cell clip on the oil's capillary force flattened",
+        "Rayleigh–Plateau on a thread, so waves past the cutoff grew and beads",
+        "came at any spacing. At 512² on a thin gap, eight threads' waves grow",
+        "at the plate's Darcy law (past kr = 1 they shrink, the fastest near",
+        "0.67, the long ones within 30% of its rate) and four noisy threads",
+        "bead 4.7 widths apart within 15%; no oil made or lost. About five",
         "minutes on software WebGPU."
       ]
     },

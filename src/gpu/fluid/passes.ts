@@ -13,7 +13,7 @@ import { WebGPUSlosh } from '../slosh';
 import { OPEN_RIM } from '../../lib/turntable';
 import { DYE_FLOOR } from '../../lib/dye';
 import { WebGPUParticles } from '../particles';
-import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, oilNuOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIQUID_FALL, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, thinGapViscosity, R32, RG32, VEL, AIR_DISP_LEAST, HOLD_APART_FINE, HOLD_APART_WIDER } from './constants';
+import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, oilNuOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIQUID_FALL, LIFT_SWEEPS, SEAL_KERNEL_NAMES, STIR_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, thinGapViscosity, R32, RG32, VEL, AIR_DISP_LEAST, HOLD_APART_FINE, HOLD_APART_WIDER } from './constants';
 import { FluidFields } from './fields';
 import type { SlumpPlan } from './slump';
 import { WARM_GROUPS } from '../wgsl/thinWarm';
@@ -1206,6 +1206,50 @@ export class FluidPasses extends FluidFields {
     this.hsRun(pass, 'sealFlow', `sealFlow:${this.vel.read.label}`, this.arg('seal flow', [m, gx, gy, 0]), [this.vel.read, this.hsSealPsi!, this.vel.write]);
     this.vel.swap();
   }
+
+  /**
+   * Turbulence's stir on the thin gap, as the closed dish lets it turn
+   * (PLAN 18a-25, wgsl/fluid/stir.ts has the physics): Φ with −∇²Φ = −∇²ψ
+   * inside the rim and Φ = 0 on it, ψ the curl noise forcesB lays on the old
+   * plate, relaxed LIFT_SWEEPS sweeps a step from where the last left it, and
+   * ∇⊥Φ added to the velocity before the gap's solve. Laid open, as forcesB
+   * laid it until then, the lab's dish kept 7% of its dye in 600 steps at
+   * Turbulence 0.5. Until the kernels are built (behind the show, or asked
+   * for here once, off the frame) the thin gap is not stirred at all.
+   */
+  protected stirClosed(pass: GPUComputePassEncoder, p: GpuStepParams): void {
+    if (!((p.turbScale ?? 0) > 0.005) || !this.stirReady()) return;
+    this.ensureThinGap();
+    const m = this.liftN;
+    this.hsRun(pass, 'stirSource', 'stirSource', this.arg('stir source', [m, 0, 0, 0]), [this.hsStirSrc!], m * m);
+    const omega = 2 / (1 + Math.sin(Math.PI / m));
+    for (let k = 0; k < LIFT_SWEEPS; k++) {
+      for (const parity of [0, 1]) {
+        this.hsRun(pass, 'hsLiftRelax', `stirRelax:${parity}`, this.arg(`stir relax ${parity}`, [m, parity, omega, 0]), [this.hsStirSrc!, this.hsStirPsi!], m * (m / 2));
+      }
+    }
+    this.hsRun(pass, 'stirFlow', `stirFlow:${this.vel.read.label}`, this.arg('stir flow', [m, 0, 0, 0]), [this.vel.read, this.hsStirPsi!, this.vel.write]);
+    this.vel.swap();
+  }
+
+  /** The stir's kernels, built behind the thin gap's own (prepareThinGap): a lab that awaits that build has them from its first step. */
+  protected async buildStir(): Promise<void> {
+    for (const name of STIR_KERNEL_NAMES) await this.pipelines.prepareCompute(this.pipelineKey(name, 'thin'), kernel(name, 'rgba16float'));
+  }
+
+  /** Whether the stir's kernels are built, as sealReady asks for the seal's. */
+  protected stirReady(): boolean {
+    let ready = true;
+    for (const name of STIR_KERNEL_NAMES) {
+      const key = this.pipelineKey(name, 'thin'), code = kernel(name, 'rgba16float');
+      if (this.pipelines.hasCompute(key, code)) continue;
+      ready = false;
+      if (!this.stirAsked) void this.pipelines.prepareCompute(key, code);
+    }
+    if (!ready) this.stirAsked = true;
+    return ready;
+  }
+  private stirAsked = false;
 
   /** A dispatch over textures and buffers in binding order, its group cached under `key`: 2D over the grid, or 1D over `count`. */
   protected hsRun(pass: GPUComputePassEncoder, name: string, key: string, args: GPUBuffer, resources: (GPUBuffer | GPUTexture)[], count?: number): void {

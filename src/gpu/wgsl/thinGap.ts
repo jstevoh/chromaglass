@@ -345,8 +345,24 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
       Plate Rock keeps 100% and moves 0.18 downhill. With oil Rain Drip stays
       laid directly, its colour's whole weight over the app's mean (a
       standing plate's oil is PLAN 27f-6, and κ is the lift over the tilt's
-      weight, not Rain Drip's); the comet's pull is an explicit push and
-      stays one.
+      weight, not Rain Drip's).
+
+      **And the comet's pull is a tilt's** (PLAN 18a-25). Comet Flow is "a
+      steady pull on the heavy dye, as a tilt or a wind would give": the
+      colour's weight over the mean times a constant (S.cometX, S.cometY),
+      which is Plate Rock's law with its own direction. It was laid straight
+      into the open-rim solve, as Rain Drip was before 18a-17, and drained
+      the dish the same way: on Classical Vibe's pours (the owner's Mac) it
+      took the mean dye from 0.59 to 0.05 in 10 s, and in the lab (128², a
+      disc to r 0.44, 600 steps, with the draught on so that this pass runs)
+      Comet 1.5 kept 0.04% of the dish where the draught alone kept 100%.
+      Now it is added to the tilt's pull L, so ψ = L_y Ψ_x − L_x Ψ_y carries
+      it: the heavy colour runs down the pull in tongues and the clear liquid
+      comes back past it, the comets the dial is for, and none of either
+      leaves. fluid.ts counts the comet as a tilt (\`rockOn\`) for that, so the
+      circulation is built where the comet alone is on, and with oil the
+      oil's lift goes against it as it goes up a tipped plate. Until the
+      circulation is built (A.b.w 0) it is laid directly, as the tilt is.
 
       A.a = (Rain Drip's weight, Updraft's share of the old push (fluid.ts,
       AIR_SHEAR), the rest gap h0, the breath's pascals to the flow's speed);
@@ -389,7 +405,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   var v = textureLoad(vel, q, 0);
   // Rain Drip's heavy colour down a standing plate, and Plate Rock's tilt (A.b.xy, fluid.ts ROCK_FALL):
   // both the dye's weight over the plate's mean, the second down whichever way the hand tips the glass.
-  // Comet flow adds an explicit, constant pull to the dye (S.cometX, S.cometY).
+  // The comet's pull (S.cometX, S.cometY) is a tilt's on the same colour, and joins the circulation with it (PLAN 18a-25).
   // With the oil (A.b.w), the water's colour and the oil's lift together as the closed circulation (above).
   if (A.a.x > 0.0 || any(A.b != vec4f(0.0)) || S.cometX != 0.0 || S.cometY != 0.0) {
     let dRim = uvOf(id) - vec2f(0.5);
@@ -401,7 +417,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     var rock = A.b.xy * w;
     // With no oil (A.b.w 2, PLAN 18a-17) Rain Drip's pull down the standing plate joins the tilt's in the circulation.
     let dripClosed = A.b.w > 1.5;
-    let pull = A.b.xy - select(vec2f(0.0), S.up * A.a.x, dripClosed);
+    let comet = vec2f(S.cometX, S.cometY);
+    let pull = A.b.xy + comet - select(vec2f(0.0), S.up * A.a.x, dripClosed);
     if (A.b.w > 0.0) {
       // u = ∇⊥ψ = (∂ψ/∂y, −∂ψ/∂x), ψ = L_y Ψ_x − L_x Ψ_y with L the colour's pull, by differences a cell of Ψ's grid apart:
       // on every cell, the rim's and past it too, so its divergence is zero on all of them (LIFT_GRID).
@@ -415,7 +432,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       let oilB = exp(clamp(clamp(textureLoad(mixT, min(q * md / i32(S.n), md - 1), 0).r, 0.0, 1.0) * A.b.z, -9.0, 9.0));
       rock = oilB * vec2f(pull.y * dy.x - pull.x * dy.y, -pull.y * dx.x + pull.x * dx.y);
     }
-    v = vec4f(v.xy - S.up * (select(A.a.x, 0.0, dripClosed) * w) + vec2f(S.cometX, S.cometY) * w + rock, v.z, v.w);
+    v = vec4f(v.xy - S.up * (select(A.a.x, 0.0, dripClosed) * w) + select(comet * w, vec2f(0.0), A.b.w > 0.0) + rock, v.z, v.w);
   }
   if (S.air > 0.1) {
     /*

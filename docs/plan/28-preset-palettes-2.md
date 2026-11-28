@@ -216,6 +216,17 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
     blob): Turbulence 0, the tongue defined again but the dish still as dim (18a-25). Why
     the two stirred looks drained: 18a-25, the comet and the Turbulence noise run out
     through the open rim.
+  - **28i-9. Give the stirred looks their stir back, now that it stays in the dish** (18a-25,
+    2026-11-28). 28i-8 took Lacing Run's Turbulence 0.7 → 0 and Classical Vibe's comet and
+    Turbulence 0.5 → 0.1 because both ran the dish out over the rim; 18a-25 closed both. Film
+    each with its old stir on main's physics and let the owner pick. Measured on the Mac
+    (2026-11-28, the lab's stills with no music, 60 s): with the dye kept, Lacing Run's dark
+    share falls 0.40 → 0.18, and at its old Turbulence 0.7 to 0, a flat orange wash; Classical
+    Vibe's colourfulness 62 → 55. So the looks may want less dye (Dye Budget) before more
+    stir; the films with the band are much less affected. And Comet River's
+    description ("a raging torrent that pulls ink off the plate") describes the leak: on a
+    closed dish its pull is a tilt's, heavy colour running down in tongues with the clear
+    liquid coming back; re-word it, or re-tune it, from a film.
 - **28j. Changing looks without a jump** (the owner, 2026-10-19: "transitions between
   presets are also a little jumpy here and there"). `blendLooks` fades every number and
   colour but switches lists, steps and booleans at the midpoint, and the handoff in
