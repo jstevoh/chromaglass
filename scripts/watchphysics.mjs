@@ -134,6 +134,20 @@ function search(a, b, px, py, bs, cx, cy, r) {
 const SEED_SLACK = 1.25;
 
 /**
+ * How weak a block's texture may be along its weaker direction, against its
+ * stronger, before it counts as running one way only (see seen). Measured
+ * 2026-11-28: the words check's stripes, through the codec, under 0.01 on
+ * every one of 71,280 blocks. An 8-pixel block on the soft rim of a round
+ * form (half-size pixels; a 1.5-pixel edge): 0.35 to 0.38 on a form 10
+ * across, 0.06 to 0.08 at 20, 0.014 to 0.018 at 40 (a quarter of the
+ * width), 0.003 to 0.004 at 80. So 0.02 lets the rim of a form up to about
+ * a quarter of the picture across be matched both ways, and takes a
+ * straighter edge than that for what it is, an edge whose slide along
+ * itself an 8-pixel block cannot see.
+ */
+const APERTURE = 0.02;
+
+/**
  * The displacement field from half-size image A to B: a vector per 8×8 block
  * (16 pixels at 320), in half-size pixels, or null where the block has too
  * little texture to match. Coarse to fine: at an eighth of the sample's size
@@ -173,18 +187,21 @@ const SEED_SLACK = 1.25;
  */
 export function flowField(A, B, seed = null, ratio = 1, mask2 = null) {
   const qa = halve(A), qb = halve(B), ea = halve(qa), eb = halve(qb);
-  const BS = 8, nx = Math.floor(A.w / BS), ny = Math.floor(A.h / BS), out = [];
+  const BS = 8, nx = Math.floor(A.w / BS), ny = Math.floor(A.h / BS), blocks = [];
+  // Every block's own search first, then the seeds: the seeded match is held
+  // against the grain of the whole pair (`floor` below), which is known only
+  // once every block has been searched.
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     // Not the outer ring of blocks: what they hold can leave the frame
     // before the next sample, and then the best match is a wrong one (on the
     // self-test's slid texture they were most of the 14% of motion the fit
     // could not explain).
-    if (i === 0 || j === 0 || i === nx - 1 || j === ny - 1) { out.push(null); continue; }
+    if (i === 0 || j === 0 || i === nx - 1 || j === ny - 1) { blocks.push(null); continue; }
     const x = i * BS, y = j * BS, cx = x + BS / 2, cy = y + BS / 2;
     if (mask2) {
       let mc = 0;
       for (let yy = 0; yy < BS; yy++) for (let xx = 0; xx < BS; xx++) if (mask2[(y + yy) * A.w + x + xx]) mc++;
-      if (mc > (BS * BS) >> 2) { out.push(null); continue; }
+      if (mc > (BS * BS) >> 2) { blocks.push(null); continue; }
     }
     // Texture: a block flat to within a few levels cannot be matched (the
     // aperture problem), so it carries no vector.
@@ -193,15 +210,38 @@ export function flowField(A, B, seed = null, ratio = 1, mask2 = null) {
     m /= BS * BS;
     for (let yy = 0; yy < BS; yy++) for (let xx = 0; xx < BS; xx++) v += (A.d[(y + yy) * A.w + x + xx] - m) ** 2;
     const sd = Math.sqrt(v / (BS * BS));
-    if (sd < 3) { out.push(null); continue; }
+    if (sd < 3) { blocks.push(null); continue; }
+    // Coarse to fine, each level's answer kept to what that level's block
+    // can see (oneWay, 47x-11) before it seeds the next.
     const e = search(ea, eb, cx / 4, cy / 4, 6, 0, 0, 6);
-    const q = search(qa, qb, cx / 2, cy / 2, 8, Number.isFinite(e.s) ? 2 * e.dx : 0, Number.isFinite(e.s) ? 2 * e.dy : 0, 2);
-    let h = search(A, B, cx, cy, BS, Number.isFinite(q.s) ? 2 * q.dx : 0, Number.isFinite(q.s) ? 2 * q.dy : 0, 2);
-    let edge = Math.abs(e.dx) === 6 || Math.abs(e.dy) === 6;
+    const pe = Number.isFinite(e.s) ? seen(ea, e, [e.dx, e.dy], [0, 0], 6) : [0, 0];
+    const q = search(qa, qb, cx / 2, cy / 2, 8, Math.round(2 * pe[0]), Math.round(2 * pe[1]), 2);
+    const pq = Number.isFinite(q.s) ? seen(qa, q, [q.dx, q.dy], [2 * pe[0], 2 * pe[1]], 8) : [2 * pe[0], 2 * pe[1]];
+    const h = search(A, B, cx, cy, BS, Math.round(2 * pq[0]), Math.round(2 * pq[1]), 2);
+    blocks.push({ i, j, cx, cy, sd, h, pred: [2 * pq[0], 2 * pq[1]], edge: Math.abs(e.dx) === 6 || Math.abs(e.dy) === 6 });
+  }
+  // The pair's grain, as a SAD: the median of every block's best match. Most
+  // blocks match truly, and what a true match still leaves is the codec's
+  // grain, its blocking and the part-pixel the integer search cannot reach;
+  // two matches nearer each other than that are both as good as a match gets.
+  const found = blocks.filter(bk => bk && Number.isFinite(bk.h.s)).map(bk => bk.h.s).sort((p, q) => p - q);
+  const floor = found.length ? found[found.length >> 1] : 0;
+  const out = [];
+  for (const bk of blocks) {
+    if (!bk) { out.push(null); continue; }
+    const { i, j, cx, cy, sd } = bk;
+    let { h, edge, pred } = bk;
     const sv = seed ? seed.v[j * nx + i] : null;
     if (sv && !sv.edge && sv.resid <= 0.6) {
       const t = search(A, B, cx, cy, BS, Math.round(sv.dx * ratio), Math.round(sv.dy * ratio), 1 + Math.ceil(ratio));
-      if (Number.isFinite(t.s) && !(t.s > SEED_SLACK * h.s)) { h = t; edge = false; }
+      // The seeded match wins unless the search's own is better by more
+      // than SEED_SLACK and by more than the grain (47x-11). A ratio alone
+      // fails where both are at the grain's floor, which is where an alias
+      // and the truth both sit: on the words check's stripes the alias 17
+      // back matched at 22 grey levels and the truth at 37, on a pair whose
+      // blocks' median best match was about 30, and a quarter of the blocks
+      // in some pairs took the alias and dragged the fit to half the speed.
+      if (Number.isFinite(t.s) && !(t.s > SEED_SLACK * h.s && t.s > h.s + floor)) { h = t; edge = false; pred = [sv.dx * ratio, sv.dy * ratio]; }
     }
     if (!Number.isFinite(h.s)) { out.push(null); continue; }
     const par = (l, c, r) => (Number.isFinite(l) && Number.isFinite(r) && l + r - 2 * c > 0 ? Math.max(-0.5, Math.min(0.5, (l - r) / (2 * (l + r - 2 * c)))) : 0);
@@ -209,9 +249,48 @@ export function flowField(A, B, seed = null, ratio = 1, mask2 = null) {
     const fy = par(zsad(A, B, h.x, h.y, BS, h.dx, h.dy - 1), h.s, zsad(A, B, h.x, h.y, BS, h.dx, h.dy + 1));
     // Match quality: the residual a pixel against the block's own contrast.
     const resid = h.s / (BS * BS) / sd;
-    out.push({ x: cx, y: cy, dx: h.dx + fx, dy: h.dy + fy, resid, edge });
+    const [dx, dy] = seen(A, h, [h.dx + fx, h.dy + fy], pred, BS);
+    out.push({ x: cx, y: cy, dx, dy, resid, edge });
   }
   return { nx, ny, v: out };
+}
+
+/**
+ * What a block can see of its own motion. The structure tensor of the
+ * block's gradients (the sums of gx², gy², gx·gy) has two eigenvalues, the
+ * texture's strength across its strongest direction and across the one at
+ * right angles. Where the second is under APERTURE of the first the block's
+ * texture runs one way only (a stripe, the side of a long thread or of a
+ * large blob, a wave front) and its match along that way is decided by the
+ * grain alone: the aperture problem. Its measured offset `d` then keeps
+ * only its part across the texture, and along it takes `pred`, the motion
+ * the level above or the seed predicted for it (normal flow on top of the
+ * coarser read, which saw more of the picture).
+ *
+ * Found on the words check's two takes of one look (47x-11): vertical
+ * stripes have no texture up and down, so every level of the search picked
+ * a vertical shift of up to its whole reach at random, the chain through
+ * time scaled each one by its ratio, and by the second a seed pointed 18 to
+ * 30 pixels up or down, off the picture or onto nothing, and lost to the
+ * stripes' alias. What was left read as the fluid's own flow: 0.75 % of the
+ * width a second on one take and 1.26 on the other, 1.3 steps apart, for a
+ * picture that only slid. On a block textured both ways nothing changes.
+ * `b` is the search's result (its block's top left in `img`), `n` its size.
+ */
+function seen(img, b, d, pred, n) {
+  let gxx = 0, gyy = 0, gxy = 0;
+  for (let yy = 0; yy < n; yy++) for (let xx = 0; xx < n; xx++) {
+    const X = b.x + xx, Y = b.y + yy, q = Y * img.w + X;
+    const gx = (img.d[X + 1 < img.w ? q + 1 : q] - img.d[X > 0 ? q - 1 : q]) / 2;
+    const gy = (img.d[Y + 1 < img.h ? q + img.w : q] - img.d[Y > 0 ? q - img.w : q]) / 2;
+    gxx += gx * gx; gyy += gy * gy; gxy += gx * gy;
+  }
+  const half = (gxx + gyy) / 2, r = Math.sqrt(((gxx - gyy) / 2) ** 2 + gxy * gxy), l1 = half + r, l2 = half - r;
+  if (!(l1 > 0) || l2 >= APERTURE * l1) return d;
+  // The strongest direction: across the texture.
+  const a = 0.5 * Math.atan2(2 * gxy, gxx - gyy), nx = Math.cos(a), ny = Math.sin(a);
+  const k = (d[0] - pred[0]) * nx + (d[1] - pred[1]) * ny;
+  return [pred[0] + k * nx, pred[1] + k * ny];
 }
 
 /**

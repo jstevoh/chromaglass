@@ -92,7 +92,19 @@ export const PRESETS: Preset[] = [
       plateCurve: 0,             // flat: at 0.2 a held Press never rests (heldpress, 38w-19)
       depthDrag: 1.2,
       plateSpring: 0.35,
-      plateRock: 0.8,            // the swells: 0.55 read as still (round four); 3.4x the motion (38w-24)
+      /*
+        The hand (PLAN 38w-28): the kick presses the whole clock glass, one
+        rigid piece down and back up (lib/glassPress.ts), and the rock is a
+        real hand's lean. The rock at 0.8, 4.5x past real, slid every cell
+        together, which was 77% of what moved (`npm run classichand`, the
+        owner's round-five read of the film said 80%); the press shears the
+        water against the oil, which is where liquids interact. Main's hand
+        read own motion 0.42 %/s, turnover 7.8 s; this one about 0.8 and
+        4.2, the slide 22% of it (real shows 2.0 to 8.0, 1.5 to 2.4 s, 15%).
+      */
+      plateRock: 0.3,
+      beatSqueeze: 1,
+      kickGlass: true,
       edgeRelief: 0,             // its rim reads the dye's slope, not the oil: dark lattice halos (38w-23)
       crispEdges: 1,             // the rims a real dish shows: one pixel, not the solver's band (38w-15)
       bubbles: 0.2,

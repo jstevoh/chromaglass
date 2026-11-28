@@ -240,6 +240,9 @@ export class FluidCore {
   /** The sealed bottle's (PLAN 27f-9): the weight's right-hand side and its Ψ, on the lift's grid. */
   protected hsSealSrc: GPUBuffer | null = null;
   protected hsSealPsi: GPUBuffer | null = null;
+  /** Turbulence's closed stir on the thin gap (PLAN 18a-25): its right-hand side and Φ, on the lift's grid. */
+  protected hsStirSrc: GPUBuffer | null = null;
+  protected hsStirPsi: GPUBuffer | null = null;
   protected liftN = 2;
   protected hsP: GPUBuffer | null = null;
   /**
@@ -897,6 +900,8 @@ export class FluidCore {
     if (this.hsLiftPsi) enc.clearBuffer(this.hsLiftPsi);
     // And the sealed bottle's, the last wax's.
     if (this.hsSealPsi) enc.clearBuffer(this.hsSealPsi);
+    // And the stir's, the last noise's.
+    if (this.hsStirPsi) enc.clearBuffer(this.hsStirPsi);
     // And the thin solve's faces, the flow's state (PLAN 18a-8): a wiped plate is still.
     if (this.hsFlow) enc.clearBuffer(this.hsFlow);
     this.submit(enc);

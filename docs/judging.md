@@ -3174,6 +3174,11 @@ crosses the solubility curve, the oil is conserved); how it looks in a show is t
    like paint, white gathering into thick opaque ribbons along an edge, the whole plate a
    grey veil inside a few minutes. Judged from the Mac's film (the thread's page), not by
    loading the app.
+7. Louche with music (PLAN 48s-8, Kick Bloom 0.3). Good: the plate breathes with the song,
+   a push and fold of the cloud through the passages where the kick hits hard, then a
+   quieter spell where little moves; each kick still drops a few small specks of colour.
+   Bad: a steady churn of bright specks on every beat with no rest between, or a dish that
+   has gone dark and empty. Judged from the before/after film on the thread's page.
 
 ## 151. Oil threads pinch into beads (PLAN 38w-27)
 
@@ -3203,7 +3208,24 @@ each top.
 3. Bad: domes that read as holes or bowls rather than raised, a sheen that looks painted on, or
    any change to the plate at 1x.
 
-## 153. The ferrofluid on its real onset (PLAN 9t-2, 38k-7)
+## 153. Caustics: each drop focuses the lamp's light (PLAN 31s-2)
+
+With Projector Focus off its middle, the light is traced through the liquid to the wall instead
+of being darkened and brightened in place. The judging films are on the thread's page.
+
+1. Any oil look (Classic, Clock Glass), Projector Focus 0.6: every drop should have a bright
+   rim just inside its edge and a dark band at the edge, one smooth line, not beads.
+2. Projector Focus 0.8 to 1: the drop's light gathers to a bright core or crosses into a wide
+   bright rim; softer the further off focus (the lamp's size). Below 0.5 the drops throw their
+   light outward instead.
+3. Projector Focus 0.5: nothing changed.
+4. Bad: a rim drawn as dots, a seam or square at a drop's edge, flicker as a drop moves, a
+   whole look much darker or brighter off focus than before.
+
+To put it back: `causticDz` in `src/gpu/caustic.ts` returns 0 (the display falls back to the
+first-order shadowgraph it drew before).
+
+## 154. The ferrofluid on its real onset (PLAN 9t-2, 38k-7)
 
 Filmed on the owner's Mac before and after (2026-11-01); the films are on one page in the
 project. `spikes`, `standing`, `ferrodrag`, `ferrohold` and `ferropour` check the physics
@@ -3216,7 +3238,7 @@ in the lab; only the Mac shows whether it reads as ferrofluid.
 4. Not this change (9t-12): a wide pool dragged by the Magnet turns to worms and creeps,
    the same before and after.
 
-## 154. The ferrofluid maze's period from the coil, the looks as thin as before (PLAN 38d-1)
+## 155. The ferrofluid maze's period from the coil, the looks as thin as before (PLAN 38d-1)
 
 The labyrinth's period now follows Labyrinth (the coil's field) through the magnetic Bond
 number. Magnet Garden and Ferro Paint sit at the top of the dial, where the period is 0.042

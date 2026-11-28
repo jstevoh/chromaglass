@@ -4,7 +4,7 @@
  *
  *   npm run watch -- <file or URL> [--out DIR] [--frames 24] [--from S] [--to S]
  *                                  [--at 3.5,12] [--rate 10] [--per-sheet 12] [--vs REF_OUT]
- *                                  [--crop x,y,w,h] [--keep NAME [--note TEXT]]
+ *                                  [--crop x,y,w,h] [--keep NAME [--note TEXT]] [--liquid | --general]
  *   npm run watch -- --before A --after B [--out DIR]  |  --refs  |  --selftest
  *
  * Asked for: "a skill or agent that is able to better watch video … it will make
@@ -73,17 +73,19 @@ import zlib from 'node:zlib';
 import { physicsAcc, physicsFrame, physicsSummary, physicsLines, physicsGaps, comparePhysics, techniqueLines } from './watchphysics.mjs';
 import { designFrame, designSummary, designLines, designGaps, compareDesign, paletteAcc, paletteStrip } from './watchdesign.mjs';
 import { readSelftest, dissolveClips } from './watchreadtest.mjs';
+import { clipAudio, ffmpegVersion } from './watchffmpeg.mjs';
 import { thumb, findDissolves } from './watchcuts.mjs';
 import { resolveRef, keepRef, listRefs } from './watchrefs.mjs';
 import { overall } from './watchoverall.mjs';
 import { describe } from './watchwords.mjs';
 import { detectAutocrop, analyseFootage, footageLines, footageOut } from './watchfootage.mjs';
 import { reportCard, loadRatings, formatSideBySideCards } from './watchcard.mjs';
-import { gapSettings } from './watchsettings.mjs';
+import { loadConfig, useConfig, settingsMapFor, macFetch, fetchElsewhere } from './watchconfig.mjs';
+import { readMode, cueNumbers, generalMotionLines } from './watchmode.mjs';
 
 // ─── arguments ───────────────────────────────────────────────────────────────
 
-const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', before: '', after: '', selftest: false, quiet: false, crop: null, noAutocrop: false, vs: '', keep: '', note: '', refs: false, settings: null };
+const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', before: '', after: '', selftest: false, quiet: false, crop: null, noAutocrop: false, vs: '', keep: '', note: '', refs: false, settings: null, config: '', liquid: null };
 const opt = { ...DEFAULTS };
 
 /** A failure the caller can report: a harness catches it, the command line prints it and exits with `code`. */
@@ -115,6 +117,14 @@ function parseArgs(argv) {
     else if (a === '--crop') { const [x, y, w, h] = v().split(',').map(Number); if ([x, y, w, h].every(Number.isFinite) && w > 0 && h > 0) opt.crop = { x, y, w, h }; else fail('--crop wants x,y,w,h as fractions, e.g. 0.5,0,0.25,0.35', 2); }
     else if (a === '--no-autocrop') opt.noAutocrop = true;
     else if (a === '--settings') opt.settings = v();
+    // The liquid read (physics, report card, techniques, the wet show's words,
+    // Settings to try) or the general one, whatever the footage looks like
+    // (scripts/watchmode.mjs, PLAN 47p-3); by default the footage decides.
+    else if (a === '--liquid') opt.liquid = true;
+    else if (a === '--general') opt.liquid = false;
+    // Where the reference library, the fetch folder and the settings map are
+    // (scripts/watchconfig.mjs, PLAN 47p-1); by default reelreader.config.json.
+    else if (a === '--config') { opt.config = v(); try { useConfig(opt.config); } catch (e) { fail(e.message, 2); } }
     else if (a === '--selftest') opt.selftest = true;
     else if (a === '--help' || a === '-h') { printHelp(); process.exit(0); }
     else if (!opt.input) opt.input = a;
@@ -160,6 +170,29 @@ function findYtDlp() {
   return null;
 }
 
+/**
+ * Add one pixel to the 4×4×4 colour histogram the cut test compares (47x-6),
+ * shared between the bins either side of it on each channel by how near it
+ * is to each bin's middle (32, 96, 160, 224), as a linear interpolation
+ * does. Counted whole into one bin, as it was, a picture whose colours move
+ * smoothly moves its pixels between bins in jumps: the self-test's clip D
+ * crossfades red to magenta over three seconds, and the sample in which its
+ * blue channel crossed 128 moved a third of the picture from one bin to the
+ * next at once, a change of 0.31 against 0.03 around it, and read as a hard
+ * cut on some builds; on others the crossing fell across two samples, 0.20
+ * and 0.22, under the bar, and it passed. Shared, a colour moving by a
+ * little moves its weight by a little (the crossfade's largest change is now
+ * 0.05, the bar 0.25), and a cut still moves it all.
+ */
+function softBin(hist, r, g, b) {
+  const at = v => { const p = Math.max(0, Math.min(3, (v - 32) / 64)), lo = Math.min(2, Math.floor(p)); return [lo, p - lo]; };
+  const [r0, rf] = at(r), [g0, gf] = at(g), [b0, bf] = at(b);
+  for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) for (let k = 0; k < 2; k++) {
+    const w = (i ? rf : 1 - rf) * (j ? gf : 1 - gf) * (k ? bf : 1 - bf);
+    if (w) hist[(r0 + i) * 16 + (g0 + j) * 4 + b0 + k] += w;
+  }
+}
+
 const INSTALL = 'Install: `brew install ffmpeg yt-dlp` on a Mac; in a cloud session `python3 -m pip install yt-dlp imageio-ffmpeg`.';
 
 let FF_ = null;
@@ -195,17 +228,10 @@ function download(url, dir) {
           ...thumbs.map(f => `  ${f}`),
           '',
         ] : []),
-        'watch: YouTube refused the video to this machine. It does that to cloud',
-        'addresses; it is not the environment\'s network setting. Ways round it:',
-        '  1. fetch it on the owner\'s Mac, where YouTube serves it (a home address),',
-        '     then bring the file here and watch that. With the Mac\'s Desktop Commander',
-        '     tools (start_process), or through Remote Control, run:',
-        '',
-        `     ${macFetch(url)}`,
-        '',
-        '     then stage source.mkv and source.info.json with device_stage_files and',
-        '     run `npm run watch` on the staged source.mkv (the skill says more);',
-        '  2. ask for the file: a screen recording or a download dropped in the thread;',
+        'watch: YouTube refused the video to this machine. It does that to cloud and',
+        'datacenter addresses; it is not this machine\'s network setting. Ways round it:',
+        ...fetchElsewhere(url),
+        '  2. ask for the file: a screen recording or a download you have the right to;',
         '  3. look for a mirror (archive.org keeps many YouTube uploads).',
       ].join('\n'));
     }
@@ -233,24 +259,6 @@ function fetchArgs(dir, help = '') {
   // Recent yt-dlp needs a JavaScript runtime for YouTube; node is always here.
   if (help.includes('--js-runtimes')) args.push('--js-runtimes', 'node');
   return args;
-}
-
-/**
- * The one line that fetches a URL on the owner's Mac the way `download`
- * does here: Homebrew's yt-dlp and ffmpeg (`brew install yt-dlp ffmpeg`),
- * named by their full paths because a Desktop Commander shell does not have
- * Homebrew on its PATH, and node on PATH for YouTube's JavaScript. Into
- * ~/chromaglass-films/watch/<name>, a folder this project's threads are
- * already allowed to stage files from.
- */
-function macFetch(url) {
-  const name = url.replace(/^https?:\/\/(www\.)?/, '').replace(/[^\w.-]+/g, '_').slice(0, 48);
-  const q = s => `'${s.replace(/'/g, `'\\''`)}'`;
-  return [
-    `export PATH=/opt/homebrew/bin:$PATH; d=~/chromaglass-films/watch/${name}; mkdir -p "$d" && cd "$d" &&`,
-    `yt-dlp --no-playlist --write-info-json --no-progress -f 'bv*+ba/b' -S res:1080 --merge-output-format mkv`,
-    `--ffmpeg-location /opt/homebrew/bin/ffmpeg --js-runtimes node -o 'source.%(ext)s' ${q(url)} && ls -la "$d"`,
-  ].join(' ');
 }
 
 /**
@@ -380,17 +388,69 @@ function decode(vf, onFrame, extraArgs = []) {
   });
 }
 
-/** Mono 8 kHz samples, for loudness. */
+/**
+ * The clock every read counts on: zero at the picture's first frame, and
+ * sample k the frame on screen k / rate after it (47x-6).
+ *
+ * What was reported: the self-test's A and B (sound against motion) and D
+ * (one composition change in a crossfade) failed on the owner's Mac with
+ * ffmpeg-full 9.0.2, and with Homebrew's default ffmpeg, which has no
+ * libvorbis, the self-test could not make its clips. Reproduced 2026-11-28 on
+ * Ubuntu's ffmpeg 6.1 by making the same clips with libopus: the same three
+ * failed. The encoder did not change the clips; it changed where the
+ * container puts their first frame. With libvorbis the picture starts 32 ms
+ * into the file (the decoder drops Vorbis's first block, and the muxer moves
+ * the picture to match), with libopus 7 ms, and ffmpeg's fps filter, left to
+ * its default (round=near, from the file's zero), gave sample k the last
+ * frame within half a sample of k / rate: frame 3k on the Vorbis clips and
+ * 3k + 1, a thirtieth of a second later, on the Opus ones. The sound for
+ * sample k was read from the stream's first decoded sample, wherever that
+ * lay. So the picture and the sound were each a few milliseconds off on
+ * their own count, and which frame a sample took hung on those few
+ * milliseconds: one frame later moved the motion against the sound by a
+ * third of a sample, and the best lag to the next sample.
+ *
+ * setpts=PTS-STARTPTS makes the first frame zero, so a frame made for time
+ * t is at t whatever the muxer did, and round=up takes for sample k the last
+ * frame at or before k / rate, what a player shows then (a 30 fps film at
+ * ten samples a second: frame 3k exactly). The sound is put on the same
+ * clock in decodeAudio, from `pictureStart`.
+ */
+const sampleAt = rate => `setpts=PTS-STARTPTS,fps=${rate}:round=up`;
+
+/**
+ * Where the picture's first frame sits on the file's clock, in seconds
+ * (after the seek, as the reads decode it), for decodeAudio to start the
+ * sound there; below zero where an edit list puts it there. 0 when it
+ * cannot be read.
+ */
+function pictureStart() {
+  const r = spawnSync(ff(), ['-hide_banner', '-nostats', ...seekArgs(), '-an', '-vf', 'showinfo', '-frames:v', '1', '-f', 'null', '-'], { encoding: 'utf8' });
+  const m = /pts_time:\s*(-?[\d.]+)/.exec(r.stderr ?? '');
+  return m ? +m[1] : 0;
+}
+
+/**
+ * Mono 8 kHz samples, for loudness, on the picture's clock (sampleAt):
+ * aresample's first_pts=0 pads or trims the sound so its first sample is at
+ * the file's zero (the first decoded sample was taken as zero wherever it
+ * lay, and a sound starting 0.2 s into a file read 0.2 s early), then the
+ * part before the picture's first frame is dropped.
+ */
 function decodeAudio() {
   return new Promise((resolve, reject) => {
-    const p = spawn(ff(), ['-hide_banner', '-nostats', '-loglevel', 'error', ...seekArgs(), '-vn', '-ac', '1', '-ar', '8000', '-f', 's16le', 'pipe:1']);
+    const p = spawn(ff(), ['-hide_banner', '-nostats', '-loglevel', 'error', ...seekArgs(), '-vn', '-ac', '1', '-af', 'aresample=8000:first_pts=0', '-ar', '8000', '-f', 's16le', 'pipe:1']);
     const chunks = []; let err = '';
     p.stdout.on('data', d => chunks.push(d));
     p.stderr.on('data', d => (err += d));
     p.on('close', code => {
       if (code !== 0) return reject(new Error(err));
-      const b = Buffer.concat(chunks);
-      resolve(new Int16Array(b.buffer, b.byteOffset, b.length >> 1));
+      const b = Buffer.concat(chunks), all = new Int16Array(b.buffer, b.byteOffset, b.length >> 1);
+      // A first frame before the file's zero (an MP4 edit list can put it
+      // there) has silence ahead of the sound, not sound cut away.
+      const at = Math.round(pictureStart() * 8000);
+      if (at >= 0) return resolve(all.subarray(Math.min(all.length, at)));
+      const padded = new Int16Array(all.length - at); padded.set(all, -at); resolve(padded);
     });
   });
 }
@@ -446,7 +506,7 @@ const stamp = t => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')
 // ─── the watch ───────────────────────────────────────────────────────────────
 
 async function watch() {
-  const out = path.resolve(opt.out || path.join(os.tmpdir(), 'chromaglass-watch',
+  const out = path.resolve(opt.out || path.join(os.tmpdir(), loadConfig().scratch,
     (/^https?:/.test(opt.input) ? opt.input.replace(/^https?:\/\//, '') : path.basename(opt.input)).replace(/[^\w.-]+/g, '_').slice(0, 60)));
   fs.mkdirSync(out, { recursive: true });
   for (const f of fs.readdirSync(out)) if (/^(sheet-\d+|timeline|palette|still-.*)\.png$|^(stats\.tsv|summary\.md|design\.json)$/.test(f)) fs.rmSync(path.join(out, f));
@@ -481,7 +541,7 @@ async function watch() {
   const c = opt.crop ?? (autocrop ? { x: autocrop.x, y: autocrop.y, w: autocrop.w, h: autocrop.h } : null);
   const pre = c ? `crop=trunc(iw*${c.w}/2)*2:trunc(ih*${c.h}/2)*2:trunc(iw*${c.x}):trunc(ih*${c.y}),` : '';
   const sampled = [];
-  const { n, w, h } = await decode(`${pre}fps=${rate},scale=${aw}:-2:flags=area`, (px) => { sampled.push(Buffer.from(px)); });
+  const { n, w, h } = await decode(`${pre}${sampleAt(rate)},scale=${aw}:-2:flags=area`, (px) => { sampled.push(Buffer.from(px)); });
   if (!n) fail('decoded no frames');
   const span = n / rate;
 
@@ -518,7 +578,7 @@ async function watch() {
       if (Y < 0.1) dark++;
       if (Y > 0.92) bright++;
       if (prev) diff += Math.abs(Y - prev[p]);
-      hist[(px[i] >> 6) * 16 + (px[i + 1] >> 6) * 4 + (px[i + 2] >> 6)]++;
+      softBin(hist, px[i], px[i + 1], px[i + 2]);
       let H0 = -1;
       if (S > 0.25) {
         H0 = mx === r ? ((g - b) / (mx - mn)) % 6 : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4;
@@ -633,7 +693,7 @@ async function watch() {
   const tw = best.tw - (best.tw % 2), th = Math.round(tw / aspect / 2) * 2;
   const tiles = [];
   const sel = picks.map(k => `eq(n,${k})`).join('+');
-  await decode(`${pre}fps=${rate},select='${sel}',scale=${tw}:${th}:flags=lanczos`, (px, i, W, H) => tiles.push({ k: picks[i], px: Buffer.from(px), W, H }));
+  await decode(`${pre}${sampleAt(rate)},select='${sel}',scale=${tw}:${th}:flags=lanczos`, (px, i, W, H) => tiles.push({ k: picks[i], px: Buffer.from(px), W, H }));
   const sheets = [];
   for (let s = 0; s * per < tiles.length; s++) {
     const group = tiles.slice(s * per, (s + 1) * per);
@@ -769,7 +829,15 @@ async function watch() {
     ps.spectrum = ps.spectrum ? { ...ps.spectrum, reliable: false } : { med: null, p10: null, p90: null, reliable: false };
   }
   ds.physics = ps;
-  const designOut = [...designLines(ds), '', ...physicsLines(ps), '', ...techniqueLines(info, ds, ps, activeCuts.length / Math.max(1 / 60, activeSpan / 60))];
+  // Liquid or general (scripts/watchmode.mjs, PLAN 47p-3): the physics read's
+  // words, the techniques, the report card, the wet show's words and Settings
+  // to try are a liquid light show's, so only liquid footage gets them.
+  const cfgMode = loadConfig().mode;
+  const [forced, how] = opt.liquid === true || opt.liquid === false ? [opt.liquid, opt.liquid ? '--liquid' : '--general']
+    : cfgMode !== 'auto' ? [cfgMode === 'liquid', `the config's mode, ${cfgMode}`] : [null, null];
+  const mode = readMode({ forced, how, info, m: cueNumbers({ rows: useRows, cuts: activeCuts, span: activeSpan, shape: sh, design: ds, physics: ps }) });
+  const liquid = mode.liquid;
+  const designOut = [...designLines(ds, { liquid }), '', ...(liquid ? [...physicsLines(ps), '', ...techniqueLines(info, ds, ps, activeCuts.length / Math.max(1 / 60, activeSpan / 60))] : generalMotionLines(ps))];
   let refWords = null, refTitle = null, refDoc = null;
   let takeSettings = null;
   if (opt.settings) {
@@ -788,11 +856,15 @@ async function watch() {
     try { ref = JSON.parse(fs.readFileSync(vf, 'utf8')); } catch { fail(`--vs: no design.json at ${opt.vs}, and no reference of that name (npm run watch -- --refs lists them; watch the reference first, with this version of the tool)`, 2); }
     refDoc = ref;
     refTitle = ref.title ?? vf;
-    refWords = ref.words?.lines?.length ? ref.words : describe({ design: ref });
+    refWords = ref.words?.lines?.length && (ref.mode?.liquid ?? true) === liquid ? ref.words : describe({ design: ref }, { liquid });
     designOut.push('', ...compareDesign(ref, ds, `the reference (${refTitle})`, 'this'));
-    if (ref.physics) designOut.push('', ...comparePhysics(ref.physics, ps, 'the reference', 'this'));
+    if (liquid && ref.physics) designOut.push('', ...comparePhysics(ref.physics, ps, 'the reference', 'this'));
     const allGaps = [...designGaps(ref, ds).rows, ...(ref.physics ? physicsGaps(ref.physics, ps).rows : [])];
-    designOut.push('', ...gapSettings(allGaps, takeSettings));
+    // "Settings to try" only for an app the config names a settings map for
+    // (PLAN 47p-1): a gap in edge width is a dial only in an app that has one.
+    // And only for liquid footage: the map's dials are a liquid show's.
+    const gapSettings = liquid ? await settingsMapFor(loadConfig()).catch(e => fail(e.message, 2)) : null;
+    if (gapSettings) designOut.push('', ...gapSettings(allGaps, takeSettings));
   }
 
   const buckets = Math.min(40, n);
@@ -806,17 +878,17 @@ async function watch() {
 
   const ftOut = footageOut(footage);
   const readForText = { out, rows: useRows, cuts: activeCuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, sheets, tiles, picks, timeline, span: activeSpan, pr, w, h, rate };
-  const words = describe(readForText);
+  const words = describe(readForText, { liquid });
   const ov = overall({ ...readForText, words });   // the whole film's arc and feel, before the words one measure at a time (47x-8)
   const { ratings, libDirs } = loadRatings();
-  const card = reportCard({ ...readForText, overall: ov }, { ratings, libDirs });
-  if (refDoc) {
+  const card = liquid ? reportCard({ ...readForText, overall: ov }, { ratings, libDirs }) : null;
+  if (card && refDoc) {
     const refCard = refDoc.card?.canons?.length ? refDoc.card : reportCard(refDoc);
     designOut.push('', ...formatSideBySideCards(card, refCard, refTitle));
   }
-  const cardOut = { canons: card.canons, verdict: card.verdict, agreement: card.agreement, lines: card.lines };
-  const result = { out, rows, cuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, words, overall: ov, card: cardOut, sheets, tiles, picks, timeline, span, pr, w, h, rate };
-  fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds, shape: sh, overall: ov, card: cardOut, sync, footage: ftOut, words }, null, 1) + '\n');
+  const cardOut = card ? { canons: card.canons, verdict: card.verdict, agreement: card.agreement, lines: card.lines } : null;
+  const result = { out, rows, cuts, dissolves, turnedDown, sync, shape: sh, design: ds, footage: ftOut, mode, words, overall: ov, card: cardOut, sheets, tiles, picks, timeline, span, pr, w, h, rate };
+  fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds, shape: sh, overall: ov, card: cardOut, sync, footage: ftOut, mode, words }, null, 1) + '\n');
   const palettePng = path.join(out, 'palette.png');
   if (ds.palette.length) writePng(palettePng, 960, 96, paletteStrip(ds.palette));
 
@@ -835,14 +907,15 @@ async function watch() {
     '',
     ...footageLines(footage),
     '',
+    '## Read as',
+    '',
+    mode.line,
+    '',
     '## Overall',
     '',
     ...result.overall.lines,
     '',
-    '## Report card',
-    '',
-    ...card.lines,
-    '',
+    ...(card ? ['## Report card', '', ...card.lines, ''] : []),
     '## In words',
     '',
     ...words.lines,
@@ -873,9 +946,9 @@ async function watch() {
 
 /**
  * The shape of a show over minutes, in the units the footage study measured
- * real liquid light shows in (/mnt/project-files/research/light-show/
- * footage.md, "The same clips measured further"), so a take from the app can
- * be put beside the Joshua Light Show and read in the same numbers.
+ * real liquid light shows in (research/light-show/footage.md in the project's
+ * shared folder, "The same clips measured further"), so a take from the app
+ * can be put beside the Joshua Light Show and read in the same numbers.
  *
  * Why these and not the summary's. The summary says how busy a clip is on
  * average; what separated the real shows from our plate was never the
@@ -1035,6 +1108,10 @@ export function shape({ rows, rate, span, cuts = [] }) {
 
 const SW_ = 320, SH_ = 180, SFPS = 30;
 
+/** The self-test's clips' sound encoder, found once (watchffmpeg.mjs). */
+let CLIP_AUDIO_ = null;
+const clipAudioArgs = () => (CLIP_AUDIO_ ??= clipAudio(ff()) ?? fail(`the self-test makes its clips with libvpx and libvorbis or libopus, and ${ffmpegVersion(ff())} has neither sound encoder. ${INSTALL}`, 2));
+
 /**
  * Encode a clip made here: `frame(f)` gives RGB for frame f, `sound(t)` a
  * sample in [-32768, 32767], `delay` shifts the sound later. It goes out as
@@ -1050,7 +1127,7 @@ async function makeClip(dir, name, { sec, frame, sound, delay = 0 }) {
   const wavPath = path.join(dir, `${name}.wav`), clip = path.join(dir, `${name}.webm`);
   fs.writeFileSync(wavPath, wav);
   const p = spawn(ff(), ['-hide_banner', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', `${SW_}x${SH_}`, '-r', String(SFPS), '-i', 'pipe:0',
-    '-i', wavPath, '-c:v', 'libvpx', '-b:v', '2M', '-c:a', 'libvorbis', '-shortest', '-f', 'webm', 'pipe:1'], { stdio: ['pipe', 'pipe', 'inherit'] });
+    '-i', wavPath, '-c:v', 'libvpx', '-b:v', '2M', ...clipAudioArgs(), '-shortest', '-f', 'webm', 'pipe:1'], { stdio: ['pipe', 'pipe', 'inherit'] });
   const file = fs.createWriteStream(clip);
   p.stdout.pipe(file);
   const done = Promise.all([
@@ -1413,6 +1490,9 @@ async function selftest() {
  */
 export async function watchVideo(input, options = {}) {
   Object.assign(opt, DEFAULTS, options, { input });
+  // A call names its own config or gets the usual search (watchconfig.mjs),
+  // never the one an earlier call named.
+  useConfig(options.config || null);
   return watch();
 }
 
@@ -1479,7 +1559,7 @@ export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2, blipSeconds =
   return out;
 }
 
-export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg, pickSource, ffmpegLocation, fetchArgs, macFetch, writePng, label };
+export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg, pickSource, ffmpegLocation, fetchArgs, macFetch, fetchElsewhere, writePng, label };
 
 // Run as a command only when this file is the one node was given: a harness
 // that imports it, or bundles it (gig.mjs goes through esbuild, where

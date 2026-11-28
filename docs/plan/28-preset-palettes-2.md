@@ -195,6 +195,38 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
       a dark red dish, the ferrofluid's black on dye too thin to light it. The grid now
       carries Magnet Garden in its place. The look wants its dye budget or its lamp looked
       at on the Mac (filmed, since its gallery still passes), not a brighter photograph.
+  - **28i-8. The looks the real dye mixing left looking bad, re-tuned: shipped** (the owner,
+    2026-11-27: "Refactor the looks after the real dye mixing lands. Only if it looks like
+    shit though", and "Improve classical vibe a bit. A little more dye and complexity").
+    The six suspects from #1020's stills rendered in the lab (Metal, the synth band, 10/30/60
+    s: luminance Y, share clipped, share near black, colourfulness) and looked at; all six
+    were bad, and each was re-tuned with its own dials, no shader touched. Built-ins in
+    `src/presetsRetune.ts` (laid after layPaceLooks, before layStirCords), the owner's two in
+    place in `src/presetsOwner.ts`, every change commented with what was measured.
+    Classical Vibe (a bare haze, colourfulness 57): the comet's pull and its two cords gone (a bass → Buoyancy patch in their place keeps
+    it on 28i-3b's two fast patches),
+    Turbulence 0.5 → 0.1 and Detail 3, Sound Drive 0.2 with the pours tripled, smaller and
+    more of them, Dye Budget 0.7, Layer Scale Variety 0.9, less blur and goo: a mean dye of
+    0.32/0.17 at 30/60 s, colourfulness 72/62. Mushy Mushy (55% black at 10 s): Phase Scale
+    0.36 → 0.15, a lower tension, cells and fingers, 45/27/23% dark. Poster, 1969 (47%
+    clipped): Lamp Ground 0.5 and exposure 0.55, 0% clipped at 30 and 60 s (answers 28i-7d's
+    question for Poster: it leaves the full lamp). Lava Lamp (64% clipped): a dimmer amber
+    bulb (#e3a347), 0% clipped, Oil Weight still 0.5. Turing Print (Y 0.05, 64% black): Dye
+    Budget 0.5, exposure 0.9, Y 0.22, the stripes on clear gel. Lacing Run (dimmer, a blurred
+    blob): Turbulence 0, the tongue defined again but the dish still as dim (18a-25). Why
+    the two stirred looks drained: 18a-25, the comet and the Turbulence noise run out
+    through the open rim.
+  - **28i-9. Give the stirred looks their stir back, now that it stays in the dish** (18a-25,
+    2026-11-28). 28i-8 took Lacing Run's Turbulence 0.7 → 0 and Classical Vibe's comet and
+    Turbulence 0.5 → 0.1 because both ran the dish out over the rim; 18a-25 closed both. Film
+    each with its old stir on main's physics and let the owner pick. Measured on the Mac
+    (2026-11-28, the lab's stills with no music, 60 s): with the dye kept, Lacing Run's dark
+    share falls 0.40 → 0.18, and at its old Turbulence 0.7 to 0, a flat orange wash; Classical
+    Vibe's colourfulness 62 → 55. So the looks may want less dye (Dye Budget) before more
+    stir; the films with the band are much less affected. And Comet River's
+    description ("a raging torrent that pulls ink off the plate") describes the leak: on a
+    closed dish its pull is a tilt's, heavy colour running down in tongues with the clear
+    liquid coming back; re-word it, or re-tune it, from a film.
 - **28j. Changing looks without a jump** (the owner, 2026-10-19: "transitions between
   presets are also a little jumpy here and there"). `blendLooks` fades every number and
   colour but switches lists, steps and booleans at the midpoint, and the handoff in

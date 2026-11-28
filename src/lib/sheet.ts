@@ -195,7 +195,7 @@ export const STEFAN_FILM = 0.30;
   share below |z| = 0.05, and took 0.19 ms. Past it (Press Lift near full),
   Math.exp.
 */
-function expNear0(z: number): number {
+export function expNear0(z: number): number {
   return z > -0.05 ? 1 + z * (1 + z * (0.5 + z * (1 / 6 + z * (1 / 24)))) : Math.exp(z);
 }
 

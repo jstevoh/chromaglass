@@ -30,11 +30,15 @@ import { PRESETS } from '../src/presets';
 import { phasePourShape, PRESET_CONTRACTS, dyesOnPlate } from '../src/presetPlate';
 import { dyeAbsorbances } from '../src/lib/dye';
 import { PALETTE_RGB } from '../src/constants';
-import { squishDisc, glassSpring, PressLift, KICK_HOLD, kickPress, type Stroke } from '../src/lib/squish';
+import { squishDisc, glassSpring, PressLift, KICK_HOLD, KICK_RADII, BassPress, kickPress, type Stroke } from '../src/lib/squish';
+import { layLift } from '../src/sim/pressLay';
 import { RhythmSheet, stampedVolume, kickRoom } from '../src/lib/sheet';
+import { GlassPress, glassDepth } from '../src/lib/glassPress';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
 import { layFinger, handEdge } from '../src/lib/handSolid';
 import { layBreath, BREATH_STRESS } from '../src/lib/breath';
+import { PlateCaustics } from '../src/gpu/caustic';
+import { Disposer, PipelineCache } from '../src/gpu/kit';
 import { makeDropQueue, queueDrop, stepDrops, dropsLive, dropSchedule, dropImpact } from '../src/lib/dropImpact';
 import { fingerCarry, blowCarry, blowDye, blowOil, BLOW_RADIUS, BLOW_STRENGTH, remoteBlowRadius } from '../src/lib/handCarry';
 
@@ -75,6 +79,8 @@ type Lab = {
   /** Beat Squeeze's rhythm sheet (lib/sheet.ts), made at its first press, and its change laid this step, or null with none. */
   sheet: RhythmSheet | null;
   sheetGap: Float32Array | null;
+  /** The clock glass pressed whole on a kick (lib/glassPress.ts), made at its first press. */
+  glass?: GlassPress;
   /** The magnets the plate was last stepped with, as the app hands them to the picture. */
   magnets: { x: number; y: number; height: number; strength: number }[];
 };
@@ -83,9 +89,13 @@ let lab: Lab | null = null;
  *  CPU rasteriser, Apple's on a Mac's Metal), copied out at `create` because a
  *  GPUAdapterInfo does not cross page.evaluate. A check whose claim is the
  *  rasteriser's (`npm run lampzero`) reads this rather than trusting the flags. */
+let lastTraced = false;
+let lastPath: { n: number; w: number[] } | null = null;
 let adapterInfo: { vendor: string; architecture: string; device: string; description: string } | null = null;
 
 let lastDrop: { n: number; h: Float32Array; z: Float32Array } | null = null;
+/** gridLay's bass hand, one a plate (gridLayReset). */
+let bassHand: BassPress | null = null;
 let lastFocusScale = 1;
 /** The colour drops on their way in (PLAN 18c-2), drained a step at a time by `step` as the app's sim drains its own. */
 const drops = makeDropQueue();
@@ -208,6 +218,40 @@ const api = {
       velAdd[idx * 4] += vx; velAdd[idx * 4 + 1] += vy; velAdd[idx * 4 + 3] += gap; mul[idx] *= m;
     }, thin);
   },
+  /**
+   * The app's own writers of the glass on a thin gap (PLAN 18a-15, `npm run
+   * gridlay`), through the classes the plate runs: laid on the lab's L × L
+   * deltas as the 192² grid lays them (`fine` false: what reaches the solver
+   * through the bilinear) or at the solver's own cells (`fine`, as the plate
+   * lays them once its solver has pressBowl and liftSpokes). At grid cell
+   * (x, y), `r` cells: 'press' a bowl of `amount` (always the solver's, the
+   * pressed glass a lift or a release opens); 'bass' the bass's hand followed
+   * to depth `amount` (one BassPress for the plate, so a deeper bass, a move
+   * and a let-go at 0 are each a step of the same hand); 'lift' one step of
+   * the lift's spokes, `amount` its strength (layLift). Returns the gap the
+   * 192² grid's cells were told, summed: the volume either lay must come to.
+   */
+  gridLay(what: 'press' | 'bass' | 'lift', x: number, y: number, r: number, amount: number, fine: boolean, fingering = 0.8) {
+    const { L, velAdd, solver } = lab!;
+    let told = 0;
+    const count = (_: number, g: number) => { told += g; };
+    const cell = (idx: number, gap: number) => { velAdd[idx * 4 + 3] += gap; };
+    const bowl = fine ? (bx: number, by: number, br: number, a: number) => solver.pressBowl(bx, by, br, a) : undefined;
+    if (what === 'press') { solver.pressBowl(x + 0.5, y + 0.5, r, amount); return 0; }
+    if (what === 'bass') {
+      const hand = (bassHand ??= new BassPress()), was = hand.depth;
+      hand.follow(L, x, y, r, amount, true, cell, bowl);
+      squishDisc(L, x, y, r, hand.depth - was, 0, 'press', 0, count, true);
+    }
+    if (what === 'lift') {
+      const spokes = (...a: Parameters<NonNullable<WebGPUFluid['liftSpokes']>>) => solver.liftSpokes(...a);
+      layLift(L, { x, y, radius: r, amount, fingering }, true, cell, fine ? spokes : undefined);
+      squishDisc(L, x, y, r, amount, fingering, 'lift', 0, count, true);
+    }
+    return told;
+  },
+  /** A fresh plate's writers for gridLay: no bass hand down yet, and the sheet by the cubic (`bilinear`: main's, the control). */
+  gridLayReset(bilinear = false) { bassHand = null; lab!.solver.sheetBilinear = bilinear; },
   /** The carries' substeps on the last thin step, and the Courant number that asked for them (carryPlan). */
   async carry() { return lab!.solver.readCarry(); },
   /**
@@ -255,11 +299,38 @@ const api = {
   sheetStep(dt = 1 / 60, spring = BASE.gapSpring, curve = 0) {
     const l = lab!;
     if (!l.sheet?.live) return 0;
-    const out = new Float32Array(l.L * l.L);
+    // Beside the glass's, if it laid this step (glassStep): both add.
+    const out = l.sheetGap ?? new Float32Array(l.L * l.L);
     const cells = l.sheet.step(l.L, dt, spring, out, curve);
     if (cells > 0) l.sheetGap = out;
     return cells;
   },
+  /**
+   * Beat Squeeze's kick on the clock glass, pressed whole, as the app presses
+   * it on a thin gap where the kick is the glass (FluidSimulation.pressKick,
+   * lib/glassPress.ts, PLAN 38w-28): at plate fraction (x, y), each disc of
+   * `radii` (cells of a 128 plate) pressed `amount` as the old stamp took it,
+   * so the middle goes as deep as that stamp closed it. Laid by `glassStep`.
+   * Returns the depth its middle reaches.
+   */
+  glassPress(x: number, y: number, amount: number, radii: number[] = [...KICK_RADII], down?: number) {
+    const l = lab!;
+    if (!l.glass) l.glass = new GlassPress();
+    const depth = glassDepth(amount, radii.length);
+    l.glass.press(l.L, Math.round(x * l.L), Math.round(y * l.L), radii.map((r) => r * l.L / 128), depth, down);
+    return depth;
+  },
+  /** One step of the glass, its change laid for the next flush beside the sheet's, as the app's liftStep lays it. Returns the cells laid. */
+  glassStep(dt = 1 / 60, spring = BASE.gapSpring, curve = 0) {
+    const l = lab!;
+    if (!l.glass?.live) return 0;
+    const out = l.sheetGap ?? new Float32Array(l.L * l.L);
+    const cells = l.glass.step(l.L, dt, spring, out, curve);
+    if (cells > 0) l.sheetGap = out;
+    return cells;
+  },
+  /** What the glass has pressed and laid: for the checks. */
+  glassState() { const g = lab!.glass; return g ? { live: g.live, kicks: g.kicksPressed, steps: g.steps, laid: g.laid, closed: g.closed, opened: g.opened, deepest: g.deepest } : null; },
   /** The sheet's change laid this step moved to the press's channel (the gap column of the velocity deltas), for the check that the press's ceiling cuts its ring. */
   sheetAsPress() {
     const l = lab!;
@@ -606,6 +677,57 @@ const api = {
   },
   /** The mix or the reactions (readChemistry), as plain arrays; null when the solver has none. */
   async chemistry(which: 'mix' | 'rxn' | 'lies') { const f = await lab!.solver.readChemistry(which); return f ? { n: f.n, data: Array.from(f.data) } : null; },
+  /**
+   * The lamp's light traced through a path you hand it (PLAN 31s-2, `npm run caustics`):
+   * `paths` is the derive pass's .w (OPL less 1.333, in rest gaps) on a size x size
+   * texture, `dz` the dial's throw times Boundary Contrast's gain (causticDz).
+   * Returns the trace's m and layer 0's light, m x m, through the plate's own
+   * PlateCaustics, so the check measures the code the display reads.
+   */
+  async caustics(paths: number[], size: number, dz: number, back?: number[]) {
+    const device = lab!.solver['device'] as GPUDevice;
+    const cache = new PipelineCache(device);
+    const disposer = new Disposer();
+    for (const p of PlateCaustics.prepare(cache, device)) await p.build();
+    const half = new Uint16Array(size * size * 4);
+    const f32 = new Float32Array(1);
+    const u32 = new Uint32Array(f32.buffer);
+    const toHalf = (v: number) => {
+      f32[0] = v;
+      const x = u32[0];
+      const sign = (x >>> 16) & 0x8000;
+      const e = ((x >>> 23) & 0xff) - 127 + 15;
+      if (e <= 0) return sign;
+      if (e >= 31) return sign | 0x7c00;
+      return sign | (e << 10) | ((x >>> 13) & 0x3ff);
+    };
+    const texOf = (p: number[]) => {
+      for (let i = 0; i < size * size; i++) half[i * 4 + 3] = toHalf(p[i]);
+      const t = device.createTexture({ size: [size, size], format: 'rgba16float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+      device.queue.writeTexture({ texture: t }, half, { bytesPerRow: size * 8 }, [size, size]);
+      return t;
+    };
+    // `back`, when given, is the back plate's path (layer 1, wallLight1).
+    const texs = back ? [texOf(paths), texOf(back)] : [texOf(paths)];
+    const enc = device.createCommandEncoder();
+    const light = new PlateCaustics(device, cache, disposer).trace(enc, texs, dz);
+    if (!light) { for (const t of texs) t.destroy(); disposer.dispose(); return null; }
+    const read = device.createBuffer({ size: light.size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    enc.copyBufferToBuffer(light, 0, read, 0, light.size);
+    device.queue.submit([enc.finish()]);
+    await read.mapAsync(GPUMapMode.READ);
+    const all = new Float32Array(read.getMappedRange().slice(0));
+    read.destroy(); for (const t of texs) t.destroy(); disposer.dispose();
+    const m = all[1];
+    return {
+      dz: all[0], m, words: all.length, light: Array.from(all.subarray(4, 4 + m * m)),
+      light1: back ? Array.from(all.subarray(4 + m * m, 4 + 2 * m * m)) : null,
+    };
+  },
+  /** Whether the last render traced the lamp's light to the wall (PLAN 31s-2). */
+  traced() { return lastTraced; },
+  /** Layer 0's derived path (.w) from the last render that asked for it (`readPath`), rows as the texture holds them (FLIP_Y: uv as the plate's). */
+  path() { return lastPath; },
   /** Free-surface / oil-layer height h in metres (PLAN 31s-1). */
   async surfaceHeight() { const f = await lab!.solver.readSurfaceHeight(); return f ? { n: f.n, data: Array.from(f.data) } : null; },
   setSurfaceHeight(data: number[], props?: { oilMu?: number; oilSigma?: number; oilRho?: number; waterMu?: number; waterSigma?: number; waterRho?: number }) {
@@ -852,6 +974,10 @@ const api = {
       leanDrop?: number;
       /** Registered as the app's opening registers it, the whole one building behind the show (`leandisplay`'s control of that path). */
       leanBehind?: boolean;
+      /** Draw with the lamp's light not traced (PLAN 31s-2): the wall falls back to the first-order shadowgraph, `npm run caustics`'s line that the display reads the trace. */
+      noTrace?: boolean;
+      /** Read layer 0's derived path (.w, OPL less 1.333 in rest gaps) back after the draw, for `path()`. */
+      readPath?: boolean;
     } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
@@ -924,7 +1050,17 @@ const api = {
     const flipped = cam.flip || !!cam.sources?.length;
     if (cam.focusMax) plate.focus.maxScale = cam.focusMax;
     for (let i = 1; i < (cam.repeat ?? 1); i++) plate.draw(enc, target.createView(), { width: size, height: size }, layers, undefined, flipped);
+    // An own property shadows the class's trace for this draw only, and is deleted after it.
+    const caustics = (plate as unknown as { caustics: { trace?: () => null } }).caustics;
+    if (cam.noTrace) caustics.trace = () => null;
     plate.draw(enc, target.createView(), { width: size, height: size }, layers, undefined, flipped);
+    if (cam.noTrace) Reflect.deleteProperty(caustics, 'trace');
+    const derivedTex = cam.readPath ? (plate as unknown as { layers: { derived: GPUTexture }[] }).layers[0]?.derived : undefined;
+    const pathRow = derivedTex ? Math.ceil(derivedTex.width * 8 / 256) * 256 : 0;
+    const pathBuf = derivedTex ? device.createBuffer({ size: pathRow * derivedTex.height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }) : null;
+    if (derivedTex && pathBuf) enc.copyTextureToBuffer({ texture: derivedTex }, { buffer: pathBuf, bytesPerRow: pathRow }, [derivedTex.width, derivedTex.height]);
+    // Whether this frame's light was traced to the wall (PLAN 31s-2), for `npm run caustics`.
+    lastTraced = (plate as unknown as { causticLight: GPUBuffer | null }).causticLight !== null;
     // As the app fills them: the frame's settings with the other rows at
     // nothing, no camera and no chain, so each display does its own finish.
     const owns = (cam.sources ?? []).map((kind) => {
@@ -954,6 +1090,20 @@ const api = {
       }
       buf.unmap(); buf.destroy(); tex.destroy();
       pictures[kind] = Array.from(out);
+    }
+    if (derivedTex && pathBuf) {
+      await pathBuf.mapAsync(GPUMapMode.READ);
+      const src = new Uint16Array(pathBuf.getMappedRange());
+      const n = derivedTex.width, w = new Array<number>(n * derivedTex.height);
+      const fromHalf = (x: number) => {
+        const e = (x >> 10) & 0x1f, f = x & 0x3ff, sign = x & 0x8000 ? -1 : 1;
+        if (e === 0) return sign * f * 2 ** -24;
+        if (e === 31) return f ? NaN : sign * Infinity;
+        return sign * (1 + f / 1024) * 2 ** (e - 15);
+      };
+      for (let y = 0; y < derivedTex.height; y++) for (let x = 0; x < n; x++) w[y * n + x] = fromHalf(src[y * pathRow / 2 + x * 4 + 3]);
+      pathBuf.unmap(); pathBuf.destroy();
+      lastPath = { n, w };
     }
     // The closeup's drop surface this frame solved (PLAN §29a), for npm run ferrodrop.
     lastDrop = await plate.drop.read();

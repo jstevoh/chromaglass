@@ -147,7 +147,7 @@ const frames = [
     The squish writers that run with no hand near the plate (PLAN 14ab-11):
     a bubble sitting on the glass presses its disc every step it sits
     (LiquidVisualizer's bubble poll, 'bubble'), a kick presses three nested
-    discs, holds them against the gap's spring a step at a time and gives
+    discs, held them against the gap's spring a step at a time (until 38w-28) and gives
     the gap back (KickRelease.step), and the bass's hand follows the bass
     down and up (BassPress.follow). Each went through squishCell, whose
     `dirty = true` sent the whole grid every step a bubble sat or music
@@ -156,10 +156,19 @@ const frames = [
     not the app's: what is asked is where each writes, not how much.
   */
   ['a bubble\'s press', (s) => s.applySquish(70, 50, 2, 0.0035, 0, false, 'press', 'bubble')],
-  ['a kick\'s press, three discs', (s) => s.pressKick(96, 96, 0.004, 0, [6, 4, 2])],
-  // Two steps: a kick's first step after its press holds nothing (KickRelease.step lays the hold from the second).
-  ['the kick held against the spring', (s) => { s.kickRelease.step(L, 0.02, s.squishCell, 0.5); s.kickRelease.step(L, 0.02, s.squishCell, 0.5); }],
-  ['the kick given back', (s) => s.kickRelease.step(L, 1, s.squishCell, 0.5)],
+  /*
+    The kick's discs and KickRelease are the old plate's since PLAN 38w-28:
+    on a thin gap a kick of three discs is the rigid clock glass
+    (lib/glassPress.ts), laid through the rhythm sheet's channel, which goes
+    up whole beside the deltas as the sheet's does and is not a squish
+    writer, so on the thin gap these three frames wrote nothing. The press
+    and its release are asked on the old plate, where they still write. The
+    hold against the gap's spring is gone: KickRelease held only a thin
+    gap's kick (the spring is the film's), and no thin gap's kick reaches
+    KickRelease now (sim/kickLay.ts), so there is no writer left to ask.
+  */
+  ['a kick\'s press, three discs', oldPlate((s) => s.pressKick(96, 96, 0.004, 0, [6, 4, 2]))],
+  ['the kick given back', oldPlate((s) => s.kickRelease.step(L, 1, s.squishCell, 0.5))],
   ['the bass\'s hand down', (s) => s.pressBass(140, 60, 9, 0.003)],
   ['the bass\'s hand let up', (s) => s.pressBass(140, 60, 9, 0)],
   ['the room\'s stir, the whole plate', (s) => { for (let i = 0; i < AREA; i++) s.vx[i] += 1e-3; s.markDirty(); }],
@@ -221,8 +230,8 @@ check('a step of a few cells after another sends their rows and nothing else', f
 */
 const saidRows = (f) => f.span.reduce((n, [a, b]) => n + b - a + 1, 0);
 const squishers = rowsRun.map((f, i) => ({ f, all: wholeRun[i].bytes, i })).filter(({ i }) => /bubble's press|kick|bass/.test(frames[i][0]));
-check('a bubble\'s press, a kick\'s hold and release and the bass\'s hand hand rows, a small share of the grid',
-  squishers.length === 6 && squishers.every(({ f }) => f.span && f.rows > 0 && saidRows(f) < L / 4),
+check('a bubble\'s press, a kick\'s press and release on the old plate and the bass\'s hand hand rows, a small share of the grid',
+  squishers.length === 5 && squishers.every(({ f }) => f.span && f.rows > 0 && saidRows(f) < L / 4),
   squishers.map(({ f, all }) => `${f.name}: ${f.span ? `${saidRows(f)} rows said` : 'whole'}, ${MB(all)} → ${MB(f.bytes)}`).join('; '));
 const sum = (r) => r.reduce((a, f) => a + f.bytes, 0);
 console.log(`  over the ${frames.length} frames: ${MB(sum(wholeRun))} → ${MB(sum(rowsRun))}`);

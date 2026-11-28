@@ -71,7 +71,7 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
 - **27d. The rest of the sweep (open, its own PR).** From the run above and a read of
   the code (handoff `meaningful-controls.md` in the project's files):
   - Dead on a thin gap (every look since #248): Depth Drag (18a's open item), Vibration
-    (18a-2's), Damping (only the lasting current now), Plate Pressure (only the clock
+    (18a-2's), Damping (nothing in the thin step since 18a-4: the current's lag was all it did there), Plate Pressure (only the clock
     and the dish's bed drag).
   - Two dials that are one number: Gooey × Post Blur (`U.gooey * U.postBlur`), Blob
     Surface Tension × Polarity (`immiscibility`); Rain Drip against Dye Weight with
@@ -227,7 +227,9 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       it as the gap is wrong by the name alone (it cost an hour here). Rename the key with a
       migration, or say so where `VisualizerSettings` declares it.
     - **27f-9s, open (the shortcut 27f-9q names). A tension the step cannot break, so the
-      lamp can have all nine.** 27f-9q gives the sealed bottle's oil four times its tension,
+      lamp can have all nine.** (47k, 2026-11-28, is the same limit on a thread: its pull is
+      slowed by one factor, THREAD_PULL, so a thread beads at the right spacing but in a
+      second, not milliseconds; done implicitly, the factor goes.) 27f-9q gives the sealed bottle's oil four times its tension,
       not the nine its Bond number asks: at ×9 (cap one cell) the bodies read 0.94 round, but
       the cells over half oil fall from 5.1% of the plate to 3.0% in two minutes and 2.1% in
       three, the edge shed as a haze, because the capillary force is explicit and past the

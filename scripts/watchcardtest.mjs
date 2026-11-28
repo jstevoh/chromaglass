@@ -23,6 +23,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { watchVideo, findFfmpeg } from './watch.mjs';
+import { clipAudio, ffmpegVersion } from './watchffmpeg.mjs';
 import { reportCard, REAL_SHOW_CARDS } from './watchcard.mjs';
 import { MEASURE_SETTINGS } from './watchsettings.mjs';
 
@@ -41,6 +42,9 @@ if (!ff) {
   console.error('ffmpeg not found (set FFMPEG=...)');
   process.exit(2);
 }
+// libvorbis or libopus, whichever the build has (47x-6, watchffmpeg.mjs).
+const AUDIO = clipAudio(ff);
+const audioArgs = () => AUDIO ?? (console.error(`${ffmpegVersion(ff)} has neither libvorbis nor libopus, so no clip with sound can be made`), process.exit(2));
 
 // 5x7 bitmap glyphs for crisp deterministic title cards and corner logos (no font deps).
 const FONT5X7 = {
@@ -106,7 +110,7 @@ async function encodeWebm(outPath, { sec, fps = FPS, bitrate = '2M', extraArgs =
     for (let i = 0; i < nAud; i++) wav.writeInt16LE(Math.max(-32767, Math.min(32767, Math.round(sound(i / 8000)))), 44 + i * 2);
     wavPath = `${outPath}.wav`;
     fs.writeFileSync(wavPath, wav);
-    args.push('-i', wavPath, '-c:v', 'libvpx', '-b:v', bitrate, ...extraArgs, '-c:a', 'libvorbis', '-shortest', '-f', 'webm', outPath);
+    args.push('-i', wavPath, '-c:v', 'libvpx', '-b:v', bitrate, ...extraArgs, ...audioArgs(), '-shortest', '-f', 'webm', outPath);
   } else {
     args.push('-an', '-c:v', 'libvpx', '-b:v', bitrate, ...extraArgs, '-f', 'webm', outPath);
   }
@@ -304,7 +308,10 @@ async function runSuite(mods, dir, clips, only = null) {
   const out = [];
   const want = id => !only || only === id;
   const rec = (id, name, ok, detail) => out.push({ id, name, ok: !!ok, detail });
-  const rw = mods.watchVideo;
+  // The report card and Settings to try are the liquid read's (PLAN 47p-3, scripts/watchmode.mjs):
+  // these clips hold them to pictures, so they are watched as liquid footage whatever the footage
+  // cues decide; that general footage gets neither is npm run watchmode.
+  const rw = (file, o) => mods.watchVideo(file, { liquid: true, ...o });
 
   // (a) letterbox: 12% bars top & bottom cropped within 1%; dark grainy ground NOT cropped
   if (want('a')) {
@@ -511,6 +518,17 @@ async function runSuite(mods, dir, clips, only = null) {
       parserOk && unknownKeys.length === 0 && physicsBeforeGrade && vsSum.includes('## Settings to try')
         && vsSum.includes('## Report card (side by side') && raiseMatch,
       `parserOk=${parserOk}, unknown=[${unknownKeys.join(',')}], physicsFirst=${physicsBeforeGrade}, colLine="${colLine.slice(0, 90)}"`);
+
+    // (h2) the same --vs watch with a config that names no settings map (a
+    // packaged copy watching some other app's film, PLAN 47p-1) leaves the
+    // section out and keeps the rest: the comparison still ran.
+    const bare = path.join(dir, 'bare.config.json');
+    fs.writeFileSync(bare, '{}');
+    const rBare = await rw(clips.grey, { out: path.join(dir, 'out-vs-bare'), vs: rPlain.out, settings: settingsFile, rate: 4, quiet: true, config: bare });
+    const bareSum = fs.readFileSync(path.join(rBare.out, 'summary.md'), 'utf8');
+    rec('h2', 'settings: with no settingsMap in the config, --vs leaves "Settings to try" out and still compares',
+      !bareSum.includes('## Settings to try') && bareSum.includes('## Report card (side by side') && vsSum.includes('## Settings to try'),
+      `bare has section=${bareSum.includes('## Settings to try')}, bare compared=${bareSum.includes('## Report card (side by side')}`);
   }
 
   return out;
@@ -527,7 +545,8 @@ async function runMutant(m, clips, tmpRoot) {
   const mDir = fs.mkdtempSync(path.join(tmpRoot, `mut-${m.id}-`));
   try {
     for (const f of fs.readdirSync(HERE)) {
-      if (/^watch.*\.mjs$/.test(f) && f !== 'watchcardtest.mjs') {
+      // reelreader.config.json too: without it the copy would watch with no settings map (47p-1).
+      if ((/^watch.*\.mjs$/.test(f) && f !== 'watchcardtest.mjs') || f === 'reelreader.config.json') {
         fs.copyFileSync(path.join(HERE, f), path.join(mDir, f));
       }
     }

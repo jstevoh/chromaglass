@@ -81,3 +81,44 @@ in the live file. Stories moved before 2026-11-21 are in `docs/plan-shipped.md`,
   plate keeps it. `npm run grating` section 7 holds both (with the forced pass as the
   control). Saves the `dye grid` stage on every look (3 to 9% of a layer's step on
   Metal at 18m-5, twice with oil bodies).
+- ~~**18a-25, the comet's pull and the Turbulence noise are through-flows at the open rim.**~~
+  **Shipped 2026-11-28** (`npm run rimstir`): on the thin gap Turbulence is the closed dish's
+  projection of the same curl noise, u = ∇⊥Φ with −∇²Φ = −∇²ψ inside and Φ = 0 at the rim
+  (`src/gpu/wgsl/fluid/stir.ts`, relaxed on hsLiftRelax), and the comet's pull is a tilt's,
+  added to Plate Rock's pull in hsBody's closed circulation. Not a window on ψ (the draught's
+  way): the stir's lowest octave is the dish, and a window would make a jet round the rim (estimated, not tried). Lab
+  (128², 600 steps, a disc to r 0.44): Turbulence 0.5 kept 6.86% → 100.01% with the middle's
+  stir 96% of the open curl's and no ring at the rim; the comet 1.5 kept 0.04% → 100.02% and
+  still moves the colour 0.18 of the plate along its pull. The comet now acts on every thin
+  gap (it ran only where Air, Rain Drip, the breath or a tilt ran hsBody), and with oil the
+  oil's lift goes against it as up a tipped plate. Follow-up: 28i-9.
+  Found re-tuning the looks the real dye mixing left bare (28i-8, 2026-11-27). On Classical
+  Vibe's thin gap, each stir alone on its own pours (lab, Metal, the dish's mean dye): with
+  nothing stirring the dish held 0.59; the comet's pull (`cometSpeed`) at 0.75 took it to
+  0.05 in 10 s; Turbulence 0.25 to 0.17 in 30 s; the music's stir cord on Turbulence alone
+  to 0.08; Air changed nothing. Lacing Run read the same (a mean of 0.08 at 30 s at Turbulence 0.1,
+  0.02–0.04 at 0.2, and 0.06 at 60 s at 0 with the music's stir cord still on it). The comet is a uniform drift and the curl noise in forcesB
+  (`src/gpu/wgsl/fluid/forces.ts`) has a lowest octave the size of the dish, and neither is
+  held closed at the rim, so both carry liquid, and its dye, out over it; the regulator
+  cannot put back what has left. The looks were re-tuned around it (less of both); the fix
+  is the physics: lay both as stream functions held at zero near the rim, the way 18a-16
+  did the draught and 18a-17 the tilt, so they turn the liquid inside the dish and send
+  none out. Then the looks 28i-8 calmed can have their stir back. Measure with the dish's
+  own mean over 60 s at Turbulence 0.5 and the comet at 1.5 on Classical Vibe's saved
+  settings (a mean under 0.4 at 60 s means it still leaks).
+- **18a-5, the press over its own time: shipped** (2026-11-28). The physical and
+  numerical halves (Stefan's closing in `squeezeUpdate`, the carries' substeps) shipped
+  on 2026-10-03 (`docs/plan-shipped.md`, "the Press draws the liquid back"). What was
+  left: a held press (the Press tool's hand, a bubble's standing squeeze) laid the same
+  dent every solver step, and the governor's step rate is not fixed, so at 30 steps a
+  second the glass came down at 0.64–0.68 of the speed it did at 60 (and faster at
+  120), while the spring, the lift, a kick's hold and release and the clock glass all
+  counted seconds. A hand is a load, and Stefan's rate is per second: the press is now
+  laid as each step's share of its rate (`pressOverStep`, sim/pressLay.ts), which
+  `squeezeUpdate` integrates exactly (1/h² linear in the rate), so 30 and 120 steps a
+  second close within 2% of 60 (0.98–1.01), and 60 is bit for bit as it was. And
+  `gapMemory` is not run on a thin gap: a Stokes film has no inertia to carry a press
+  past its hand, and the thin solve reads the gap's change (hsDivergence), never the
+  rate the memory padded. Let go, that rate read 7.96× off the gap's change on main
+  (the memory remembering the spring's own motion) and 3e-8 now; the old plate keeps
+  its memory. `npm run pressclock`.

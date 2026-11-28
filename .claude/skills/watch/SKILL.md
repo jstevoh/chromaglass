@@ -24,6 +24,7 @@ npm run watch -- --before A --after B --out <scratchpad>/<name>       # what cha
 npm run watch -- film.mkv --out … --keep <name> --note "why"   # into the reference library
 npm run watch -- our-take.webm --out … --vs <name>   # against a kept reference, no fetch
 npm run watch -- --refs         # the library, with each reference's numbers
+npm run watch -- our-take.webm --out … --liquid   # the liquid read whatever the footage shows (a drained, frozen or cut take of the app)
 npm run watch -- --selftest     # synthetic clips, frames and flows with known answers
 npm run watchwords              # vocabulary and before/after diff contract check
 npm run watchcard               # footage robustness, report card & gap settings check
@@ -38,14 +39,23 @@ npm run watchcard               # footage robustness, report card & gap settings
    `~/chromaglass-films/watch/<name>/`, a folder threads may stage from), then
    `device_stage_files` the `source.mkv` and `source.info.json` and watch the
    staged `source.mkv`. The info file is what gives the techniques section the
-   page's description, tags, chapters and links. Vimeo wants a login from
+   page's description, tags, chapters and links. (The Mac, its folder and the
+   reference library come from `scripts/reelreader.config.json`; `docs/watch.md` is
+   the tool's README.) Vimeo wants a login from
    anyone now and its copies are DRM-locked: ask for a screen recording.
 2. **Look at the first sheet, then crop.** If the camera shows the room (a
    tutorial, a gig from the floor), find the projection or the plate on a
    sheet and run again with `--crop x,y,w,h` (fractions), or the design read
    measures the room. A circular projection inside a square crop reads some
    symmetry from the mask; say so.
-3. **Read** the timeline, the sheets, then the summary's **Footage** section (cropped
+3. **Check the Read as line first.** The physics read, Techniques, the Report card,
+   the wet show's words and Settings to try come only with a liquid read (PLAN 47p-3,
+   `scripts/watchmode.mjs`): one take, its own motion, coloured light on a dark ground.
+   A real show or an app take reads liquid by itself; an app take that is drained,
+   frozen or cut reads general, so pass `--liquid` for any take of the app and any
+   liquid reference that reads general (and say so). Anything else reads general, with a
+   Motion section in place of Physics.
+4. **Read** the timeline, the sheets, then the summary's **Footage** section (cropped
    letterbox/pillarbox bars, masked still sharp overlays, excluded title-card spans,
    global camera pan share, and compression softness flags — or `clean`), **Overall** section (the whole
    film's arc and feel in one paragraph: whether it builds, settles, swells or holds, its
@@ -65,15 +75,15 @@ npm run watchcard               # footage robustness, report card & gap settings
    edge** note for words that differ while their measure moved under a step, a **How
    it felt** section with both Overall paragraphs and how the arc changed, plus both
    "In words" reads), `diff-timeline.png` and `pairs.png`.
-4. **Scan the pages.** Open the links the Techniques section lists
+5. **Scan the pages.** Open the links the Techniques section lists
    (WebFetch), the maker's site and gear lists, for what they say they used.
    Where nothing says, the "Guessed from the footage" lines are a start: check
    each against the stills, keep what holds.
-5. **Compare with ours.** Film or find the closest look of ours (the owner's
+6. **Compare with ours.** Film or find the closest look of ours (the owner's
    Mac has takes under `~/chromaglass-films/presets-*/clips/`, `npm run film`
    makes more, the Record button makes one) and watch it with `--vs` pointing
    at the reference's out folder. The gaps come ranked, biggest first.
-6. **Write the account**: what happens; the design critique (palette and
+7. **Write the account**: what happens; the design critique (palette and
    harmony, light, edges, scale and form, composition); the physics (what
    phenomenon makes each thing seen: immiscible drops and surface tension,
    diffusion, shear, buoyancy, refraction at a meniscus); the techniques;
