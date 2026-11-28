@@ -25,7 +25,19 @@ From one clip, in its out folder:
   frame; a design read (palette, colourfulness, contrast, edge width, form scale, flow lines,
   symmetry, composition); a physics read (flow speed, turning, spreading, lifetime, detail);
   how motion follows the sound; and a plain-language account.
-- `design.json`, `palette.png`: the reads as data, for comparing two films.
+- **Structure and light** (`scripts/watchstructure.mjs`, `watchdepth.mjs`), a section of
+  `summary.md` read on six native-resolution stills: cells and borders (whole cells a frame,
+  size and spread, sides and their variance μ2, junctions and how far their angles sit from
+  120°, border thickness against cell size), edge profiles (step, line, double line, halo, and
+  their widths), light against structure (a dark-field index, the share of the light on
+  borders, the hue of interiors, border flanks, border cores and nodes, specular highlights,
+  the colour fringe outward), a speck census by size with satellites and how they are arranged,
+  focus layers (sharp against blurred) and motion layers (the scene's own motion, a camera
+  glide with or without parallax, a turn with its period and centre), and an illustrated index
+  (0 photographic, 1 drawn) with its parts. `structure.png` is the overlay: borders white, cells
+  tinted, junctions red, specks cyan. Sources under 360 pixels wide are not read.
+- `design.json`, `palette.png`: the reads as data, for comparing two films (the structure read
+  is its `structure`).
 - `report.html`: all of it on one page for a person, best moment first, then the timeline,
   the read, the words, the numbers and every sheet. Self-contained (pictures inside it), so it
   can be mailed or opened on a phone; it names no folder of the machine that made it.
@@ -62,6 +74,7 @@ node scripts/watch.mjs --batch <folder | playlist | list.txt> [--rank pace]   # 
 node scripts/watch.mjs --refit [ratings.json]           # fit the card to your ratings
 node scripts/watch.mjs --notes [ratings.json]           # what the notes keep saying
 node scripts/watch.mjs --refs | --selftest
+node scripts/watchstructure.mjs <video or image> [--crop x,y,w,h] [--out DIR] [--vs structure.json]   # the structure and light read alone, on a still too
 ```
 
 In this repository `npm run watch -- …` runs the same thing. The public copy (`npx reelreader …`, the Claude Code plugin, the

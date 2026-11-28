@@ -203,3 +203,37 @@ blur.
   page, the refit and the notes' themes (handoff "Ratings for everyone"): `scripts/watchshots.mjs`,
   `watchbatch.mjs`, `watchrate.mjs`, `watchfit.mjs`, `watchnotes.mjs`; checks `npm run watchshots`,
   `npm run watchbatch`, `npm run ratepage`.
+- ~~**47p-6**~~ the release build (shipped, this PR). reelreader's public repository is a build
+  of this one, never edited by hand: `scripts/reelreaderpack.mjs --out DIR [--demo] [--zip]
+  [--test]` copies every watch module but the settings map (and every file they import, so
+  watchreadtest.mjs goes too), the tests that need only node and ffmpeg, the skill as
+  `skills/reelreader/` with its helper again as `agents/`, and `reelreader/release/` (README,
+  package.json, MIT licence, `.claude-plugin/` plugin + marketplace, the `/reelreader` command, CI
+  and a tag-driven release workflow that puts the skill zip on the GitHub release and the
+  package on npm). `npm run reelpack` (14 checks, each shown failing on a wrong build) holds that
+  every import resolves, npm packs no test, clip or demo, one version everywhere, no home
+  folder, address or model name, and the command runs through a bin link as npx runs it.
+
+## 47q. The structure and light read: what a frame is made of (the owner's ask, 2026-11-28) (M)
+
+- ~~**47q-1**~~ the read (shipped, this PR): `scripts/watchstructure.mjs` (cells and borders by
+  a search over edge and brightness segmentations scored on convex cells; sides, μ2, junction
+  angles against 120°, border thickness; edge profiles classed step, line, double line, halo;
+  dark-field index, light on borders, hue of interiors, border flanks, cores and nodes,
+  speculars, lateral fringe; a speck census by octave with satellites, Clark–Evans and chains;
+  the illustrated index and its parts), `scripts/watchdepth.mjs` (focus layers from the fine
+  over coarse gradient ratio; motion layers from the flow with wild vectors dropped: own motion,
+  glide, glide with parallax, zoom, a turn or a steady turn under own motion with its period and
+  centre), `scripts/watchimage.mjs` (the plumbing). In every watch summary and design.json,
+  `structure.png` the overlay, and alone on stills (`node scripts/watchstructure.mjs`). The
+  physics read's rotation line says "no turn" when the motion layers find a glide.
+  `npm run watchstructure` holds 53 known answers. ChromaGlass's layer, not shipped:
+  `npm run structuretargets -- <reference read> <our read>` turns each gap into the phenomenon
+  behind it and the control or plan item that gives the plate the same.
+  First reads (2026-11-28, the owner's foam film against Foam Cells and the clock-glass look,
+  cropped to the picture): dark-field index 0.64 against 0.17 and -0.26; double-line borders
+  65% against 19% and 2%; 82 speculars a frame against 2; 396 satellite specks against 0; 54%
+  of edges sharp against 5% and 0%; illustrated 0.18 against 0.61 and 0.62. The film's motion
+  is a steady clockwise turn about (0.48, 0.78) of the frame, one turn in about 33 s, not a
+  glide: the old read's "turning" was right, and the new one says a dish and a camera's roll
+  read alike.

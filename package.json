@@ -431,6 +431,8 @@
     "watchreport": "node scripts/watchreporttest.mjs",
     "watchshots": "node scripts/watchshotstest.mjs",
     "watchbatch": "node scripts/watchbatchtest.mjs",
+    "watchstructure": "node scripts/watchstructuretest.mjs",
+    "structuretargets": "node scripts/structuretargets.mjs",
     "ratepage": "node scripts/ratepagetest.mjs",
     "reelset": "node scripts/reelsettest.mjs",
     "reelpack": "node scripts/reelreaderpacktest.mjs"

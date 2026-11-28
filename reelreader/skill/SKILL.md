@@ -98,8 +98,14 @@ reference library, where to fetch a refused link, a settings map) is its config 
    **Read as**, **Overall** (the whole film's arc and feel in one paragraph), **In words**
    (each word with the number that chose it and its source in
    [watch-words.md](watch-words.md)), **Design** (palette, colourfulness, hues and harmony,
-   light, edges, scale, flow lines, forms, symmetry, composition), then **Motion** for general
+   light, edges, scale, flow lines, forms, symmetry, composition), **Structure and light**
+   (what each frame is made of and where its light sits: cells and borders, edge profiles,
+   colour by structure, specks, focus and motion layers, the illustrated index; check its
+   overlay `structure.png` before you trust a cell count), then **Motion** for general
    footage or **Physics**, **Techniques** and the **Report card** for liquid footage.
+   For a still, or a second look at a clip: `node scripts/watchstructure.mjs <file>`, and
+   `--vs` against an earlier `structure.json`. When something you can see in a frame (layers,
+   rims, specks, glints) has no number in this section, say so: that is a gap in the tool.
 4. **Stills** (`--at`) where the sheets say something happens.
 5. `stats.tsv` (every sample: brightness, near black, blown, saturation, motion, loudness) and
    `design.json` when a number needs checking against a moment.

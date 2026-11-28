@@ -88,6 +88,7 @@ import { loadConfig, useConfig, settingsMapFor, macFetch, fetchElsewhere } from 
 import { readMode, cueNumbers, generalMotionLines } from './watchmode.mjs';
 import { bestMoment, exportBest, writeReport } from './watchreport.mjs';
 import { shotList, shotsOut, shotSection } from './watchshots.mjs';
+import { structureRead } from './watchstructure.mjs';
 
 // ─── arguments ───────────────────────────────────────────────────────────────
 
@@ -833,6 +834,7 @@ async function watch() {
   // The physics read needs the cuts (no flow is measured across one) and the
   // form size from the design read (for the turnover time).
   const ps = physicsSummary(phys, { rate, cut: rows.map(r => !!(r.cut || r.fade)), W: w, scale: ds.scaleX?.med ?? null, mask });
+  const { lines: stLines, ...st } = structureRead(nativeFrames, { lum: phys.frames, rate, cut: rows.map(r => !!(r.cut || r.fade)), physics: ps, out });
   phys.frames.length = 0;
   footage.cameraShare = ps.cameraShare;
   if (footage.reliable?.detail === false) {
@@ -842,6 +844,7 @@ async function watch() {
     ps.spectrum = ps.spectrum ? { ...ps.spectrum, reliable: false } : { med: null, p10: null, p90: null, reliable: false };
   }
   ds.physics = ps;
+  ds.structure = st;
   // Liquid or general (scripts/watchmode.mjs, PLAN 47p-3): the physics read's
   // words, the techniques, the report card, the wet show's words and Settings
   // to try are a liquid light show's, so only liquid footage gets them.
@@ -850,7 +853,7 @@ async function watch() {
     : cfgMode !== 'auto' ? [cfgMode === 'liquid', `the config's mode, ${cfgMode}`] : [null, null];
   const mode = readMode({ forced, how, info, m: cueNumbers({ rows: useRows, cuts: activeCuts, span: activeSpan, shape: sh, design: ds, physics: ps }) });
   const liquid = mode.liquid;
-  const designOut = [...designLines(ds, { liquid }), '', ...(liquid ? [...physicsLines(ps), '', ...techniqueLines(info, ds, ps, activeCuts.length / Math.max(1 / 60, activeSpan / 60))] : generalMotionLines(ps))];
+  const designOut = [...designLines(ds, { liquid }), '', ...stLines, '', ...(liquid ? [...physicsLines(ps), '', ...techniqueLines(info, ds, ps, activeCuts.length / Math.max(1 / 60, activeSpan / 60))] : generalMotionLines(ps))];
   let refWords = null, refTitle = null, refDoc = null;
   let takeSettings = null;
   if (opt.settings) {

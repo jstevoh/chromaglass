@@ -113,15 +113,6 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   standing film's FFT (`wgsl/standing.ts`) can apply the kernel. *Measure:* the period
   against N_B at three gaps and three fields, within 15% of the law; stripes, not dots, at
   the fill where the theory says stripes.
-  - ~~**38d-1. The period from the Bond number, for the coil**~~ — **Shipped** (`npm run
-    bondmaze`; story in `docs/plan-shipped.md`). Labyrinth is the coil's field (7.5 mT at 1)
-    and the maze's period is λ/h = 1.906·e^{4π/N} − 0.5 from the stripe energy, read from the
-    field's mean square over 4 s; the frame loop swings the coil about the setting (0.75 +
-    music, was 0.55 +). The physics shipped; the first cut's look retune did not: it moved
-    Ferro Paint and Magnet Garden toward the onset (0.65 and 0.58, periods 0.15 and 0.27),
-    and the owner, seeing it (2026-11-13): "The reference images have much thinner and more
-    complex fingers." Both looks ship at Labyrinth 1 (N 14, period 0.042, Ferro Paint over
-    √3 by Maze Detail 0.5) with their magnets as before: no wider than on main.
   - **38d-1b. Thin, branched fingers** (M, open). The photos' long, wavy, branched black
     fingers are the labyrinthine instability far above onset (high N) over a pool much
     wider than the period; our pours are small drops or a ring, which give beads and worms.
@@ -360,9 +351,6 @@ The glass and the grain at rest (38u-8, 38u-11, shipped) left two:
   4.0 mT (`SPIKE_ONSET` since 38k-7, a share of 0.033), held to an independent solution by
   `npm run disc` 13/13. The plate runs on it since 38k-7 (shipped, #662). Story
   in `docs/plan-shipped.md` §38k.
-  - **38k-7. The plate on the real onset (shipped, #662, with 9t-2).** `SPIKE_ONSET`
-    is the liquid's 4.0 mT; the owner's films of Magnet Garden, Ferro Paint and a dragged
-    Magnet are `docs/judging.md` §154. Story in `docs/plan-shipped.md` §9t-2 + 38k-7.
   - **38k-1. A Magnetite dial** (S–M; Medium, the owner's call). The ferrofluid's loading
     φ sets Ms and χ together (both in proportion to φ; EFH1 is about 8%), so one dial
     from very dilute (no field raises domes: Ms under Mc) to very loaded (past real, 20%

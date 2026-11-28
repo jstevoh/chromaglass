@@ -83,7 +83,7 @@ export const TESTS = [
   // with the liquid read, which needs the app's settings map) and ratepagetest
   // (it drives Chromium).
   'watchwordstest.mjs', 'watchreporttest.mjs',
-  'watchshotstest.mjs', 'watchbatchtest.mjs', 'reelsettest.mjs',
+  'watchshotstest.mjs', 'watchbatchtest.mjs', 'watchstructuretest.mjs', 'reelsettest.mjs',
 ];
 
 // What no shipped text may hold: a home folder or a machine's own folders, an
