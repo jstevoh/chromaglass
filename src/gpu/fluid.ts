@@ -1126,9 +1126,10 @@ export class WebGPUFluid extends FluidCover {
         return;
       }
       if (!bodiesOn) { 
-        this.macCormack(pass, this.dye, this.velForced, disp, 'dye'); 
-        this.carryLiquids(pass, 'mac', null, disp);
-        if (this.chemLive) this.macCormack(pass, this.chem, this.velForced, disp, 'dye'); 
+        const dd = Math.max(0, p.depthDrag ?? 0);
+        this.macCormack(pass, this.dye, this.velForced, disp, 'dye', dd); 
+        this.carryLiquids(pass, 'mac', null, disp, undefined, dd);
+        if (this.chemLive) this.macCormack(pass, this.chem, this.velForced, disp, 'dye', dd); 
         return; 
       }
       /*

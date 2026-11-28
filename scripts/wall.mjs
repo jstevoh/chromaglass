@@ -1385,10 +1385,9 @@ let failed = 0;
 try {
   page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
   await installFrameReader(page);
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=comet&dpr=${encodeURIComponent(DPR)}${engineQuery()}`, { waitUntil: 'load' });
-  // Comet: Classic's white frame (38w-1) saturates the grade. Long enough
-  // for the governor to settle and dye to land: a bare plate passes every
-  // gate below wrongly.
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=bass-drop&dpr=${encodeURIComponent(DPR)}${engineQuery()}`, { waitUntil: 'load' });
+  // Bass Drop: black ground (Classic saturates), full-width pools; long enough
+  // for governor & dye to land (a bare plate passes every gate wrongly).
   await page.waitForTimeout(9000);
   // Read before anything below touches the output: the gain and gamma checks
   // switch the guard off for themselves and back on after.

@@ -1549,29 +1549,30 @@ export class FluidPasses extends FluidFields {
    * both ways of it: no carry on a plate never poured on or cleared, and
    * the carries back, open plate and thin gap, after one drop.
    */
-  protected carryLiquids(pass: GPUComputePassEncoder, how: 'thin' | 'mac' | 'pressed', args: GPUBuffer | null, disp = 0, at?: GPUBuffer[]): void {
+  protected carryLiquids(pass: GPUComputePassEncoder, how: 'thin' | 'mac' | 'pressed', args: GPUBuffer | null, disp = 0, at?: GPUBuffer[], depthDrag = 0): void {
     if (!this.liquidsLive) return;
-    this.carryLiquid(pass, this.liquids0, how, args, disp, at);
-    this.carryLiquid(pass, this.liquids1, how, args, disp, at);
+    this.carryLiquid(pass, this.liquids0, how, args, disp, at, depthDrag);
+    this.carryLiquid(pass, this.liquids1, how, args, disp, at, depthDrag);
   }
 
-  private carryLiquid(pass: GPUComputePassEncoder, f: PingPong, how: 'thin' | 'mac' | 'pressed', args: GPUBuffer | null, disp: number, at?: GPUBuffer[]): void {
-    if (how === 'mac') { this.macCormack(pass, f, this.velForced, disp, 'dye'); return; }
+  private carryLiquid(pass: GPUComputePassEncoder, f: PingPong, how: 'thin' | 'mac' | 'pressed', args: GPUBuffer | null, disp: number, at?: GPUBuffer[], depthDrag = 0): void {
+    if (how === 'mac') { this.macCormack(pass, f, this.velForced, disp, 'dye', depthDrag); return; }
     if (how === 'thin') { this.carrySubsteps(pass, 'bodyAdvect', f, args!, undefined, at); return; }
     this.runPressed(pass, 'bodyAdvect', f.write, [f.read, this.velForced], args!);
     f.swap();
   }
 
-  protected macCormack(pass: GPUComputePassEncoder, field: PingPong, velTex: GPUTexture, disp: number, label: string): void {
+  protected macCormack(pass: GPUComputePassEncoder, field: PingPong, velTex: GPUTexture, disp: number, label: string, depthDrag = 0): void {
     const fwd = this.arg('advect forward', [disp, 0, 0, 0]);
     const back = this.arg('advect back', [-disp, 0, 0, 0]);
     const phi0 = field.read;
     this.run(pass, 'advect', this.scratchA, [phi0, velTex, this.sampler], fwd);
     this.run(pass, 'advect', this.scratchB, [this.scratchA, velTex, this.sampler], back);
     // The dye is an amount and thins where the flow spreads (see macCormack);
-    // the velocity is carried as it was.
-    const last = label === 'dye' ? this.arg('advect dye conserving', [disp, 1, 0, 0]) : fwd;
-    this.run(pass, 'macCormack', field.write, [phi0, this.scratchA, this.scratchB, velTex, this.sampler], last);
+    // the velocity is carried as it was. A.a.z carries depthDrag so div(vel)
+    // strips the viscous wall mobility (forcesB) instead of treating it as compressibility.
+    const last = label === 'dye' ? this.arg('advect dye conserving', [disp, 1, depthDrag, 0]) : fwd;
+    this.run(pass, 'macCormack', field.write, [phi0, this.scratchA, this.scratchB, velTex, this.squeeze.read, this.sampler], last);
     field.swap();
   }
 }
