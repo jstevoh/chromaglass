@@ -329,6 +329,28 @@ capillary pass so threads narrower than the gap bead at the Rayleigh-Plateau wav
 *Measure:* bead spacing 9.0 r within 15 %, breakup time against the Tomotika rate for the
 two liquids' viscosity ratio, and a strip wider than the gap stays whole.
 
+*The beading part shipped 2026-11-28* (`npm run pinch`, with 38w-27's `npm run beads`). The
+gap curvature was in (38w-27), but measured, the beads came at the wrong spacing: the
+per-cell clip on the capillary force (OIL_CELLS) bound about twelve times over on a thread's
+edge, so neck and bulge pushed alike and a wave at kr = 1.5, past Plateau's cutoff, grew.
+Now a thread's whole pull is slowed by one factor (THREAD_PULL in
+`src/gpu/wgsl/fluid/capillary.ts`), which keeps the law's shape. Measured against the
+plate's own law (Darcy between the glasses, the oil 1.9 times the clear liquid's viscosity:
+s = (mσ/r³) x sinh x (1 − x²)/(cosh x + m sinh x), fastest at kr = 0.67, 9.4 radii, near
+Rayleigh's 9.0 and Tomotika's 9 to 11): waves past kr = 1 shrink, the fastest of eight is at
+0.70, the three longest grow within 23% of the law's rate, and noisy threads bead 4.3 to 5.1
+widths apart against the law's 4.7 (main: 4.0 to 8.6). The breakup time is the shortcut: a
+real 1 mm thread breaks in milliseconds, the explicit force cannot step that at 60 Hz, so
+the plate's takes about a second (and longer on a finer grid, the factor being in cells a
+step); the implicit capillary, **27f-9s**, takes it out.
+
+- **47k-2. Open: the tendrils from each bead.** The film's beads then throw tendrils into a
+  star: solutal Marangoni spreading from each bead (47g's physics, small), not built.
+- **47k-3. Open: ink threads.** An ink thread in water is miscible, with no interfacial
+  tension, and does not bead by Rayleigh–Plateau; the films' ink channels that do are paint
+  or ink in an immiscible carrier. Which our dye is, on which looks, wants the reference
+  first (47m) before anything is built.
+
 ## 47m. Gear: a small kit to film real references (owner's call, not code)
 
 The realism rule asks for the real phenomenon before each build; three of the items above
