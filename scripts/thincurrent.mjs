@@ -17,28 +17,33 @@
  * (CURRENT_DRIVE_WGSL, src/gpu/wgsl/fluid/forces.ts). Measured in the lab at
  * 128² over a 128² plate, so the lab's deltas reach the solver cell for cell:
  *
- *   kernels  one watched step of a thin gap runs none of the current's four
- *            kernels (currentForces, curDivergence, curPressure, curGradient);
- *            the old plate, the control, runs all four
- *   lift     a warm spot on a standing thin plate rises, and its first step's
- *            speed is the same at Damping 0.8 and 0.99, within 5%: what lag is
- *            left is the gap's own drag, not Damping's relaxation (main's
- *            first step at 0.99 over its first at 0.8 read 0.37 for the lift
- *            and 0.05 for the pull, the current's (1 − d)). The drive is held under the cap, where the
+ *   kernels  one watched step of a thin gap dispatches none of the current's
+ *            four kernels (currentForces, curDivergence, curPressure,
+ *            curGradient), watched at `pipeline`, which every dispatcher asks
+ *            and which dispatches nothing when it returns none; the old
+ *            plate, the control, dispatches all four
+ *   lift     the current's share of one thin step's flow at a warm spot on a
+ *            standing plate (Buoyancy up less Buoyancy 0: the thin gap lifts
+ *            warm water by another path too, the dye's weight with its heat)
+ *            is 5× what that other path gives, halves at half the dial, and is
+ *            the same at Damping 0.99 and 0.8, within 5%: what lag is left is
+ *            the gap's own drag, not Damping's relaxation (main read 0.050,
+ *            the current's 1 − d). The drive is held under the cap, where a
  *            cap would hide a lag (a capped current is at its cap at once).
  *   pull     the same for a heavy spot drawn to the middle (Center Gravity)
- *   facets   the lift laid at the solver's cells, not as the M grid's 2×2
- *            facets. A field brought up 2× by the bilinear is linear between
- *            M samples, so its second difference along x comes in equal
- *            pairs, d²(2i) = d²(2i + 1); a smooth field's does not. The
- *            score is rms(d²(2i) − d²(2i + 1)) over rms(d²(2i + 1) − d²(2i + 2))
- *            over the plume: near 0 for facets, near 1 for a smooth field.
- *            Bar 0.8 (main's thin gap read 0.46). The control: the old
- *            plate's own current, read on its M grid and brought up by the
- *            same bilinear as bilerpN, must read under 0.1.
- *
- * The settled speeds are printed: main's thin gap settles on the same drive,
- * capped the same way, so step 40 on main and here are compared in the PR.
+ *   boil     with Heat up the lift is water's real density deficit (Kell),
+ *            1.6× the linear lift at 30 K; a boiling plate that took the
+ *            linear path would read 1.0
+ *   facets   the lift's share laid at the solver's cells, not as the M grid's
+ *            2×2 facets or blocks. A field brought up 2× by the bilinear is
+ *            linear between M samples, so its second difference along x comes
+ *            in equal pairs, d²(2i) = d²(2i + 1), and a block field's values
+ *            do; a smooth field's do not. Pairs: rms(d²(2i) − d²(2i + 1)) over
+ *            rms(d²(2i + 1) − d²(2i + 2)); blocks: the same on the values;
+ *            both near 1 for a smooth field. Bars 0.8 (main read 0.538 on
+ *            pairs). The controls: the old plate's own current, read on its M
+ *            grid and brought up by bilerpN's bilinear and as blocks, must
+ *            read under 0.1 on each.
  */
 import { openLab } from './lab.mjs';
 
@@ -62,10 +67,9 @@ try {
       }
       return v;
     };
-    const standing = { plateUpright: 1, gravityX: 0, gravityY: -1, currentBuoy: 0.3, heatDecay: 1, dt: 1 / 60, maxCurrent: 0.05 };
-    // The drive under the cap: 0.3 × 0.1 K = 0.03 at the spot's middle, and 0.03 × tanh(1) of the pull.
-    const T = 0.1;
-    const lay = async (thin, what) => {
+    const standing = { plateUpright: 1, gravityX: 0, gravityY: -1, heatDecay: 1, dt: 1 / 60, maxCurrent: 0.05, currentDamp: 0.8 };
+    const pulling = { plateUpright: 0, dt: 1 / 60, maxCurrent: 0.05, meanDensity: 0, currentDamp: 0.8 };
+    const lay = async (thin, what, T = 0.1) => {
       await lab.create(N, N);
       if (what === 'warm') lab.addVel(warm(0.5, 0.5, 0.08, T));
       else lab.dye(0.7, 0.5, 0.12, [0.5, 0.5, 0.5], 1);
@@ -74,101 +78,143 @@ try {
     };
     const at = (f, x, y) => { const k = (Math.floor(x * N) + Math.floor(y * N) * N) * 4; return [f[k], f[k + 1]]; };
 
-    // kernels: what one step runs, watched at the solver's own run.
+    // kernels: what one step dispatches, watched where every dispatcher gets its pipeline (a null one dispatches nothing).
     const kernels = async (thin) => {
       const plate = await lay(thin, 'warm');
-      await lab.step(3, { ...standing, ...plate });
+      await lab.step(3, { ...standing, currentBuoy: 0.3, ...plate });
       const s = lab.solver();
       const seen = new Set();
-      const run = s.run, run2 = s.run2;
-      s.run = function (pass, name, ...rest) { seen.add(name); return run.call(this, pass, name, ...rest); };
-      s.run2 = function (pass, name, ...rest) { seen.add(name); return run2.call(this, pass, name, ...rest); };
-      await lab.step(1, { ...standing, ...plate });
-      s.run = run; s.run2 = run2;
-      return { thin: s.thinGapLive, ran: CURRENT.filter((n) => seen.has(n)), forcesB: seen.has('forcesB') };
+      const pipeline = s.pipeline;
+      s.pipeline = function (name, ...rest) { const got = pipeline.call(this, name, ...rest); if (got) seen.add(name); return got; };
+      await lab.step(1, { ...standing, currentBuoy: 0.3, ...plate });
+      s.pipeline = pipeline;
+      return { thin: s.thinGapLive, ran: CURRENT.filter((n) => seen.has(n)), forcesB: seen.has('forcesB'), seen: seen.size };
     };
 
-    // lift / pull: the speed at the spot after one step at Damping 0.8 and 0.99, and settled (forty at 0.8).
-    const settle = async (what, over) => {
-      const pick = what === 'warm' ? (f) => at(f, 0.5, 0.5)[1] : (f) => -at(f, 0.7, 0.5)[0];
-      const first = async (d) => {
-        const plate = await lay(true, what);
-        await lab.step(1, { ...over, currentDamp: d, ...plate });
-        return pick(await lab.field('vel'));
-      };
-      const hi = await first(0.99);
-      const plate = await lay(true, what);
-      await lab.step(1, { ...over, currentDamp: 0.8, ...plate });
-      const one = pick(await lab.field('vel'));
-      await lab.step(39, { ...over, currentDamp: 0.8, ...plate });
-      const forty = pick(await lab.field('vel'));
-      return { hi, one, forty, damping: hi / (Math.abs(one) > 1e-12 ? one : 1e-12), thin: lab.solver().thinGapLive };
+    // One thin step's flow (velForced), from a fresh plate, with the current's dial at `over`.
+    const first = async (what, over, T) => {
+      const plate = await lay(true, what, T);
+      await lab.step(1, { ...(what === 'warm' ? standing : pulling), ...over, ...plate });
+      return { f: await lab.field('vel'), thin: lab.solver().thinGapLive };
+    };
+    // The current's own share: the flow with the dial up less the flow with it at 0 (the thin gap
+    // lifts warm water by another path too, the dye's weight with its heat, hsBody).
+    const share = (on, off) => on.map((x, k) => x - off[k]);
+
+    const lift = async () => {
+      const off = await first('warm', { currentBuoy: 0 });
+      const on = await first('warm', { currentBuoy: 0.3 });
+      const half = await first('warm', { currentBuoy: 0.15 });
+      const hi = await first('warm', { currentBuoy: 0.3, currentDamp: 0.99 });
+      const v = (x) => at(x.f, 0.5, 0.5)[1];
+      return { thin: off.thin && on.thin && half.thin && hi.thin, off: v(off), on: v(on), half: v(half), hi: v(hi), shareF: share(on.f, off.f) };
+    };
+    const pull = async () => {
+      const off = await first('heavy', { currentGrav: 0 });
+      const on = await first('heavy', { currentGrav: 0.03 });
+      const half = await first('heavy', { currentGrav: 0.015 });
+      const hi = await first('heavy', { currentGrav: 0.03, currentDamp: 0.99 });
+      const v = (x) => -at(x.f, 0.7, 0.5)[0];
+      return { thin: off.thin && on.thin && half.thin && hi.thin, off: v(off), on: v(on), half: v(half), hi: v(hi) };
+    };
+    /*
+      The boil (Heat up): its lift is water's real density deficit (Kell),
+      not the linear one, and at 30 K that is 1.6 times the linear lift
+      (Δρ 10.2 kg/m³ against 30 × 0.207). A boiling plate that took the
+      linear path would read 1.0. Buoyancy small and the cap high, so
+      neither is capped.
+    */
+    const boil = async () => {
+      const over = { currentDamp: 0.8, maxCurrent: 1, dimmer: 0 };
+      const lin = share((await first('warm', { ...over, currentBuoy: 0.003 }, 30)).f, (await first('warm', { ...over, currentBuoy: 0 }, 30)).f);
+      const hot = await first('warm', { ...over, heat: 1, currentBuoy: 0.003 }, 30);
+      const cold = await first('warm', { ...over, heat: 1, currentBuoy: 0 }, 30);
+      const boiled = share(hot.f, cold.f);
+      const live = lab.solver().boilLive;
+      const v = (x) => at(x, 0.5, 0.5)[1];
+      return { live, thin: hot.thin, lin: v(lin), boiled: v(boiled), ratio: v(boiled) / (Math.abs(v(lin)) > 1e-12 ? v(lin) : 1e-12) };
     };
 
-    // facets: d² along x of vy, pairs within an M cell against pairs across, over the plume.
+    /*
+      facets, on the current's own share of one step's flow (vy), along x,
+      over the cells where it is over a tenth of its peak:
+        pairs   rms(d²(2i) − d²(2i + 1)) over rms(d²(2i + 1) − d²(2i + 2)):
+                a 2× bilinear is linear between M samples, so its d² comes
+                in equal pairs and this reads 0; a smooth field reads ~1
+        blocks  rms(f(2i + 1) − f(2i)) over rms(f(2i + 2) − f(2i + 1)):
+                a 2×2 block field is equal in pairs and reads 0
+    */
     const score = (f, n) => {
       let peak = 0;
       for (let k = 0; k < n * n; k++) peak = Math.max(peak, Math.abs(f[k * 4 + 1]));
-      let within = 0, across = 0, nw = 0, na = 0;
+      const g = (i, j) => f[(i + j * n) * 4 + 1];
+      let pw = 0, pa = 0, bw = 0, ba = 0, cells = 0;
       for (let j = 4; j < n - 4; j++) {
-        const d2 = (i) => f[(i + 1 + j * n) * 4 + 1] - 2 * f[(i + j * n) * 4 + 1] + f[(i - 1 + j * n) * 4 + 1];
+        const d2 = (i) => g(i + 1, j) - 2 * g(i, j) + g(i - 1, j);
         for (let i = 2; i < n - 4; i += 2) {
-          if (Math.abs(f[(i + j * n) * 4 + 1]) < 0.1 * peak) continue;
-          within += (d2(i) - d2(i + 1)) ** 2; nw++;
-          across += (d2(i + 1) - d2(i + 2)) ** 2; na++;
+          if (Math.abs(g(i, j)) < 0.1 * peak) continue;
+          pw += (d2(i) - d2(i + 1)) ** 2; pa += (d2(i + 1) - d2(i + 2)) ** 2;
+          bw += (g(i + 1, j) - g(i, j)) ** 2; ba += (g(i + 2, j) - g(i + 1, j)) ** 2;
+          cells++;
         }
       }
-      return { score: Math.sqrt(within / Math.max(nw, 1)) / Math.max(Math.sqrt(across / Math.max(na, 1)), 1e-30), cells: nw };
+      return { pairs: Math.sqrt(pw) / Math.max(Math.sqrt(pa), 1e-30), blocks: Math.sqrt(bw) / Math.max(Math.sqrt(ba), 1e-30), cells, peak };
     };
-    // bilerpN's own bilinear, from an m² field to n²: p = uv·m − ½, its corners clamped.
-    const upBilinear = (c, m, n) => {
+    // bilerpN's own bilinear, from an m² field to n²: p = uv·m − ½, its corners clamped; and the 2×2 block (nearest).
+    const up = (c, m, n, block) => {
       const out = new Float32Array(n * n * 4);
+      const cl = (v) => Math.max(0, Math.min(m - 1, v));
+      const g = (x, y, ch) => c[(cl(x) + cl(y) * m) * 4 + ch];
       for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
         const px = ((i + 0.5) / n) * m - 0.5, py = ((j + 0.5) / n) * m - 0.5;
         const x0 = Math.floor(px), y0 = Math.floor(py), fx = px - x0, fy = py - y0;
-        const cl = (v) => Math.max(0, Math.min(m - 1, v));
-        const g = (x, y, ch) => c[(cl(x) + cl(y) * m) * 4 + ch];
         for (let ch = 0; ch < 2; ch++) {
-          out[(i + j * n) * 4 + ch] = (g(x0, y0, ch) * (1 - fx) + g(x0 + 1, y0, ch) * fx) * (1 - fy) + (g(x0, y0 + 1, ch) * (1 - fx) + g(x0 + 1, y0 + 1, ch) * fx) * fy;
+          out[(i + j * n) * 4 + ch] = block ? g(Math.floor((i * m) / n), Math.floor((j * m) / n), ch)
+            : (g(x0, y0, ch) * (1 - fx) + g(x0 + 1, y0, ch) * fx) * (1 - fy) + (g(x0, y0 + 1, ch) * (1 - fx) + g(x0 + 1, y0 + 1, ch) * fx) * fy;
         }
       }
       return out;
     };
-    const facets = async () => {
-      let plate = await lay(true, 'warm');
-      await lab.step(40, { ...standing, currentDamp: 0.8, ...plate });
-      const thin = { ...score(await lab.field('vel'), N), thin: lab.solver().thinGapLive };
-      plate = await lay(false, 'warm');
-      await lab.step(40, { ...standing, currentDamp: 0.8, ...plate });
+    const controls = async () => {
+      const plate = await lay(false, 'warm');
+      await lab.step(40, { ...standing, currentBuoy: 0.3, ...plate });
       const s = lab.solver();
       const c = await s.readHalf(s.cur);
-      const control = { ...score(upBilinear(c.data, c.n, N), N), thin: s.thinGapLive, m: c.n };
-      return { thin, control };
+      return { thin: s.thinGapLive, m: c.n, bilinear: score(up(c.data, c.n, N, false), N), block: score(up(c.data, c.n, N, true), N) };
     };
 
-    const pulling = { plateUpright: 0, currentGrav: 0.03, dt: 1 / 60, maxCurrent: 0.05, meanDensity: 0 };
+    const L = await lift();
     return {
       N,
       kThin: await kernels(true), kOld: await kernels(false),
-      lift: await settle('warm', standing), pull: await settle('heavy', pulling),
-      facets: await facets(),
+      lift: { ...L, shareF: undefined }, facets: score(L.shareF, N), pull: await pull(), boil: await boil(),
+      controls: await controls(),
     };
   });
 
   const f = (x) => x.toExponential(3);
-  check('kernels: a thin gap\'s step runs none of the current\'s four kernels',
-    r.kThin.thin && r.kThin.forcesB && r.kThin.ran.length === 0, `ran [${r.kThin.ran.join(', ')}]${r.kThin.thin ? '' : ', the plate ran old'}`);
-  check('kernels: the old plate, the control, runs all four', !r.kOld.thin && r.kOld.ran.length === 4, `ran [${r.kOld.ran.join(', ')}]`);
-  const speeds = (x) => `step 1 at Damping 0.99 ${f(x.hi)}, at 0.8 ${f(x.one)}, ratio ${x.damping.toFixed(3)} (bar 0.95–1.05); settled (step 40) ${f(x.forty)}, step 1 over it ${(x.one / x.forty).toFixed(3)}`;
-  check('lift: a warm spot on a standing thin plate rises, and Damping does not lag it',
-    r.lift.thin && r.lift.forty > 0 && r.lift.one > 0 && Math.abs(r.lift.damping - 1) <= 0.05, `vy ${speeds(r.lift)}`);
-  check('pull: a heavy spot on a thin gap is drawn to the middle, and Damping does not lag it',
-    r.pull.thin && r.pull.forty > 0 && r.pull.one > 0 && Math.abs(r.pull.damping - 1) <= 0.05, `inward speed ${speeds(r.pull)}`);
-  check('facets: the thin gap\'s lift is laid at its own cells, not as the M grid\'s 2×2 facets', r.facets.thin.thin && r.facets.thin.cells > 50 && r.facets.thin.score >= 0.8,
-    `pair score ${r.facets.thin.score.toFixed(3)} over ${r.facets.thin.cells} pairs (bar 0.8; facets read 0)`);
-  check('facets: the control, the old plate\'s current brought up from its M grid by the bilinear, reads as facets',
-    !r.facets.control.thin && r.facets.control.m === r.N / 2 && r.facets.control.cells > 50 && r.facets.control.score < 0.1,
-    `pair score ${r.facets.control.score.toFixed(3)} over ${r.facets.control.cells} pairs, from ${r.facets.control.m}² (bar under 0.1)`);
+  check('kernels: a thin gap\'s step dispatches none of the current\'s four kernels',
+    r.kThin.thin && r.kThin.forcesB && r.kThin.seen >= 8 && r.kThin.ran.length === 0, `ran [${r.kThin.ran.join(', ')}] of ${r.kThin.seen} kernels${r.kThin.thin ? '' : ', the plate ran old'}`);
+  check('kernels: the old plate, the control, dispatches all four', !r.kOld.thin && r.kOld.ran.length === 4, `ran [${r.kOld.ran.join(', ')}]`);
+  for (const [name, x, what] of [['lift', r.lift, 'a warm spot on a standing thin plate rises'], ['pull', r.pull, 'a heavy spot on a thin gap is drawn to the middle']]) {
+    const s1 = x.on - x.off, s2 = x.half - x.off, sh = x.hi - x.off;
+    check(`${name}: ${what} by the current, in its first step, as much again at half the dial and half as much`,
+      x.thin && s1 > 1e-4 && s1 >= 5 * Math.abs(x.off) && Math.abs(s1 / s2 - 2) <= 0.1,
+      `first step ${f(x.on)} with the dial, ${f(x.off)} without (share ${f(s1)}, bar 5× and over 1e-4); at half the dial ${f(s2)}, ratio ${(s1 / s2).toFixed(3)} (bar 1.9–2.1)`);
+    check(`${name}: Damping does not lag it (its share in the first step the same at Damping 0.99 and 0.8)`,
+      x.thin && Math.abs(sh / s1 - 1) <= 0.05, `${f(sh)} against ${f(s1)}, ratio ${(sh / s1).toFixed(3)} (bar 0.95–1.05; main read 0.050 for both)`);
+  }
+  check('boil: with Heat up, a thin gap\'s lift is water\'s real density deficit, not the linear one',
+    r.boil.live && r.boil.thin && r.boil.lin > 1e-4 && r.boil.ratio >= 1.3,
+    `share at 30 K boiling ${f(r.boil.boiled)} against linear ${f(r.boil.lin)}, ratio ${r.boil.ratio.toFixed(3)} (bar 1.3; Kell at the middle 1.6, linear 1.0)${r.boil.live ? '' : ', the boil never ran'}`);
+  const fs = r.facets;
+  check('facets: the current\'s share of a thin step is laid at the solver\'s cells, neither as 2×2 facets nor 2×2 blocks',
+    r.lift.thin && fs.cells > 50 && fs.peak > 1e-4 && fs.pairs >= 0.8 && fs.blocks >= 0.8,
+    `pair score ${fs.pairs.toFixed(3)}, block score ${fs.blocks.toFixed(3)} over ${fs.cells} cells, peak ${f(fs.peak)} (bars 0.8; main read 0.538 on pairs)`);
+  const c = r.controls;
+  check('facets: the controls, the old plate\'s current brought up from its M grid by the bilinear and as blocks, read as facets and as blocks',
+    !c.thin && c.m === r.N / 2 && c.bilinear.cells > 50 && c.bilinear.pairs < 0.1 && c.block.blocks < 0.1,
+    `bilinear pair score ${c.bilinear.pairs.toFixed(3)}, block score ${c.block.blocks.toFixed(3)}, from ${c.m}² (bars under 0.1)`);
   check('no GPU pass failed validation', gpuErrors.length === 0, gpuErrors.join(', '));
 } finally {
   await close();

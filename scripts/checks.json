@@ -1957,11 +1957,11 @@
       "shard": "lab2",
       "run": "npm run thincurrent",
       "why": [
-        "PLAN.md 18a-4 (scripts/thincurrent.mjs): a thin gap's step runs none of the current's four",
-        "kernels on the M grid (the old plate, the control, runs all four); a warm spot on a standing",
-        "plate rises, and a heavy one is drawn to the middle, at their settled speed from the first",
-        "step (the old plate's current lags by Damping); and the lift is laid at the solver's cells,",
-        "not as the M grid's 2x2 facets (the old plate, the control, reads as facets)."
+        "PLAN.md 18a-4 (scripts/thincurrent.mjs): a thin gap's step dispatches none of the current's",
+        "four kernels on the M grid (the old plate, the control, runs all four); the current's share of",
+        "a thin step's lift and pull scales with its dial and is not lagged by Damping (main's was, 0.05);",
+        "with Heat up the lift is water's real density deficit; and the lift is laid at the solver's",
+        "cells, not as the M grid's 2x2 facets or blocks (the old plate's current, the control, reads as both)."
       ]
     },
     {
