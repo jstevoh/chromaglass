@@ -50,6 +50,7 @@ import { createInterface } from 'node:readline';
 import { port } from './ports.mjs';
 import { captionRoutes, textScenario } from './youtubeText.mjs';
 import { shortsScenario } from './youtubeShorts.mjs';
+import { ANALYTICS_MUTANTS, analyticsRoutes, analyticsScenario } from './youtubeAnalytics.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const SERVER = resolve(import.meta.dirname, '../mcp/youtube-mcp.js');
@@ -70,7 +71,9 @@ function standIn(gport) {
     codes: new Map(), refresh: new Set(), access: new Set(), refreshes: 0, rejected401: 0,
     sessions: [], videos: new Map(), playlistItems: [], thumbnails: [], updates: 0, wire: 0,
     faults: new Map([[2, 'stall'], [4, 'expire'], [5, 'drop'], [7, '503']]), refreshesAtExpiry: null, stalled: false, secrets: new Set([CLIENT_SECRET]),
-    pkceOk: false, authAsked: null,
+    pkceOk: false, authAsked: null, auths: 0,
+    // Scopes (44i-2d): what each code, refresh key and access key was granted, and the ones a person unticks on the consent page.
+    rtScope: new Map(), scopeOf: new Map(), untick: new Set(),
     requests: 0, limitNext: 0, pageSize: 50, playlistPages: 0, startCalls: 0, holdStart: null, onStartEnter: null,
     playlists: [{ id: 'PL1', snippet: { title: 'Films' }, status: { privacyStatus: 'public' } }],
   };
@@ -78,7 +81,7 @@ function standIn(gport) {
   const err = (res, status, reason, message) => json(res, status, { error: { code: status, message, errors: [{ reason, message }] } });
   const body = (req) => new Promise((r) => { const b = []; req.on('data', (c) => b.push(c)); req.on('end', () => r(Buffer.concat(b))); req.on('error', () => r(Buffer.concat(b))); });
   const authed = (req) => g.access.has((req.headers.authorization ?? '').replace(/^Bearer /, ''));
-  const issue = () => { const a = `at-${randomBytes(8).toString('hex')}`; g.access.add(a); g.secrets.add(a); return a; };
+  const issue = (scope = 'https://www.googleapis.com/auth/youtube') => { const a = `at-${randomBytes(8).toString('hex')}`; g.access.add(a); g.secrets.add(a); g.scopeOf.set(a, scope); return a; };
   const finish = (s) => {
     const id = `vid${g.videos.size + 1}`;
     const v = {
@@ -113,11 +116,11 @@ function standIn(gport) {
     const p = u.pathname; const q = u.searchParams;
     try {
       if (p === '/auth') {
-        g.authAsked = Object.fromEntries(q);
+        g.authAsked = Object.fromEntries(q); g.auths++;
         const ok = q.get('client_id') === 'cid' && /^http:\/\/127\.0\.0\.1:\d+\/$/.test(q.get('redirect_uri') ?? '') && q.get('code_challenge_method') === 'S256' && q.get('access_type') === 'offline' && (q.get('scope') ?? '').includes('youtube');
         if (!ok) return json(res, 400, { error: 'invalid_request' });
         const code = `code-${randomBytes(6).toString('hex')}`;
-        g.codes.set(code, { challenge: q.get('code_challenge'), redirect: q.get('redirect_uri') });
+        g.codes.set(code, { challenge: q.get('code_challenge'), redirect: q.get('redirect_uri'), scope: q.get('scope') });
         res.writeHead(302, { location: `${q.get('redirect_uri')}?code=${code}&state=${encodeURIComponent(q.get('state'))}&scope=youtube` }).end();
         return;
       }
@@ -131,12 +134,15 @@ function standIn(gport) {
           if (createHash('sha256').update(verifier).digest('base64url') !== c.challenge) return json(res, 400, { error: 'invalid_grant', error_description: 'code_verifier' });
           g.codes.delete(f.get('code')); g.pkceOk = true;
           const rt = `rt-${randomBytes(8).toString('hex')}`; g.refresh.add(rt); g.secrets.add(rt);
-          return json(res, 200, { access_token: issue(), expires_in: 3599, refresh_token: rt, scope: 'https://www.googleapis.com/auth/youtube', token_type: 'Bearer' });
+          // What was asked less what the person unticked, as Google's granular consent answers.
+          const scope = c.scope.split(' ').filter((x) => !g.untick.has(x)).join(' ');
+          g.rtScope.set(rt, scope);
+          return json(res, 200, { access_token: issue(scope), expires_in: 3599, refresh_token: rt, scope, token_type: 'Bearer' });
         }
         if (f.get('grant_type') === 'refresh_token') {
           if (!g.refresh.has(f.get('refresh_token'))) return json(res, 400, { error: 'invalid_grant' });
           g.refreshes++;
-          return json(res, 200, { access_token: issue(), expires_in: 3599, token_type: 'Bearer' });
+          return json(res, 200, { access_token: issue(g.rtScope.get(f.get('refresh_token'))), expires_in: 3599, token_type: 'Bearer' });
         }
         return json(res, 400, { error: 'unsupported_grant_type' });
       }
@@ -175,6 +181,7 @@ function standIn(gport) {
       }
       if (!authed(req)) { g.rejected401++; await body(req); return err(res, 401, 'authError', 'Invalid Credentials'); }
       if (await captionRoutes(g, req, res, p, q, { json, err, body })) return;
+      if (analyticsRoutes(g, req, res, p, q, { json, err })) return;
       if (p === '/upload/youtube/v3/videos' && req.method === 'POST' && q.get('uploadType') === 'resumable') {
         g.startCalls++;
         if (g.onStartEnter) g.onStartEnter();
@@ -228,6 +235,8 @@ function standIn(gport) {
       }
       if (p === '/youtube/v3/videos' && req.method === 'GET') {
         const ids = (q.get('id') ?? '').split(',');
+        // YouTube takes at most 50 ids a call (44i-2d's review: the channel report's titles must be asked in fifties).
+        if (ids.length > 50) return err(res, 400, 'badRequest', 'At most 50 ids.');
         // Only the parts named come back, as YouTube's do (44i-2b: a read without localizations has none to keep).
         const named = (q.get('part') ?? '').split(',');
         const only = (v) => Object.fromEntries(Object.entries(resource(v)).filter(([k]) => k === 'id' || named.includes(k)));
@@ -353,7 +362,7 @@ async function scenario(server, gport) {
     const init = await a.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'check', version: '1' } });
     const list = await a.rpc('tools/list', {});
     const names = (list.result?.tools ?? []).map((t) => t.name);
-    line('protocol', `it speaks MCP: initialize with a guide, and its seventeen tools listed (${names.join(', ')})`, init.result?.serverInfo?.name === 'youtube' && /PRIVATE/.test(init.result?.instructions ?? '') && names.length === 17 && names.includes('queue_folder') && names.includes('add_captions') && names.includes('list_captions'));
+    line('protocol', `it speaks MCP: initialize with a guide, and its eighteen tools listed (${names.join(', ')})`, init.result?.serverInfo?.name === 'youtube' && /PRIVATE/.test(init.result?.instructions ?? '') && names.length === 18 && names.includes('analytics') && names.includes('queue_folder') && names.includes('add_captions') && names.includes('list_captions'));
     const before = g.refreshes;
     const ch = await a.tool('channel');
     line('refresh', 'an access key Google refuses is refreshed once and the call goes through', !ch.error && ch.v.title === 'Stand-in Channel' && g.refreshes === before + 1 && g.rejected401 >= 1, ch.text.slice(0, 160));
@@ -774,6 +783,9 @@ async function scenario(server, gport) {
     // (n) Shorts and folders (44i-2c): real MP4 and WebM headers, read by the server's own probe (scripts/youtubeShorts.mjs)
     await shortsScenario({ server, start, env, conf, dir, g, line, logs });
 
+    // (o) analytics (44i-2d): the opt-in scope, the four reports, Pacific dates (scripts/youtubeAnalytics.mjs)
+    await analyticsScenario({ server, start, env, conf, dir, g, line, logs });
+
     // (i) nothing secret in any reply, the log, the manifest, uploads.json or the plist
     const manifestRaw = readText(join(conf, 'manifest.json'));
     const uploadsRaw = readText(join(conf, 'uploads.json'));
@@ -912,6 +924,7 @@ const MUTANTS = [
   { rule: 'folderHidden', in: 'youtube/folder.js', find: 'if (/[\\/\\\\]\\.[^\\/\\\\]/.test(under)) throw', replace: 'if (false) throw' },
   { rule: 'folderMax', in: 'youtube/folder.js', find: 'if (films.length > FOLDER_MAX) throw', replace: 'if (false) throw' },
   { rule: 'releasePlan', in: 'youtube/release.js', find: 'const slotMs = every % 24 === 0\n      ? zoneWall(y, mo, d + i * (every / 24), h, min, 0)\n      : slot0Ms + i * every * 3600_000;', replace: 'const slotMs = slot0Ms + i * every * 3600_000;' },
+  ...ANALYTICS_MUTANTS,
 ];
 
 function mutant(m) {

@@ -70,10 +70,16 @@ Mac app, and not named on any page a visitor or customer reads.
   videos via `publishAt` — 50 quota units each — and queued jobs at a clock time in the settings time zone,
   with `dry_run` and DST-safe slot spacing; only run when the owner asked for that
   release), `set_thumbnail`, `list_playlists`, `create_playlist`, `add_to_playlist`,
-  `manifest` (reads `~/.chromaglass/youtube/manifest.json` and optionally syncs all
+  `analytics` (44i-2d, after `login --add analytics`, which asks for the read-only
+  `yt-analytics.readonly` scope on top of the saved sign-in's, a later `login` keeping it: for
+  one video, by `video_id` or manifest `key`, its totals, retention at each tenth of the film as
+  clock times with the steepest drop, traffic sources and search terms; with none, the channel's
+  totals, its videos by watch time named by manifest key, and its traffic sources; dates in
+  Pacific time, YouTube's, the last 28 days unless `days` or `start`/`end`; the Analytics API's own
+  quota, 1 Data API unit for a named video), `manifest` (reads `~/.chromaglass/youtube/manifest.json` and optionally syncs all
   upload pages including `views` and `likes` from `videos.list` `statistics`, keeping
   local fields), `mark_video` (sets local manifest fields on one video or a list of
-  `video_ids`). No delete. Command-line modes: `login`, `whoami`, `logout`, `drain`
+  `video_ids`). No delete. Command-line modes: `login` (`--add analytics` for the analytics scope), `whoami`, `logout`, `drain`
   (uploads queued jobs whose `notBefore` has passed, one at a time, using
   `busyElsewhere` so two drains never push the same job, and shows a notification
   (osascript, notify-send or a PowerShell balloon) after each finished or failed job unless
@@ -130,7 +136,10 @@ Mac app, and not named on any page a visitor or customer reads.
   `MANIFEST_STATUS`, `readManifestStrict`, `readManifest`, `writeManifest`,
   `recordPlaylistInManifest`, `jobPlaylists`, `recordUploadedManifest`, `syncManifest`,
   `formatManifestTable`, `markVideo`) and `release.js` (`bindRelease`, `parseReleasePlanArgs`,
-  `releasePlan`). Those two are not pure: the server hands each its file, clock, queue and
+  `releasePlan`), and 44i-2d's `analytics.js` (`OPT_IN`, `ANALYTICS_SCOPE`, `TOP_MAX`,
+  `TERMS_MAX`, `scopesFor`, `granted`, `ANALYTICS_OFF`, `analyticsFix`, `parseRange`, `rowsOf`,
+  `SOURCE_NAMES`, `retentionSummary`, `videoReport`, `channelReport`: the reports asked for and
+  read, given the server's `ask` and `lookup`). `manifest.js` and `release.js` are not pure: the server hands each its file, clock, queue and
   Google calls once at start (`bindManifest`, `bindRelease`), so their lines stay the
   server's own. They import only Node's modules and each other.
 - `youtube-mcp.js` imports nothing from the repo but `youtube/` (the two move to a
