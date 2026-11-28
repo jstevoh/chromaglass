@@ -202,13 +202,19 @@ its frame rate live. "Free" means no new passes or texture reads.
     pressure that takes it out reaches the middle for two steps (`npm run thingap`
     prints that first step). The rim should sit a cell or two inside the square, or the
     cells outside it count as open too.
-  - **18a-8c, the grid filter's kernels still compile at every opening.** No opening
-    runs `dampGridCurv`, `dampGridLimit` or `dampGrid` since 18a-8b (every look opens on
-    a thin gap), but they are still waited for (`true` in `WebGPUFluid.prepare`). Built
-    behind the show instead, `run` skips a kernel that is not ready one at a time, so
-    the stage could run `dampGrid` on a stale `scratchA` while `dampGridCurv` is still
-    compiling. Gate the stage on all three being ready, then mark them `false`, and read
-    `npm run startup` for the opening's time.
+  - **18a-8c, the grid filter's kernels still compile at every opening: shipped 2026-11-27.**
+    No opening had run `dampGridCurv`, `dampGridLimit` or `dampGrid` since 18a-8b (every
+    look opens on a thin gap), yet every opening waited for them. They are now built with
+    the old plate's own pipelines (`FluidFields.gridBuilds`, in `oldPlateBuilds`): waited for
+    by a look that opens with Thin Gap off, otherwise built off the frame when Thin Gap is
+    first turned off (`prepareOldPlate`, the plate staying thin until they are in). The stage
+    (`FluidFields.dampGrids`) asks for all three before running any, so a kernel that failed
+    to build cannot leave `dampGrid` adding a stale `scratchA` and the swap handing the plate
+    that. Measured with the opening's own list (`WebGPUFluid.prepare` for `openingOf`): a thin
+    opening waits for 46 fluid pipelines on main, 43 now; an old-plate opening 39, unchanged.
+    Found on the way: `run` does not skip a kernel that is still compiling, as the 18a-8b
+    note had it; `computePipeline` builds a missing one synchronously on the frame, and only
+    a failed build returns null. The stale-scratch risk was the failed build's.
   - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
     against it; measure whether any look shows it, and drop it for the time if not.
