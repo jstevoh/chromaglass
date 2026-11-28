@@ -558,6 +558,22 @@
       ]
     },
     {
+      "name": "The watch tool's places come from its config",
+      "shard": "logic",
+      "run": "npm run watchconfig",
+      "why": [
+        "The watch tool is being packaged for anyone (PLAN 47p). Its modules named",
+        "this project's shared folder, a folder on the owner's Mac, Homebrew's bin",
+        "folder and the app's settings map in their code; 47p-1 moved them into",
+        "scripts/reelreader.config.json (scripts/watchconfig.mjs). This holds that no",
+        "watch module names one again (the scan shown to catch the old lines), that",
+        "an empty config gives the general places and no settings map, that this",
+        "repo's config gives the project's, and that a missing config or a map that",
+        "will not load is an error. Node only, under a second; the end-to-end line",
+        "(no map, no Settings to try) is (h2) in npm run watchcard."
+      ]
+    },
+    {
       "name": "Watching in words",
       "shard": "sound",
       "run": "npm run watchwords",

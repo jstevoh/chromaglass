@@ -131,3 +131,12 @@ blur.
   maps every comparable measure to `DEFAULT_SETTINGS` keys (`src/types.ts`) with real physics
   before post grades, and `gapSettings(gaps)` writes `## Settings to try` under `--vs` (with
   current values when `--settings` or a take's settings block is given).
+
+## 47p. Packaging the link watcher for anyone (the owner's pick, 2026-11-28) (M)
+
+- ~~**47p-1** unhook it from this repository~~ (shipped, this PR): the shared folder, the owner's
+  Mac folders, Homebrew's bin folder and the settings map moved out of the code into
+  `scripts/reelreader.config.json` (`scripts/watchconfig.mjs`); "Settings to try" only when a map is
+  configured; `docs/watch.md` with the limits (YouTube only from a home connection, Vimeo
+  can't be fetched, only videos you have the right to). `npm run watchconfig` 16/16 (before:
+  10 lines in watch.mjs and watchrefs.mjs named a project place); (h2) in `npm run watchcard`.
