@@ -280,7 +280,7 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
             <option value="384">GPU · 384²</option>
             <option value="512">GPU · 512²</option>
             <option value="768">GPU · 768² (heavy)</option>
-            {/* 1024² has 4× the cells of 512² (~56 ms/step vs ~13 ms on an Apple Silicon Mac, ~14 fps live)
+            {/* 1024² has 4× the cells of 512² (~51 ms/step vs ~13 ms on an Apple Silicon Mac, ~14–15 fps live)
                 and cannot be held near 30 fps on mobile GPUs, so the phone omits it (QA-33b-6). */}
             {!isPhone && (
               <option value="1024" disabled={isTierGatingEnforced() && !isProLicenseUnlocked()}>GPU · 1024² (Pro · 4× cells, slow live)</option>
@@ -288,7 +288,7 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
           </select>
           {!isPhone && rawSim === 1024 && (
             <p className="text-[12px] leading-snug text-amber-300/90" data-testid="sim-1024-cost">
-              1024² solves 4× as many cells as 512² (~56 ms/step vs ~13 ms on an Apple Silicon Mac, ~14 fps live). Use Auto or 512² for 60 fps live shows; keep 1024² for offline song renders.
+              1024² solves 4× as many cells as 512² (~51 ms/step vs ~13 ms on an Apple Silicon Mac, ~14–15 fps live). Use Auto or 512² for 60 fps live shows; keep 1024² for offline song renders.
             </p>
           )}
           <Info>
@@ -297,7 +297,7 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
             {engineStatus?.governed && engineStatus.steppedDown ? ' — it has stepped down on this machine.' : '.'}
             {isPhone
               ? ' 1024² is omitted on phones because mobile GPUs cannot hold it live.'
-              : ' 1024² solves 4× as many cells as 512² (~56 ms/step vs ~13 ms on an Apple Silicon Mac, ~14 fps live) — meant for offline song renders or still setups rather than a 60 fps live show.'}
+              : ' 1024² solves 4× as many cells as 512² (~51 ms/step vs ~13 ms on an Apple Silicon Mac, ~14–15 fps live) — meant for offline song renders or still setups rather than a 60 fps live show.'}
             {engineStatus && ` Running ${engineStatus.tier === 'hosted' ? 'from the web' : engineStatus.tier === 'native' ? 'natively' : 'locally'}; ${engineStatus.gpu === 'software' ? 'software GL' : `${engineStatus.gpu} GPU`}.`}
           </Info>
           {!isPhone && ((engineStatus?.governed && engineStatus.steppedDown) || engineStatus?.gpuUnavailable) && !isProLicenseUnlocked() && (
