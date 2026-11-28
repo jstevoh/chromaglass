@@ -179,10 +179,23 @@ its frame rate live. "Free" means no new passes or texture reads.
     `fingerCarry`, `pressDye`, `pressMix`, `blowDye`, `blowOil`, `blowCarry`) still run
     on top of the flow, so with Thin Gap on the colour is moved twice. Retire them one
     at a time against `finger`, `wind`, `pressoil`, `ferrohands`, `tools`.
-  - **18a-4, the current into the field.** The lasting current (`cur`) is fed into the
-    thin solve as a force, but it still has its own solver on the M grid; its forces
-    (rock, buoyancy, centre gravity) belong in the main field, and then the
-    current's solver and its 0.4 ms go.
+  - **18a-4, the current into the field (shipped).** A thin gap takes the current's
+    drive (Buoyancy's heat lift, Center Gravity's pull, the boil's lift; the rock was
+    already hsBody's) at its own cells in `forcesB` (`currentDrive`, `boilLift` in
+    wgsl/fluid/forces.ts), as the speed it drives at the rest gap, capped as before,
+    and runs none of the current's four kernels (13 dispatches a step). It settles on
+    what the current settled on, without the current's Damping lag (a lag of seconds
+    on top of the drag's milliseconds) and without the M grid's 2×2 facets.
+    `npm run thincurrent`. The old plate keeps its current as it was.
+    - **18a-4b, open.** The `cur` textures and the four kernels now serve the old plate
+      only: they could build with `oldPlateBuilds` (as 18a-8c did for dampGrid), and the
+      M-grid textures be made only when the old plate runs. A plate that falls back from
+      thin to old picks up the current where it stood when the thin gap took over.
+    - **18f-visc, open (found 2026-11-28, Mac GPU).** `npm run heat` line 6 is red on main
+      (da4dde79) and here alike: "thin-gap mobility rises with heat" reads 1.888 against a
+      bar of 1.4–1.8 (cold 0.00829, warm 0.01566). Real water's μ(20 °C)/μ(50 °C) is
+      1.0016/0.5465 = 1.83, so the bar's "~2%/K" may be the thing that is off, or the
+      warm plate's speed carries more than the viscosity. Measure which before moving it.
   - **18a-5, the press over its own time.** `squish` can lay a press's dent in one
     step, so the displaced volume leaves in one step, faster than the dye's face
     fluxes may carry it (0.45 of a cell a step). The app's Press lays its dent a step
