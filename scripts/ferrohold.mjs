@@ -190,8 +190,11 @@
  * 43.8 off, a gap of 7.9 against a differential of 13; the body 84.0 on
  * and 63.5 off, a gap of 20.5. So the pass's differential reads what the
  * pass keeps, the body, as line 3's absolute bar already does, and keeps
- * its 13 (a full cell's worth is a cell's), under the 20.5 measured and
- * above half of it. CORE_BAR stays an absolute bar on the run as given.
+ * its 13 (a full cell's worth is a cell's), above half of the gap. On the
+ * Mac at b9595e82 (main with physics batch 1 in): body 74.9 on and 56.7
+ * off (gap 18.2), 46.7 cells over three quarters on (CORE_BAR 33), lead
+ * 1.77R; the quick drag's momentum differential 0.43R. CORE_BAR stays an
+ * absolute bar on the run as given.
  *
  * Lab only (software WebGPU in headless Chrome, or Metal on the Mac).
  */
